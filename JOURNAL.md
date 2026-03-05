@@ -50,3 +50,29 @@ Both reference projects (wallops and subtext) are by joshua stein (jcs@jcs.org),
 ### Current State
 
 Phase 0 is complete. The skeleton app builds successfully with Retro68. Next step: boot it in Basilisk II to verify it actually runs on the emulated Mac.
+
+---
+
+## 2026-03-05 — Switching to Snow Emulator and Installing System 6.0.8
+
+### Why Snow Instead of Basilisk II
+
+Basilisk II hit a dead end: all its 512KB ROMs force 32-bit addressing, which System 6.0.8 doesn't support, and every method of programmatically clicking the resulting dialog failed. Switched to [Snow](https://snowemu.com/) (v1.3.1), a Rust-based emulator with low-level hardware emulation, Mac Plus support, and DaynaPORT SCSI/Link Ethernet for MacTCP networking.
+
+### GUI Automation: Teaching Claude to Use a Mac
+
+Developed a method for Claude to operate the Snow emulator entirely through X11 automation — taking screenshots to see the screen, then using `xdotool` to click and type. This required switching from KDE to WindowMaker (KDE lacks `_NET_ACTIVE_WINDOW`), discovering that `xdotool click` doesn't work with Snow's egui (must use explicit `mousedown`/`mouseup` pairs), and learning the different interaction patterns for Mac menus (press-hold-drag) vs Snow's host menus (regular click).
+
+A comprehensive automation guide was written at `docs/SNOW-GUI-AUTOMATION.md`.
+
+### Automated System 6.0.8 Installation
+
+Using the GUI automation techniques, Claude performed the entire System 6.0.8 installation unattended — launching the Installer from a floppy, clicking through the UI, and swapping four floppy disk images via Snow's Drives menu as the Installer requested them. The result is a bootable 90MB SCSI hard drive image at `diskimages/snow-sys608.img`.
+
+Creating the SCSI drive image itself required trial and error — three failed approaches before finding a pre-formatted blank HFS image with the proper Apple partition map and SCSI driver. See `docs/DEVLOG.md` for the full technical details and `docs/screenshots/` for step-by-step screenshots.
+
+### What's Next
+
+- Boot from HDD without floppy to verify standalone boot
+- Install MacTCP 2.1 and configure DaynaPORT networking
+- Transfer and test the TelnetM68K skeleton app in the emulator

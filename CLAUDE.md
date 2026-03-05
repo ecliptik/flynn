@@ -19,16 +19,44 @@ A Telnet client application for classic Macintosh (68000/Macintosh Plus) written
 ## Build System
 
 - Cross-compile on Linux using [Retro68](https://github.com/autc04/Retro68) toolchain
-- Retro68 provides m68k-apple-macos-gcc and CMake support for classic Mac targets
-- The toolchain is not yet installed; it needs to be set up before building
-- Install for me or help me install and setup as needed
+- Toolchain installed at `/opt/Retro68-build/toolchain/` (m68k-apple-macos-gcc 12.2.0)
+- CMake flag: `-m68000` for Mac Plus compatibility
+- MacTCP.h is NOT in Retro68's Multiversal Interfaces — copied from wallops-146
+- Retro68 API quirks vs classic Toolbox: `qd.thePort` not `thePort`, `GetMenuHandle` not `GetMHandle`, `AppendResMenu` not `AddResMenu`, `LMGetApplLimit()` not `GetApplLimit`
 
 ## Testing
 
-- A Mac 6.0.8 disk image with MacTCP 2.1 and Ethertalk is at `./diskimages/mac608.hda`
-- Use Basilisk II emulator with `unix://` shared filesystem for testing
-- Test telnet target: `<telnet-host>` (user: `<username>`, password: `<password>`) — see local memory for real values
-- GUI testing can use the X/Wayland session on the dev system
+### Emulator: Snow (Primary)
+
+[Snow](https://snowemu.com/) v1.3.1, a Rust-based classic Mac emulator with low-level hardware emulation.
+
+- **Binary**: `tools/snow/snowemu` (local copy, gitignored)
+- **Workspace**: `diskimages/telnet-m68k.snoww` (Mac Plus, 1.5x scale)
+- **HDD image**: `diskimages/snow-sys608.img` (90MB SCSI, System 6.0.8 installed)
+- **ROM**: `roms/68k/128k/Macintosh Plus/1986-03 - 4D1F8172 - MacPlus v3.ROM`
+- **Floppies**: `tools/floppies/*.img` (System 6.0.8 set, 800K each)
+- **Keyboard**: Right ALT = Command key (`map_cmd_ralt: true`)
+- **Networking**: DaynaPORT SCSI/Link Ethernet emulation, NAT mode (10.0.0.0/8)
+- **File sharing**: BlueSCSI Toolbox protocol (`Tools > File Sharing`)
+- **Launch**: `DISPLAY=:0 tools/snow/snowemu diskimages/telnet-m68k.snoww &`
+
+### GUI Automation
+
+Snow can be fully automated via X11 for unattended testing. See `docs/SNOW-GUI-AUTOMATION.md` for the complete guide.
+
+- **Window manager**: WindowMaker (`wmaker`) — KDE lacks `_NET_ACTIVE_WINDOW` support
+- **Click method**: `xdotool mousedown 1 && sleep 0.05 && xdotool mouseup 1` (NOT `xdotool click`)
+- **Screenshots**: `DISPLAY=:0 import -window root screenshot.png`
+- **Coordinates**: Screenshot pixel coords = X11 screen coords (1:1 at 1280x800)
+
+### Basilisk II (Deprecated)
+
+Basilisk II was tested extensively but has critical incompatibilities with System 6.0.8. All 512KB ROMs force 32-bit addressing, which System 6 doesn't support, and synthetic mouse events don't register in its X11 event loop. See `docs/TESTING.md` for details.
+
+### Test Target
+
+- Host: `<telnet-host>` (user: `<username>`, password: `<password>`) — see local memory for real values
+- Service: telnetd (standard Linux)
 
 ## Repository Conventions
 

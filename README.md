@@ -22,7 +22,7 @@ make
 
 ## Testing
 
-Uses Basilisk II emulator with a System 6.0.8 disk image and MacTCP 2.1.
+Uses [Snow](https://snowemu.com/) emulator (v1.3.1) with a Mac Plus ROM and System 6.0.8 SCSI hard drive image. Snow supports DaynaPORT SCSI/Link Ethernet emulation for MacTCP networking. The emulator can be fully automated via X11 for unattended testing. See `docs/TESTING.md` for details.
 
 ## Acknowledgments
 

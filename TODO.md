@@ -3,9 +3,14 @@
 ## Phase 0: Environment Setup
 - [x] Create project scaffolding and CMakeLists.txt
 - [x] Install Retro68 toolchain (m68k-apple-macos-gcc 12.2.0)
-- [x] Set up Basilisk II emulator (built from source, SLiRP networking)
+- [x] Set up Snow emulator (v1.3.1, Mac Plus, DaynaPORT networking)
+- [x] Create SCSI hard drive image with System 6.0.8 installed
+- [x] Develop X11 GUI automation for Snow (xdotool + WindowMaker)
 - [x] First successful build of skeleton app
-- [ ] Verify app boots in Basilisk II emulator
+- [ ] Boot from HDD without floppy (verify standalone boot)
+- [ ] Verify skeleton app runs in Snow emulator
+- [ ] Install MacTCP 2.1 on HDD
+- [ ] Configure DaynaPORT SCSI/Link Ethernet (SCSI ID 3, NAT mode)
 
 ## Phase 1: Minimal Mac Application
 - [ ] Verify app skeleton runs in emulator (window, menus, quit)
