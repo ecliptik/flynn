@@ -11,3 +11,8 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 Makefile
+
+# Tools - binary artifacts (kept locally, not committed)
+tools/snow/
+tools/floppies/
+tools/blank_100MB_HFS.dsk
