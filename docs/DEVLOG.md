@@ -1,5 +1,25 @@
 # Development Log
 
+## 2026-03-05: Telnet Protocol Engine and VT100 Terminal
+
+### Retro68 Toolchain Rebuild
+
+Rebuilt Retro68 from source in-repo (`Retro68-build/`) with `--no-ppc --no-carbon` for 68K-only. GCC 12.2.0 with newer Multiverse.h headers required extensive compatibility fixes to the wallops-146 code (MacTCP.h enum guards, API renames, missing headers). See `memory/retro68-compat.md` for full details.
+
+### Telnet Protocol Engine (telnet.c/telnet.h)
+
+Client-side IAC negotiation engine adapted from subtext-596's server-side implementation. 9-state parser handles: ECHO, SGA, BINARY, TTYPE ("VT100"), NAWS (80x24), TSPEED ("19200,19200"). Transport-independent — processes byte arrays, no MacTCP coupling.
+
+### VT100 Terminal Emulator (terminal.c/terminal.h)
+
+Full escape sequence parser with 5-state CSI machine. 80x24 screen buffer (2 bytes/cell) + 96-line scrollback ring buffer. Supports cursor movement, screen/line clear, insert/delete, scroll regions, text attributes. ~19KB total struct size.
+
+### Integration
+
+Data pipeline wired in main.c: `conn_idle() → telnet_process() → terminal_process() → InvalRect`. IAC responses sent back immediately. Basic Monaco 9pt text rendering for display. Build size: 61KB.
+
+---
+
 ## 2026-03-05: System 6.0.8 Installation via GUI Automation
 
 ### SCSI Hard Drive Setup

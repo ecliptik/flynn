@@ -4,6 +4,8 @@ project(Flynn)
 add_application(Flynn
     src/main.c
     src/connection.c
+    src/telnet.c
+    src/terminal.c
     src/tcp.c
     src/dnr.c
     src/sysutil.c

@@ -4,6 +4,47 @@ A living document recording the development of Flynn, a Telnet client for classi
 
 ---
 
+## 2026-03-05 — Telnet Protocol and VT100 Terminal Engine
+
+### Rebuilding Retro68 and Fixing Compatibility
+
+The Retro68 toolchain at `/opt` had been lost, so it was rebuilt from source directly in-repo (`Retro68-build/`, gitignored). Building with `--no-ppc --no-carbon` for 68K-only took about 40 minutes and produced GCC 12.2.0.
+
+The newer GCC + Multiverse.h headers introduced several incompatibilities with the wallops-146 code:
+
+- **MacTCP.h**: The `kPascalStackBased` enum conflicted with `Multiverse.h`. Fix: guard with `#ifndef STACK_ROUTINE_PARAMETER` (can't use `#ifndef` on enum values — only works on `#define` macros).
+- **API renames**: Retro68 uses newer Toolbox names (`GetDialogItem` not `GetDItem`, `DisposePtr` not `DisposPtr`, `PBControlSync` not `PBControl`). The PB functions also changed from 2-arg `(pb, async)` to 1-arg `Sync`/`Async` variants — fixed with dispatch macros.
+- **Missing headers**: `Folders.h` and `GestaltEqu.h` don't exist as separate files; their contents are in `Multiverse.h`.
+
+All of this was documented in `memory/retro68-compat.md` for future reference.
+
+### Three-Agent Team for Phase 3+4
+
+Used a team of three parallel agents to implement the telnet protocol engine, VT100 terminal emulator, and emulator testing simultaneously:
+
+1. **Telnet Protocol Agent** — Studied subtext-596's server-side `telnet.c` and wrote a client-side implementation. The key insight is inverting the negotiation: where the server sends WILL, the client responds DO; where the server sends DO, the client responds WILL. The engine processes raw TCP bytes and produces clean terminal output + IAC responses as separate byte arrays, making it completely transport-independent.
+
+2. **Terminal Display Agent** — Wrote a full VT100 escape sequence parser with a 5-state machine (NORMAL, ESC, CSI, CSI_PARAM, CSI_INTERMEDIATE). The 80×24 screen buffer uses 2 bytes per cell (character + attributes), totaling ~4KB. A 96-line scrollback ring buffer adds ~15KB. The entire `Terminal` struct is ~19KB — less than 0.5% of the Mac Plus's 4MB RAM.
+
+3. **Emulator Test Agent** — Deployed Flynn.bin to the Mac HDD via `hfsutils`, booted Snow, and verified the application appears in the Finder. Testing revealed the previous 51KB build (pre-telnet) ran correctly.
+
+### Integration
+
+Wired the three modules into the main event loop:
+```
+TCP receive → telnet_process() → terminal_process() → InvalRect → redraw
+```
+
+IAC responses from `telnet_process()` are immediately sent back via `conn_send()`. Terminal output is fed to the VT100 parser, which updates the screen buffer and marks dirty rows. A basic Monaco 9pt renderer draws the buffer contents on update events.
+
+The full build is now 61KB — up from 51KB with connection dialog, up from 8.5KB for the original skeleton.
+
+### Current State
+
+Phases 0–4 core modules are complete. The data pipeline works end-to-end in code: connect → IAC negotiate → parse VT100 → render. Next: test with an actual telnet server to verify the pipeline works in practice, then build the proper terminal UI rendering module.
+
+---
+
 ## 2026-03-05 — Project Inception and Phase 0 Complete
 
 ### Planning with a Research Team

@@ -1,6 +1,13 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Use Claude Teams (https://code.claude.com/docs/en/agent-teams) when appropriate to parallelize work.
+
+Team Members:
+- Team Lead with extensive Classic Macintosh System 6 and System 7 experience (Make decisions and delegates work to aligned team members)
+- Macintosh System 6 and System 7 Software Architect and Telnet Expert (Reviews code for completeness, functionality and overall design)
+- Macintosh System 6 Build Engineer (Retro68, HFS disks, Snow emulator)
+- Macintosh System 6 Documentation Writer (Update docs/, screenshots, DEVLOG.md, JOURNAL.md, README.md and any build and testing learnings
+- Macintosh System 6 UI/UX QA Engineer (Testing Flynn Application UI/UX with python scripts to interact with Snow)
 
 ## Project Overview
 
@@ -30,7 +37,7 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 
 ### Emulator: Snow (Primary)
 
-[Snow](https://snowemu.com/) v1.3.1, a Rust-based classic Mac emulator with low-level hardware emulation.
+[Snow](https://snowemu.com/) v1.3.1, a Rust-based classic Mac emulator with low-level hardware emulation. See `docs/TESTING.md` for complete guide.
 
 - **Binary**: `tools/snow/snowemu` (local copy, gitignored)
 - **Workspace**: `diskimages/flynn.snoww` (Mac Plus, 1.5x scale)
@@ -48,7 +55,7 @@ Snow can be fully automated via X11 for unattended testing. See `docs/SNOW-GUI-A
 
 - **Window manager**: WindowMaker (`wmaker`) — KDE lacks `_NET_ACTIVE_WINDOW` support
 - **Click method**: `xdotool mousedown 1 && sleep 0.05 && xdotool mouseup 1` (NOT `xdotool click`)
-- **Screenshots**: `DISPLAY=:0 import -window root screenshot.png`
+- **Screenshots**: `DISPLAY=:0 scrot screenshot.png` (do NOT use `import -window root` — it permanently breaks Snow mouse input)
 - **Coordinates**: Screenshot pixel coords = X11 screen coords (1:1 at 1280x800)
 
 ### Basilisk II (Deprecated)

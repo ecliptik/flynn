@@ -248,9 +248,10 @@ class SnowAutomation:
         self.cmd_key('a')
 
     def screenshot(self, path):
-        """Take screenshot of the full X11 screen."""
+        """Take screenshot of the full X11 screen.
+        Uses scrot instead of import -window root, which breaks Snow mouse input."""
         import subprocess
-        subprocess.run(['import', '-window', 'root', path],
+        subprocess.run(['scrot', path],
                        env={'DISPLAY': self.d.get_display_name()})
 ```
 
@@ -332,6 +333,8 @@ The `.snoww` workspace file affects coordinate mapping:
 
 ## Troubleshooting
 
+**X11 display unresponsive**: If `DISPLAY=:0 xdpyinfo` hangs or `scrot` fails with "Can't open X display", the X server needs restarting. Run `sudo systemctl restart sddm`, then `DISPLAY=:0 xhost +local:` and disable the screensaver (`xset s off && xset -dpms && xset s noblank`). See `docs/TESTING.md` for full steps.
+
 **Clicks don't register**: Ensure jiggle() runs after move_to() and wait 300ms before clicking. Check that only one Snow instance is running.
 
 **Keyboard not working**: Click inside the framebuffer first to give Snow X11 focus. Verify `map_cmd_ralt: true` in workspace config.
@@ -339,3 +342,5 @@ The `.snoww` workspace file affects coordinate mapping:
 **Wrong coordinates**: Re-measure FB_LEFT and FB_TOP if the window size or viewport_scale changes. The values above are for a 1000x750 window at viewport_scale=1.5.
 
 **`ui_active` blocking input**: If a Snow dialog (file picker, about box) is open, all emulator input is blocked. Close the dialog first.
+
+**`import -window root` breaks mouse input**: Do NOT use ImageMagick `import` for screenshots — it grabs the X pointer, permanently breaking Snow mouse input. Use `scrot` instead (`DISPLAY=:0 scrot screenshot.png`).

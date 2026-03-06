@@ -213,10 +213,58 @@ DISPLAY=:0 xdotool mousedown 1 && sleep 0.05 && DISPLAY=:0 xdotool mouseup 1
 
 ## Screenshots
 
-Use ImageMagick `import` for screenshots:
+**Use `scrot` for screenshots** (not `import -window root`, which permanently breaks Snow mouse input by grabbing the X pointer):
 ```bash
-DISPLAY=:0 import -window root screenshot.png          # Full desktop
-DISPLAY=:0 import -window <window_id> screenshot.png   # Specific window
+DISPLAY=:0 scrot screenshot.png                        # Full desktop
+DISPLAY=:0 scrot -u screenshot.png                     # Focused window
 ```
 
 Find window IDs: `xwininfo -root -tree | grep -i <name>`
+
+## Deployment Workflow
+
+Build Flynn, deploy to the HDD image, and boot in Snow:
+
+```bash
+# 1. Build
+./build.sh
+
+# 2. Deploy to HDD image using hfsutils
+hmount diskimages/snow-sys608.img
+hcopy -m build/Flynn.bin :Flynn
+hattrib -t APPL -c FLYN :Flynn
+humount
+
+# 3. Boot Snow
+DISPLAY=:0 tools/snow/snowemu diskimages/flynn.snoww &
+```
+
+Requires `hfsutils` (built from [Distrotech/hfsutils](https://github.com/Distrotech/hfsutils)). The `-m` flag on `hcopy` preserves MacBinary resource/data fork encoding. The `hattrib` step sets the file type to `APPL` and creator to `FLYN` so System 6 recognizes it as a launchable application.
+
+## Troubleshooting
+
+### X11 Display Becomes Unresponsive
+
+X11 (DISPLAY=:0) can become unresponsive, causing `xdpyinfo` to hang and `scrot` to fail with "Can't open X display". This is a known failure mode on the dev system.
+
+**Symptoms:**
+- `DISPLAY=:0 xdpyinfo` hangs indefinitely
+- `DISPLAY=:0 scrot screenshot.png` fails with "Can't open X display"
+- Snow cannot be launched
+
+**Fix:**
+```bash
+# Restart the display manager (restarts the X server)
+sudo systemctl restart sddm
+
+# After restart, allow local X connections
+DISPLAY=:0 xhost +local:
+
+# Disable screensaver/DPMS
+DISPLAY=:0 xset s off
+DISPLAY=:0 xset -dpms
+DISPLAY=:0 xset s noblank
+
+# Snow can now be launched normally
+DISPLAY=:0 tools/snow/snowemu diskimages/flynn.snoww &
+```

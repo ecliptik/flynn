@@ -20,12 +20,16 @@
 
 #include "main.h"
 #include "connection.h"
+#include "telnet.h"
+#include "terminal.h"
 
 /* Globals */
 static MenuHandle apple_menu, file_menu, edit_menu;
 static WindowPtr term_window;
 static Boolean running = true;
 static Connection conn;
+static TelnetState telnet;
+static Terminal terminal;
 
 /* Forward declarations */
 static void init_toolbox(void);
@@ -50,6 +54,8 @@ main(void)
 
 	memset(&conn, 0, sizeof(conn));
 	conn_init();
+	telnet_init(&telnet);
+	terminal_init(&terminal);
 
 	main_event_loop();
 	return 0;
@@ -120,7 +126,25 @@ main_event_loop(void)
 		case nullEvent:
 			conn_idle(&conn);
 			if (conn.read_len > 0) {
-				/* TODO: pass data to telnet/terminal parser */
+				unsigned char out_buf[TCP_READ_BUFSIZ];
+				unsigned char send_buf[256];
+				short out_len = 0, send_len = 0;
+
+				telnet_process(&telnet,
+				    (unsigned char *)conn.read_buf,
+				    conn.read_len, out_buf, &out_len,
+				    send_buf, &send_len);
+
+				if (send_len > 0)
+					conn_send(&conn, (char *)send_buf,
+					    send_len);
+
+				if (out_len > 0) {
+					terminal_process(&terminal, out_buf,
+					    out_len);
+					InvalRect(&term_window->portRect);
+				}
+
 				conn.read_len = 0;
 			}
 			break;
@@ -182,8 +206,10 @@ handle_mouse_down(EventRecord *event)
 		DragWindow(win, event->where, &qd.screenBits.bounds);
 		break;
 	case inGoAway:
-		if (TrackGoAway(win, event->where))
+		if (TrackGoAway(win, event->where)) {
+			do_disconnect();
 			running = false;
+		}
 		break;
 	case inContent:
 		if (win != FrontWindow())
@@ -204,7 +230,6 @@ handle_update(EventRecord *event)
 	SetPort(win);
 	BeginUpdate(win);
 
-	/* Draw status and received data */
 	EraseRect(&win->portRect);
 
 	if (conn.state == CONN_STATE_CONNECTED) {
@@ -217,6 +242,28 @@ handle_update(EventRecord *event)
 		for (i = 0; i < pstatus[0]; i++)
 			pstatus[i + 1] = status[i];
 		SetWTitle(term_window, pstatus);
+
+		/* Render terminal contents */
+		{
+			short row, col;
+			TermCell *cell;
+
+			TextFont(4);	/* Monaco */
+			TextSize(9);
+
+			for (row = 0; row < TERM_ROWS; row++) {
+				for (col = 0; col < TERM_COLS; col++) {
+					cell = terminal_get_cell(&terminal,
+					    row, col);
+					if (cell->ch >= 0x20) {
+						MoveTo(col * 6, (row + 1) * 12);
+						DrawChar(cell->ch);
+					}
+				}
+			}
+
+			terminal_clear_dirty(&terminal);
+		}
 	} else {
 		SetWTitle(term_window, "\pFlynn");
 	}
@@ -263,6 +310,7 @@ handle_menu(long menu_id)
 			do_disconnect();
 			break;
 		case FILE_MENU_QUIT_ID:
+			do_disconnect();
 			running = false;
 			break;
 		}
@@ -290,7 +338,10 @@ do_about(void)
 static void
 do_connect(void)
 {
-	conn_open_dialog(&conn);
+	if (conn_open_dialog(&conn)) {
+		telnet_init(&telnet);
+		terminal_reset(&terminal);
+	}
 }
 
 static void

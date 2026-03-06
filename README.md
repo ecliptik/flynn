@@ -10,6 +10,10 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 - Designed for interactive terminal use (vi, nano, shell sessions)
 - Targets Motorola 68000 CPU (Mac Plus compatible)
 
+## Current Status
+
+Phases 0-4 (core) are complete: the application builds at 61KB, includes a connection dialog, client-side Telnet IAC negotiation, and a VT100 escape sequence parser with 80x24 screen buffer and 96-line scrollback. The full data pipeline (TCP receive, telnet processing, terminal parsing, screen rendering) is wired end-to-end. Basic Monaco 9pt text rendering displays terminal contents. Next steps are live testing against a telnet server and building the dedicated terminal UI rendering module.
+
 ## Building
 
 Requires the [Retro68](https://github.com/autc04/Retro68) cross-compilation toolchain. Build it from source (68k only):

@@ -15,32 +15,39 @@
 - [x] Verify skeleton app runs in Snow emulator (window, menus, quit all work)
 
 ## Phase 1: Minimal Mac Application
-- [ ] Verify app skeleton runs in emulator (window, menus, quit)
-- [ ] Connection dialog (host, port input)
-- [ ] Status bar / connection indicator
+- [x] Verify app skeleton runs in emulator (window, menus, quit)
+- [x] Connection dialog (host, port input)
+- [x] Status bar / connection indicator
 
 ## Phase 2: MacTCP Networking
-- [ ] TCP connection management (connect, send, receive, close)
-- [ ] DNS resolution
-- [ ] Connection error handling
+- [x] TCP connection management (connect, send, receive, close)
+- [x] DNS resolution
+- [x] Connection error handling
+- [x] Retro68 GCC 12.2.0 compatibility fixes (MacTCP.h, API renames)
+- [x] In-repo toolchain build (Retro68-build/, gitignored)
 
 ## Phase 3: Telnet Protocol Engine
-- [ ] IAC command parser (client-side, adapted from subtext-596)
-- [ ] Option negotiation (BINARY, ECHO, SGA, TTYPE, NAWS, TSPEED)
-- [ ] IAC doubling for data transparency
-- [ ] Subnegotiation handling
+- [x] IAC command parser (client-side, adapted from subtext-596)
+- [x] Option negotiation (BINARY, ECHO, SGA, TTYPE, NAWS, TSPEED)
+- [x] IAC doubling for data transparency
+- [x] Subnegotiation handling (TTYPE IS VT100, NAWS 80x24, TSPEED 19200)
 
 ## Phase 4: VT100 Terminal Emulator
-- [ ] ANSI escape sequence parser
-- [ ] Character cell grid (80x24)
-- [ ] Cursor movement and positioning
-- [ ] Text attributes (bold, reverse, underline)
-- [ ] Scrolling and scroll region support
-- [ ] Scrollback buffer (4 pages)
+- [x] ANSI escape sequence parser (5-state CSI machine)
+- [x] Character cell grid (80x24)
+- [x] Cursor movement and positioning
+- [x] Text attributes (bold, reverse, underline)
+- [x] Scrolling and scroll region support
+- [x] Scrollback buffer (4 pages, 96 lines)
+- [x] Wired into main event loop (telnet→terminal→display pipeline)
+- [x] Basic inline text rendering (Monaco 9pt)
+- [ ] Test with actual telnet server
 
 ## Phase 5: Terminal UI
+- [ ] Dedicated terminal_ui.c rendering module
+- [ ] Efficient dirty-region redraw
 - [ ] Keyboard input mapping (arrow keys, function keys, ESC, Ctrl)
-- [ ] Window content rendering from character grid
+- [ ] Bold/inverse/underline text rendering
 - [ ] Copy/paste support
 - [ ] Scroll with mouse
 

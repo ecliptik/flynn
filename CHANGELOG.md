@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-05
+
+### Added
+- Client-side Telnet protocol engine (`telnet.c`/`telnet.h`)
+  - 9-state IAC parser with full option negotiation
+  - ECHO, SGA, BINARY, TTYPE (VT100), NAWS (80x24), TSPEED (19200)
+  - Adapted from subtext-596 server-side implementation (inverted for client)
+- VT100 terminal emulation engine (`terminal.c`/`terminal.h`)
+  - 80x24 screen buffer with 96-line scrollback ring buffer
+  - Full cursor movement, screen/line clear, insert/delete, scroll regions
+  - Text attributes: bold, underline, inverse
+  - CSI parameter parser supporting up to 8 parameters
+- Wired telnet and terminal into main event loop
+  - Data flow: TCP → telnet_process → terminal_process → display
+  - IAC responses automatically sent back to server
+  - Basic Monaco 9pt text rendering in window
+
+### Fixed
+- Retro68 GCC 12.2.0 compatibility (MacTCP.h, API renames, missing headers)
+- In-repo toolchain build (`build.sh`, Retro68-build/ gitignored)
+- DLOG resource missing `noAutoCenter` field for Rez
+
 ## [0.2.0] - 2026-03-05
 
 ### Changed
