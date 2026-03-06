@@ -22,6 +22,7 @@
 #include "connection.h"
 #include "telnet.h"
 #include "terminal.h"
+#include "terminal_ui.h"
 
 /* Globals */
 static MenuHandle apple_menu, file_menu, edit_menu;
@@ -108,8 +109,10 @@ init_window(void)
 	term_window = NewWindow(0L, &bounds, "\pFlynn", true,
 	    documentProc, (WindowPtr)-1L, true, 0L);
 
-	if (term_window)
+	if (term_window) {
 		SetPort(term_window);
+		term_ui_init(term_window, &terminal);
+	}
 }
 
 static void
@@ -142,11 +145,15 @@ main_event_loop(void)
 				if (out_len > 0) {
 					terminal_process(&terminal, out_buf,
 					    out_len);
-					InvalRect(&term_window->portRect);
+					term_ui_invalidate(term_window,
+					    &terminal);
 				}
 
 				conn.read_len = 0;
 			}
+			if (conn.state == CONN_STATE_CONNECTED)
+				term_ui_cursor_blink(term_window,
+				    &terminal);
 			break;
 		case keyDown:
 		case autoKey:
@@ -174,17 +181,77 @@ static void
 handle_key_down(EventRecord *event)
 {
 	char key;
+	short vkey;
+	char esc_seq[8];
 
 	key = event->message & charCodeMask;
+	vkey = (event->message >> 8) & 0xFF;
+
 	if (event->modifiers & cmdKey) {
 		handle_menu(MenuKey(key));
 		return;
 	}
 
-	/* Send keypress over connection if connected */
-	if (conn.state == CONN_STATE_CONNECTED) {
+	if (conn.state != CONN_STATE_CONNECTED)
+		return;
+
+	/* Map special keys to VT100 escape sequences */
+	switch (vkey) {
+	case 0x7E:	/* Up arrow */
+		conn_send(&conn, "\033[A", 3);
+		return;
+	case 0x7D:	/* Down arrow */
+		conn_send(&conn, "\033[B", 3);
+		return;
+	case 0x7C:	/* Right arrow */
+		conn_send(&conn, "\033[C", 3);
+		return;
+	case 0x7B:	/* Left arrow */
+		conn_send(&conn, "\033[D", 3);
+		return;
+	case 0x73:	/* Home */
+		conn_send(&conn, "\033[H", 3);
+		return;
+	case 0x77:	/* End */
+		conn_send(&conn, "\033[F", 3);
+		return;
+	case 0x74:	/* Page Up */
+		conn_send(&conn, "\033[5~", 4);
+		return;
+	case 0x79:	/* Page Down */
+		conn_send(&conn, "\033[6~", 4);
+		return;
+	case 0x75:	/* Forward Delete */
+		conn_send(&conn, "\033[3~", 4);
+		return;
+	case 0x33:	/* Delete/Backspace → DEL */
+		key = 0x7F;
 		conn_send(&conn, &key, 1);
+		return;
+	case 0x35:	/* Escape */
+		key = 0x1B;
+		conn_send(&conn, &key, 1);
+		return;
+	case 0x24:	/* Return */
+	case 0x4C:	/* Keypad Enter */
+		key = 0x0D;
+		conn_send(&conn, &key, 1);
+		return;
+	case 0x30:	/* Tab */
+		key = 0x09;
+		conn_send(&conn, &key, 1);
+		return;
 	}
+
+	/* Ctrl+key: compute control character */
+	if (event->modifiers & ControlKey) {
+		key = key & 0x1F;
+		conn_send(&conn, &key, 1);
+		return;
+	}
+
+	/* Regular printable character */
+	conn_send(&conn, &key, 1);
 }
 
 static void
@@ -243,27 +310,10 @@ handle_update(EventRecord *event)
 			pstatus[i + 1] = status[i];
 		SetWTitle(term_window, pstatus);
 
-		/* Render terminal contents */
-		{
-			short row, col;
-			TermCell *cell;
-
-			TextFont(4);	/* Monaco */
-			TextSize(9);
-
-			for (row = 0; row < TERM_ROWS; row++) {
-				for (col = 0; col < TERM_COLS; col++) {
-					cell = terminal_get_cell(&terminal,
-					    row, col);
-					if (cell->ch >= 0x20) {
-						MoveTo(col * 6, (row + 1) * 12);
-						DrawChar(cell->ch);
-					}
-				}
-			}
-
-			terminal_clear_dirty(&terminal);
-		}
+		/* Mark all rows dirty for full update repaints */
+		for (i = 0; i < TERM_ROWS; i++)
+			terminal.dirty[i] = 1;
+		term_ui_draw(term_window, &terminal);
 	} else {
 		SetWTitle(term_window, "\pFlynn");
 	}

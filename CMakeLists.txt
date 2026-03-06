@@ -6,6 +6,7 @@ add_application(Flynn
     src/connection.c
     src/telnet.c
     src/terminal.c
+    src/terminal_ui.c
     src/tcp.c
     src/dnr.c
     src/sysutil.c
