@@ -1,5 +1,5 @@
 /*
- * main.c - Telnet client for classic Macintosh
+ * main.c - Flynn: Telnet client for classic Macintosh
  * Targeting System 6.0.8 / Macintosh Plus with MacTCP 2.1
  */
 
@@ -16,13 +16,16 @@
 #include <ToolUtils.h>
 #include <Resources.h>
 #include <Multiverse.h>
+#include <string.h>
 
 #include "main.h"
+#include "connection.h"
 
 /* Globals */
 static MenuHandle apple_menu, file_menu, edit_menu;
 static WindowPtr term_window;
 static Boolean running = true;
+static Connection conn;
 
 /* Forward declarations */
 static void init_toolbox(void);
@@ -44,6 +47,10 @@ main(void)
 	init_toolbox();
 	init_menus();
 	init_window();
+
+	memset(&conn, 0, sizeof(conn));
+	conn_init();
+
 	main_event_loop();
 	return 0;
 }
@@ -92,7 +99,7 @@ init_window(void)
 	Rect bounds;
 
 	SetRect(&bounds, 10, 40, 10 + TERM_WIN_WIDTH, 40 + TERM_WIN_HEIGHT);
-	term_window = NewWindow(0L, &bounds, "\pTelnet", true,
+	term_window = NewWindow(0L, &bounds, "\pFlynn", true,
 	    documentProc, (WindowPtr)-1L, true, 0L);
 
 	if (term_window)
@@ -111,7 +118,11 @@ main_event_loop(void)
 
 		switch (event.what) {
 		case nullEvent:
-			/* TODO: poll TCP for incoming data */
+			conn_idle(&conn);
+			if (conn.read_len > 0) {
+				/* TODO: pass data to telnet/terminal parser */
+				conn.read_len = 0;
+			}
 			break;
 		case keyDown:
 		case autoKey:
@@ -146,7 +157,10 @@ handle_key_down(EventRecord *event)
 		return;
 	}
 
-	/* TODO: send keypress to terminal/telnet */
+	/* Send keypress over connection if connected */
+	if (conn.state == CONN_STATE_CONNECTED) {
+		conn_send(&conn, &key, 1);
+	}
 }
 
 static void
@@ -190,8 +204,22 @@ handle_update(EventRecord *event)
 	SetPort(win);
 	BeginUpdate(win);
 
-	/* TODO: redraw terminal content */
+	/* Draw status and received data */
 	EraseRect(&win->portRect);
+
+	if (conn.state == CONN_STATE_CONNECTED) {
+		char status[64];
+		Str255 pstatus;
+		short i;
+
+		conn_status_str(&conn, status, sizeof(status));
+		pstatus[0] = strlen(status);
+		for (i = 0; i < pstatus[0]; i++)
+			pstatus[i + 1] = status[i];
+		SetWTitle(term_window, pstatus);
+	} else {
+		SetWTitle(term_window, "\pFlynn");
+	}
 
 	EndUpdate(win);
 	SetPort(old_port);
@@ -254,7 +282,7 @@ handle_menu(long menu_id)
 static void
 do_about(void)
 {
-	ParamText("\pTelnet for Macintosh\r\rA terminal client for Mac Plus",
+	ParamText("\pFlynn\r\rA Telnet client for classic Macintosh",
 	    "\p", "\p", "\p");
 	Alert(128, 0L);
 }
@@ -262,11 +290,11 @@ do_about(void)
 static void
 do_connect(void)
 {
-	/* TODO: show connection dialog, initiate TCP connection */
+	conn_open_dialog(&conn);
 }
 
 static void
 do_disconnect(void)
 {
-	/* TODO: close TCP connection */
+	conn_close(&conn);
 }

@@ -7,10 +7,12 @@
 - [x] Create SCSI hard drive image with System 6.0.8 installed
 - [x] Develop X11 GUI automation for Snow (xdotool + WindowMaker)
 - [x] First successful build of skeleton app
-- [ ] Boot from HDD without floppy (verify standalone boot)
-- [ ] Verify skeleton app runs in Snow emulator
-- [ ] Install MacTCP 2.1 on HDD
-- [ ] Configure DaynaPORT SCSI/Link Ethernet (SCSI ID 3, NAT mode)
+- [x] Boot from HDD without floppy (verified — boots to Finder from SCSI HDD)
+- [x] Install MacTCP 2.1 on HDD
+- [x] Install DaynaPORT SCSI/Link drivers (v1.2.5, via Installer app)
+- [x] Configure MacTCP: Ethernet Built-In, IP 10.0.0.2, gateway 10.0.0.1, DNS 8.8.8.8
+- [x] Test networking (MacTCP Ping to 10.0.0.1 — works, ~10ms RTT)
+- [x] Verify skeleton app runs in Snow emulator (window, menus, quit all work)
 
 ## Phase 1: Minimal Mac Application
 - [ ] Verify app skeleton runs in emulator (window, menus, quit)

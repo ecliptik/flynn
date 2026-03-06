@@ -1,6 +1,6 @@
 # Testing Guide
 
-Testing environment for telnet-m68k using classic Macintosh emulators.
+Testing environment for Flynn using classic Macintosh emulators.
 
 ## Snow Emulator (Primary)
 

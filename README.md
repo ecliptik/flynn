@@ -1,4 +1,4 @@
-# Telnet for Macintosh
+# Flynn
 
 A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 with MacTCP 2.1. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 

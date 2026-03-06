@@ -22,7 +22,7 @@ Created a SCSI hard drive image for the Snow emulator. Snow expects full drive i
 
 Snow workspace files use the `.snoww` extension (two w's — discovered by reading source at `app.rs:437`). The workspace is a JSON file with paths relative to its parent directory.
 
-Final workspace (`diskimages/telnet-m68k.snoww`):
+Final workspace (`diskimages/flynn.snoww`):
 ```json
 {
   "viewport_scale": 1.5,
@@ -81,4 +81,4 @@ Automated the entire System 6.0.8 installation using X11 tools (`xdotool`, `impo
 - Boot from HDD without floppy (verify standalone boot)
 - Install MacTCP 2.1 for networking
 - Attach DaynaPORT SCSI/Link Ethernet adapter
-- Test TelnetM68K skeleton app in the emulator
+- Test Flynn skeleton app in the emulator

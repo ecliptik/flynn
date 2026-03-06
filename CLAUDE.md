@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Telnet client application for classic Macintosh (68000/Macintosh Plus) written in C, targeting System 6.0.8 with MacTCP 2.1. The primary use case is connecting to modern Linux telnetd servers for interactive terminal sessions (vi, nano, etc.).
+Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus) written in C, targeting System 6.0.8 with MacTCP 2.1. The primary use case is connecting to modern Linux telnetd servers for interactive terminal sessions (vi, nano, etc.).
 
 ## Target Platform Constraints
 
@@ -14,7 +14,7 @@ A Telnet client application for classic Macintosh (68000/Macintosh Plus) written
 - MacTCP for networking (not Open Transport)
 - Latency and responsiveness are critical priorities
 - Monochrome only, no color or grayscale
-- Start with VT100 
+- Start with VT100
 
 ## Build System
 
@@ -31,14 +31,14 @@ A Telnet client application for classic Macintosh (68000/Macintosh Plus) written
 [Snow](https://snowemu.com/) v1.3.1, a Rust-based classic Mac emulator with low-level hardware emulation.
 
 - **Binary**: `tools/snow/snowemu` (local copy, gitignored)
-- **Workspace**: `diskimages/telnet-m68k.snoww` (Mac Plus, 1.5x scale)
+- **Workspace**: `diskimages/flynn.snoww` (Mac Plus, 1.5x scale)
 - **HDD image**: `diskimages/snow-sys608.img` (90MB SCSI, System 6.0.8 installed)
 - **ROM**: `roms/68k/128k/Macintosh Plus/1986-03 - 4D1F8172 - MacPlus v3.ROM`
 - **Floppies**: `tools/floppies/*.img` (System 6.0.8 set, 800K each)
 - **Keyboard**: Right ALT = Command key (`map_cmd_ralt: true`)
 - **Networking**: DaynaPORT SCSI/Link Ethernet emulation, NAT mode (10.0.0.0/8)
 - **File sharing**: BlueSCSI Toolbox protocol (`Tools > File Sharing`)
-- **Launch**: `DISPLAY=:0 tools/snow/snowemu diskimages/telnet-m68k.snoww &`
+- **Launch**: `DISPLAY=:0 tools/snow/snowemu diskimages/flynn.snoww &`
 
 ### GUI Automation
 
@@ -62,7 +62,7 @@ Basilisk II was tested extensively but has critical incompatibilities with Syste
 
 - Git remote: `https://github.com/ecliptik/flynn.git`
 - Use feature branches, commits, and worktrees for development
-- Do NOT commit: disk images, TELNET-M68K.md, or other non-source artifacts
+- Do NOT commit: disk images, FLYNN.md, or other non-source artifacts
 - Maintain: README.md, CHANGELOG.md, TODO.md
 - Maintain a development journal documenting how the project was built with agentic AI
 

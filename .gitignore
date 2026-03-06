@@ -6,7 +6,7 @@ references/
 *.o
 *.d
 .DS_Store
-TELNET-M68K.md
+FLYNN.md
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake

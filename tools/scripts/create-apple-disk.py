@@ -53,7 +53,7 @@ def write_partition_entry(f, total_partitions, start_block, block_count, name, p
     f.write(entry)
 
 def main():
-    output = sys.argv[1] if len(sys.argv) > 1 else '/home/claude/git/telnet-m68k/diskimages/snow-sys608.img'
+    output = sys.argv[1] if len(sys.argv) > 1 else '/home/claude/git/flynn/diskimages/snow-sys608.img'
     size_mb = 40
     total_blocks = (size_mb * 1024 * 1024) // BLOCK_SIZE  # 81920
 

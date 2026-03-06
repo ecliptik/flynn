@@ -1,5 +1,5 @@
 /*
- * main.h - Telnet client for classic Macintosh
+ * main.h - Flynn: Telnet client for classic Macintosh
  * Global declarations, menu IDs, constants
  */
 
@@ -36,7 +36,7 @@
 #define TERM_WIN_HEIGHT     320
 
 /* Application creator and type */
-#define APP_CREATOR         'TELN'
+#define APP_CREATOR         'FLYN'
 #define APP_TYPE            'APPL'
 
 #endif /* MAIN_H */

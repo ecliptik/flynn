@@ -1,6 +1,6 @@
 # Development Journal
 
-A living document recording the development of telnet-m68k, a Telnet client for classic Macintosh, built with agentic AI (Claude Code).
+A living document recording the development of Flynn, a Telnet client for classic Macintosh, built with agentic AI (Claude Code).
 
 ---
 
@@ -41,7 +41,7 @@ The initial build attempt revealed several Retro68-specific differences from cla
 - **`AppendResMenu` not `AddResMenu`** — Same renaming pattern.
 - **`GetApplLimit` linker error** — Used `LMGetApplLimit()` low-memory accessor macro instead.
 
-After fixing these, the build succeeded. Output: TelnetM68K.bin (8.5KB MacBinary), TelnetM68K.dsk (800KB floppy image).
+After fixing these, the build succeeded. Output: Flynn.bin (8.5KB MacBinary), Flynn.dsk (800KB floppy image).
 
 ### Attribution
 
@@ -75,4 +75,4 @@ Creating the SCSI drive image itself required trial and error — three failed a
 
 - Boot from HDD without floppy to verify standalone boot
 - Install MacTCP 2.1 and configure DaynaPORT networking
-- Transfer and test the TelnetM68K skeleton app in the emulator
+- Transfer and test the Flynn skeleton app in the emulator

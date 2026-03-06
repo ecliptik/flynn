@@ -1,5 +1,5 @@
 /*
- * telnet.r - Resources for Telnet client
+ * telnet.r - Resources for Flynn Telnet client
  */
 
 #include "Menus.r"
@@ -12,7 +12,7 @@ resource 'MBAR' (128) {
 resource 'MENU' (128, "Apple") {
 	128, textMenuProc, allEnabled, enabled, apple,
 	{
-		"About Telnet\311", noIcon, noKey, noMark, plain
+		"About Flynn\311", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -35,6 +35,47 @@ resource 'MENU' (130, "Edit") {
 		"Copy", noIcon, "C", noMark, plain;
 		"Paste", noIcon, "V", noMark, plain;
 		"Clear", noIcon, noKey, noMark, plain
+	}
+};
+
+/* Connection dialog */
+resource 'DLOG' (129, "Connect") {
+	{60, 80, 210, 420},
+	dBoxProc,
+	visible,
+	noGoAway,
+	0x0,
+	129,
+	"Connect"
+};
+
+resource 'DITL' (129, "Connect") {
+	{
+		/* OK button */
+		{115, 250, 135, 320},
+		Button { enabled, "Connect" };
+
+		/* Cancel button */
+		{115, 165, 135, 235},
+		Button { enabled, "Cancel" };
+
+		/* Host label + field */
+		{15, 15, 31, 60},
+		StaticText { disabled, "Host:" };
+
+		{15, 65, 31, 325},
+		EditText { enabled, "" };
+
+		/* Port label + field */
+		{45, 15, 61, 60},
+		StaticText { disabled, "Port:" };
+
+		{45, 65, 61, 135},
+		EditText { enabled, "23" };
+
+		/* Info text */
+		{80, 15, 96, 325},
+		StaticText { disabled, "Enter hostname or IP address" };
 	}
 };
 

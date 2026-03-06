@@ -9,7 +9,7 @@ import os
 BLOCK_SIZE = 512
 
 def main():
-    output = '/home/claude/git/telnet-m68k/diskimages/snow-sys608.img'
+    output = '/home/claude/git/flynn/diskimages/snow-sys608.img'
     driver_file = '/tmp/hdsc/driver_scsi_128.bin'
     size_mb = 40
     total_blocks = (size_mb * 1024 * 1024) // BLOCK_SIZE  # 81920
