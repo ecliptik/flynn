@@ -34,6 +34,23 @@
 /* Cursor blink interval in ticks (30 ticks ~ 0.5s) */
 #define CURSOR_BLINK_TICKS	30
 
+/* Text selection state */
+typedef struct {
+	short		active;
+	short		selecting;
+	short		anchor_row;
+	short		anchor_col;
+	short		extent_row;
+	short		extent_col;
+	short		scroll_offset;
+	short		word_mode;
+	short		word_anchor_start;
+	short		word_anchor_end;
+	unsigned long	last_click_ticks;
+	short		last_click_row;
+	short		last_click_col;
+} Selection;
+
 /* Initialize terminal UI (set font, store references) */
 void term_ui_init(WindowPtr win, Terminal *term);
 
@@ -48,5 +65,21 @@ void term_ui_invalidate_all(WindowPtr win);
 
 /* Update cursor blink state; call from event loop idle */
 void term_ui_cursor_blink(WindowPtr win, Terminal *term);
+
+/* Text selection API */
+void  term_ui_sel_start(short row, short col, short scroll_offset);
+void  term_ui_sel_start_word(short row, short col, short scroll_offset,
+	    Terminal *term);
+void  term_ui_sel_extend(short row, short col, Terminal *term);
+void  term_ui_sel_clear(void);
+void  term_ui_sel_finalize(void);
+short term_ui_sel_active(void);
+void  term_ui_sel_get_range(short *start_row, short *start_col,
+	    short *end_row, short *end_col);
+short term_ui_sel_contains(short row, short col);
+short term_ui_sel_check_double_click(unsigned long when, short row, short col);
+void  term_ui_sel_dirty_rows(Terminal *term, short old_extent_row,
+	    short new_extent_row);
+void  term_ui_sel_dirty_all(Terminal *term);
 
 #endif /* TERMINAL_UI_H */

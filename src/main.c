@@ -51,6 +51,10 @@ static void do_connect(void);
 static void do_disconnect(void);
 static void do_copy(void);
 static void do_paste(void);
+static short pixel_to_row(short v);
+static short pixel_to_col(short h);
+static void handle_content_click(EventRecord *event);
+static void track_selection_drag(void);
 
 int
 main(void)
@@ -192,6 +196,13 @@ main_event_loop(void)
 				if (out_len > 0) {
 					GrafPtr save;
 
+					/* Clear selection on new data */
+					if (term_ui_sel_active()) {
+						term_ui_sel_dirty_all(
+						    &terminal);
+						term_ui_sel_clear();
+					}
+
 					terminal.scroll_offset = 0;
 					terminal_process(&terminal, out_buf,
 					    out_len);
@@ -299,6 +310,18 @@ handle_key_down(EventRecord *event)
 
 		handle_menu(MenuKey(key));
 		return;
+	}
+
+	/* Clear selection on any non-Cmd keypress */
+	if (term_ui_sel_active()) {
+		GrafPtr save;
+
+		term_ui_sel_dirty_all(&terminal);
+		term_ui_sel_clear();
+		GetPort(&save);
+		SetPort(term_window);
+		term_ui_draw(term_window, &terminal);
+		SetPort(save);
 	}
 
 	if (conn.state != CONN_STATE_CONNECTED)
@@ -426,7 +449,8 @@ handle_mouse_down(EventRecord *event)
 	case inContent:
 		if (win != FrontWindow())
 			SelectWindow(win);
-		/* TODO: handle clicks in terminal content */
+		else
+			handle_content_click(event);
 		break;
 	}
 }
@@ -586,18 +610,55 @@ do_copy(void)
 	short row, col, len, last_nonspace;
 	TermCell *cell;
 
-	len = 0;
-	for (row = 0; row < TERM_ROWS; row++) {
-		last_nonspace = -1;
-		for (col = 0; col < TERM_COLS; col++) {
-			cell = terminal_get_display_cell(&terminal, row, col);
-			buf[len + col] = cell->ch;
-			if (cell->ch != ' ')
-				last_nonspace = col;
+	if (term_ui_sel_active()) {
+		short sr, sc, er, ec;
+		short c_start, c_end;
+
+		term_ui_sel_get_range(&sr, &sc, &er, &ec);
+
+		len = 0;
+		for (row = sr; row <= er; row++) {
+			if (sr == er) {
+				c_start = sc;
+				c_end = ec;
+			} else if (row == sr) {
+				c_start = sc;
+				c_end = TERM_COLS - 1;
+			} else if (row == er) {
+				c_start = 0;
+				c_end = ec;
+			} else {
+				c_start = 0;
+				c_end = TERM_COLS - 1;
+			}
+
+			last_nonspace = -1;
+			for (col = c_start; col <= c_end; col++) {
+				cell = terminal_get_display_cell(
+				    &terminal, row, col);
+				buf[len + (col - c_start)] = cell->ch;
+				if (cell->ch != ' ')
+					last_nonspace = col - c_start;
+			}
+			len += last_nonspace + 1;
+			if (row < er)
+				buf[len++] = '\r';
 		}
-		len += last_nonspace + 1;
-		if (row < TERM_ROWS - 1)
-			buf[len++] = '\r';
+	} else {
+		len = 0;
+		for (row = 0; row < TERM_ROWS; row++) {
+			last_nonspace = -1;
+			for (col = 0; col < TERM_COLS; col++) {
+				cell = terminal_get_display_cell(
+				    &terminal, row, col);
+				buf[len + col] = cell->ch;
+				if (cell->ch != ' ')
+					last_nonspace = col;
+			}
+			len += last_nonspace + 1;
+			if (row < TERM_ROWS - 1)
+				buf[len++] = '\r';
+		}
 	}
 
 	ZeroScrap();
@@ -637,4 +698,104 @@ do_paste(void)
 		HUnlock(h);
 	}
 	DisposeHandle(h);
+}
+
+static short
+pixel_to_row(short v)
+{
+	short r;
+
+	r = (v - TOP_MARGIN) / CELL_HEIGHT;
+	if (r < 0) r = 0;
+	if (r >= TERM_ROWS) r = TERM_ROWS - 1;
+	return r;
+}
+
+static short
+pixel_to_col(short h)
+{
+	short c;
+
+	c = (h - LEFT_MARGIN) / CELL_WIDTH;
+	if (c < 0) c = 0;
+	if (c >= TERM_COLS) c = TERM_COLS - 1;
+	return c;
+}
+
+static void
+handle_content_click(EventRecord *event)
+{
+	Point local_pt;
+	short row, col;
+	GrafPtr save;
+	short i;
+
+	GetPort(&save);
+	SetPort(term_window);
+
+	local_pt = event->where;
+	GlobalToLocal(&local_pt);
+	row = pixel_to_row(local_pt.v);
+	col = pixel_to_col(local_pt.h);
+
+	/* Clear any previous selection first */
+	if (term_ui_sel_active()) {
+		term_ui_sel_dirty_all(&terminal);
+		term_ui_sel_clear();
+	}
+
+	if (term_ui_sel_check_double_click(event->when, row, col)) {
+		/* Double-click: word selection */
+		term_ui_sel_start_word(row, col,
+		    terminal.scroll_offset, &terminal);
+	} else if (event->modifiers & shiftKey) {
+		/* Shift-click: extend from cursor to click */
+		term_ui_sel_start(terminal.cur_row,
+		    terminal.cur_col, terminal.scroll_offset);
+		term_ui_sel_extend(row, col, &terminal);
+	} else {
+		/* New selection */
+		term_ui_sel_start(row, col,
+		    terminal.scroll_offset);
+	}
+
+	track_selection_drag();
+
+	/* Redraw all rows to show final selection state */
+	for (i = 0; i < TERM_ROWS; i++)
+		terminal.dirty[i] = 1;
+	term_ui_draw(term_window, &terminal);
+
+	SetPort(save);
+}
+
+static void
+track_selection_drag(void)
+{
+	Point pt;
+	short row, col, prev_row, prev_col;
+	short old_extent_row;
+
+	prev_row = -1;
+	prev_col = -1;
+
+	while (StillDown()) {
+		GetMouse(&pt);
+		row = pixel_to_row(pt.v);
+		col = pixel_to_col(pt.h);
+
+		if (row == prev_row && col == prev_col)
+			continue;
+
+		old_extent_row = row;  /* will be used after extend */
+		term_ui_sel_dirty_rows(&terminal, prev_row < 0 ?
+		    row : prev_row, row);
+		term_ui_sel_extend(row, col, &terminal);
+		term_ui_draw(term_window, &terminal);
+
+		prev_row = row;
+		prev_col = col;
+	}
+
+	term_ui_sel_finalize();
 }

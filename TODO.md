@@ -69,8 +69,16 @@
 - [x] Device Attribute response (DA ESC[c → VT100 ID)
 - [x] Device Status Report response (DSR ESC[6n → cursor position)
 
+## Phase 7: Mouse Selection
+- [x] Selection data model (Selection struct in terminal_ui.c)
+- [x] Click-drag text selection (StillDown/GetMouse tracking)
+- [x] Double-click word selection
+- [x] Shift-click extend selection
+- [x] Inverse video rendering (ATTR_INVERSE XOR per cell)
+- [x] Selection-aware Cmd+C copy (stream selection)
+- [x] Selection cleared on keypress or incoming data
+
 ## Future
 - [ ] Performance optimization
-- [ ] Mouse-based text selection
 - [ ] Color support (for System 7 / color Macs)
 - [ ] SSH support

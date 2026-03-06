@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-03-06
+
+### Added
+- Mouse-based text selection in terminal window
+  - Click-and-drag to select text (stream selection, not rectangular)
+  - Double-click to select word (contiguous non-space characters)
+  - Shift-click to extend selection from cursor to click point
+  - Selection renders as inverse video (XOR ATTR_INVERSE per cell)
+  - Already-inverse cells render as normal when selected (double inversion)
+  - Cursor blink suppressed during active selection
+- Selection-aware copy (Cmd+C)
+  - If text is selected: copies only selected text (partial first/last rows)
+  - If no selection: copies entire visible 80x24 screen (existing behavior)
+  - Trailing spaces trimmed per row, CR between rows
+- Selection automatically cleared on keypress or incoming server data
+- New functions in terminal_ui: Selection struct, 11 public API functions
+- GetDblTime via low-memory global 0x02F0 (Retro68 compatibility)
+
+### Changed
+- Version: 0.5.1 → 0.6.0
+- Build size: ~70KB (up from ~65KB)
+- terminal_ui.c draw_row() now computes effective attributes per cell for selection overlay
+
 ## [0.5.1] - 2026-03-06
 
 ### Added
