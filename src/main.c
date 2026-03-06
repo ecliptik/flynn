@@ -143,10 +143,15 @@ main_event_loop(void)
 					    send_len);
 
 				if (out_len > 0) {
+					GrafPtr save;
+
 					terminal_process(&terminal, out_buf,
 					    out_len);
-					term_ui_invalidate(term_window,
+					GetPort(&save);
+					SetPort(term_window);
+					term_ui_draw(term_window,
 					    &terminal);
+					SetPort(save);
 				}
 
 				conn.read_len = 0;

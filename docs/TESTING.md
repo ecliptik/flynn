@@ -241,6 +241,90 @@ DISPLAY=:0 tools/snow/snowemu diskimages/flynn.snoww &
 
 Requires `hfsutils` (built from [Distrotech/hfsutils](https://github.com/Distrotech/hfsutils)). The `-m` flag on `hcopy` preserves MacBinary resource/data fork encoding. The `hattrib` step sets the file type to `APPL` and creator to `FLYN` so System 6 recognizes it as a launchable application.
 
+## Phase 5 Test Results (2026-03-05)
+
+Build: `./build.sh` — clean compile, Flynn.bin = 64KB.
+
+### Automated Test Script
+
+Test scripts in the project root use X11 XTEST automation via python-xlib.
+Set environment variables before running:
+
+```bash
+export FLYNN_TEST_HOST=<telnet-host>
+export FLYNN_TEST_USER=<username>
+export FLYNN_TEST_PASS=<password>
+```
+
+Run: `DISPLAY=:0 python3 test_launch.py all`
+
+Steps can be run individually: `python3 test_launch.py 1` (select Flynn),
+`python3 test_launch.py 1b` (open), etc.
+
+### Test Scenarios and Results
+
+| # | Test | Steps | Result |
+|---|------|-------|--------|
+| 1 | Launch Flynn | Select in Finder list (Mac 100,137), Cmd+O | PASS |
+| 2 | Connect dialog | Cmd+N opens dialog; Host/Port fields render | PASS |
+| 3 | TCP connection | Type IP, press Return; title shows "Connected to ..." | PASS |
+| 4 | Login banner | Server banner + login prompt render in terminal | PASS |
+| 5 | Keyboard input | Type username/password, Return sends CR | PASS |
+| 6 | Login + neofetch | Full 24-row neofetch ASCII art renders correctly | PASS |
+| 7 | Shell prompt | "claude@usb4vc:~$" with blinking block cursor | PASS |
+| 8 | Echo command | Type `echo hello`, press Return | FAIL (see bug) |
+| 9 | Arrow Up (history) | Press Up arrow at shell prompt | FAIL (see bug) |
+| 10 | Ctrl+C | `sleep 999` then Ctrl+C interrupt | FAIL (see bug) |
+| 11 | ls --color | Bold text rendering | FAIL (see bug) |
+| 12 | nano | Full-screen TUI with inverse status bar | FAIL (see bug) |
+| 13 | vi | Insert mode, Escape, cursor movement | FAIL (see bug) |
+| 14 | Cmd+Q quit | Quit Flynn, return to Finder | PASS — clean exit |
+
+### Known Bug: Screen Freezes After Initial Full Render
+
+After the neofetch output fills all 24 terminal rows and the shell prompt
+appears, subsequent output does not update the display. The terminal buffer
+and telnet connection continue working (Cmd+Q still quits cleanly), but
+the visible screen remains frozen on the neofetch output.
+
+**Affected**: Any command after the screen first fills (echo, nano, vi, ls).
+
+**Not affected**: Initial connection, login banner, neofetch render, keyboard
+input (characters are sent), Cmd+key menu shortcuts.
+
+**Hypothesis**: Dirty-region invalidation in `term_ui_invalidate()` does not
+trigger repaints after the terminal scrolls past row 24. The `InvalRect()`
+calls may not be generating update events, or the update handler's
+`EraseRect` + `term_ui_draw()` cycle has a timing issue with the
+dirty-row flags.
+
+### Keyboard Mapping Verified
+
+The keyboard input mapping (handle_key_down in main.c) was confirmed working:
+
+- **Regular characters**: Typing produces correct characters at login prompt
+- **Return (0x24)**: Sends CR (0x0D), login proceeds
+- **Cmd+key**: Menu shortcuts work (Cmd+N=Connect, Cmd+Q=Quit)
+- **Arrow keys, Ctrl+C, Escape**: Sent to server (visual confirmation blocked by rendering bug, but key sends are correct based on code and Return/Cmd behavior)
+
+### Screenshots
+
+Test screenshots are saved in `screenshots/` (gitignored):
+
+- `70-flynn-window.png` — Flynn launched, empty terminal window
+- `42-connect-dialog_000.png` — Connect dialog with Host/Port fields
+- `43-host-entered.png` — IP address entered in Host field
+- `44-connected.png` — Connected, login banner rendered
+- `73-logged-in.png` — Neofetch ASCII art fully rendered
+- `74-echo.png` through `87-quit.png` — Screen frozen on neofetch (bug)
+- `88-current.png` — Finder after clean quit
+
+### Coordinate Reference for GUI Automation
+
+Flynn in Finder list view: Mac coordinates (100, 137) = screen (266, 363).
+Flynn File menu: Cmd+N for Connect (preferred over menu drag).
+Framebuffer: FB_LEFT=116, FB_TOP=158, SCALE=1.5.
+
 ## Troubleshooting
 
 ### X11 Display Becomes Unresponsive

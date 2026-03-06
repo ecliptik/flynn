@@ -20,3 +20,8 @@ Retro68-build/
 tools/snow/
 tools/floppies/
 tools/blank_100MB_HFS.dsk
+
+# Test artifacts
+/screenshots/
+test_phase5.py
+test_launch.py

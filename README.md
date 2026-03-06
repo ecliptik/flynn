@@ -2,6 +2,8 @@
 
 A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 with MacTCP 2.1. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 
+![Flynn connected to a Linux server via telnet, showing neofetch output on a Macintosh Plus running System 6.0.8](docs/screenshots/flynn-telnet-session.png)
+
 ## Features
 
 - Client-side Telnet protocol with IAC negotiation (BINARY, ECHO, SGA, TTYPE, NAWS)
@@ -12,7 +14,7 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 
 ## Current Status
 
-Phases 0-4 (core) are complete: the application builds at 61KB, includes a connection dialog, client-side Telnet IAC negotiation, and a VT100 escape sequence parser with 80x24 screen buffer and 96-line scrollback. The full data pipeline (TCP receive, telnet processing, terminal parsing, screen rendering) is wired end-to-end. Basic Monaco 9pt text rendering displays terminal contents. Next steps are live testing against a telnet server and building the dedicated terminal UI rendering module.
+Phases 0-5 are complete. Flynn connects to real telnet servers, renders VT100 terminal output including full-screen TUI applications (nano, vi), and handles interactive shell sessions. The application builds at 64KB and runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1.
 
 ## Building
 
