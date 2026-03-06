@@ -17,7 +17,7 @@
 /* Apple menu items */
 #define APPLE_MENU_ABOUT_ID 1
 
-/* File menu items */
+/* Session menu items */
 #define FILE_MENU_CONNECT_ID    1
 #define FILE_MENU_DISCONNECT_ID 2
 /* separator = 3 */

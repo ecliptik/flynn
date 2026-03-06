@@ -134,7 +134,7 @@ update_menus(void)
 
 	connected = (conn.state == CONN_STATE_CONNECTED);
 
-	/* File menu: Connect vs Disconnect */
+	/* Session menu: Connect vs Disconnect */
 	if (connected) {
 		DisableItem(file_menu, FILE_MENU_CONNECT_ID);
 		EnableItem(file_menu, FILE_MENU_DISCONNECT_ID);

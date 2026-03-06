@@ -17,8 +17,8 @@ resource 'MENU' (128, "Apple") {
 	}
 };
 
-resource 'MENU' (129, "File") {
-	129, textMenuProc, allEnabled, enabled, "File",
+resource 'MENU' (129, "Session") {
+	129, textMenuProc, allEnabled, enabled, "Session",
 	{
 		"Connect\311", noIcon, "N", noMark, plain;
 		"Disconnect", noIcon, noKey, noMark, plain;
