@@ -215,6 +215,32 @@ main_event_loop(void)
 						terminal.response_len = 0;
 					}
 
+					/* Update window title from OSC */
+					if (terminal.title_changed) {
+						if (terminal.window_title[0]) {
+							char tmp[80];
+							Str255 pt;
+							short tl, ti;
+
+							tl = sprintf(tmp,
+							    "Flynn - %s",
+							    terminal.
+							    window_title);
+							pt[0] = tl;
+							for (ti = 0;
+							    ti < tl; ti++)
+								pt[ti+1] =
+								    tmp[ti];
+							SetWTitle(
+							    term_window, pt);
+						} else {
+							SetWTitle(
+							    term_window,
+							    "\pFlynn");
+						}
+						terminal.title_changed = 0;
+					}
+
 					GetPort(&save);
 					SetPort(term_window);
 					term_ui_draw(term_window,
@@ -308,6 +334,23 @@ handle_key_down(EventRecord *event)
 			return;
 		}
 
+		/* Cmd+1..0 → F1-F10 for M0110 keyboards */
+		if (conn.state == CONN_STATE_CONNECTED &&
+		    key >= '0' && key <= '9') {
+			switch (key) {
+			case '1': conn_send(&conn, "\033OP", 3); return;
+			case '2': conn_send(&conn, "\033OQ", 3); return;
+			case '3': conn_send(&conn, "\033OR", 3); return;
+			case '4': conn_send(&conn, "\033OS", 3); return;
+			case '5': conn_send(&conn, "\033[15~", 5); return;
+			case '6': conn_send(&conn, "\033[17~", 5); return;
+			case '7': conn_send(&conn, "\033[18~", 5); return;
+			case '8': conn_send(&conn, "\033[19~", 5); return;
+			case '9': conn_send(&conn, "\033[20~", 5); return;
+			case '0': conn_send(&conn, "\033[21~", 5); return;
+			}
+		}
+
 		handle_menu(MenuKey(key));
 		return;
 	}
@@ -327,19 +370,31 @@ handle_key_down(EventRecord *event)
 	if (conn.state != CONN_STATE_CONNECTED)
 		return;
 
-	/* Map special keys to VT100 escape sequences */
+	/* Map special keys to escape sequences */
 	switch (vkey) {
 	case 0x7E:	/* Up arrow */
-		conn_send(&conn, "\033[A", 3);
+		if (terminal.cursor_key_mode)
+			conn_send(&conn, "\033OA", 3);
+		else
+			conn_send(&conn, "\033[A", 3);
 		return;
 	case 0x7D:	/* Down arrow */
-		conn_send(&conn, "\033[B", 3);
+		if (terminal.cursor_key_mode)
+			conn_send(&conn, "\033OB", 3);
+		else
+			conn_send(&conn, "\033[B", 3);
 		return;
 	case 0x7C:	/* Right arrow */
-		conn_send(&conn, "\033[C", 3);
+		if (terminal.cursor_key_mode)
+			conn_send(&conn, "\033OC", 3);
+		else
+			conn_send(&conn, "\033[C", 3);
 		return;
 	case 0x7B:	/* Left arrow */
-		conn_send(&conn, "\033[D", 3);
+		if (terminal.cursor_key_mode)
+			conn_send(&conn, "\033OD", 3);
+		else
+			conn_send(&conn, "\033[D", 3);
 		return;
 	case 0x73:	/* Home */
 		conn_send(&conn, "\033[H", 3);
@@ -376,6 +431,43 @@ handle_key_down(EventRecord *event)
 	case 0x47:	/* Clear/NumLock → Escape (M0110A keypad) */
 		key = 0x1B;
 		conn_send(&conn, &key, 1);
+		return;
+	/* Function keys F1-F12 (ADB extended keyboards) */
+	case 0x7A:	/* F1 */
+		conn_send(&conn, "\033OP", 3);
+		return;
+	case 0x78:	/* F2 */
+		conn_send(&conn, "\033OQ", 3);
+		return;
+	case 0x63:	/* F3 */
+		conn_send(&conn, "\033OR", 3);
+		return;
+	case 0x76:	/* F4 */
+		conn_send(&conn, "\033OS", 3);
+		return;
+	case 0x60:	/* F5 */
+		conn_send(&conn, "\033[15~", 5);
+		return;
+	case 0x61:	/* F6 */
+		conn_send(&conn, "\033[17~", 5);
+		return;
+	case 0x62:	/* F7 */
+		conn_send(&conn, "\033[18~", 5);
+		return;
+	case 0x64:	/* F8 */
+		conn_send(&conn, "\033[19~", 5);
+		return;
+	case 0x65:	/* F9 */
+		conn_send(&conn, "\033[20~", 5);
+		return;
+	case 0x6D:	/* F10 */
+		conn_send(&conn, "\033[21~", 5);
+		return;
+	case 0x67:	/* F11 */
+		conn_send(&conn, "\033[23~", 5);
+		return;
+	case 0x6F:	/* F12 */
+		conn_send(&conn, "\033[24~", 5);
 		return;
 	}
 
@@ -469,11 +561,15 @@ handle_update(EventRecord *event)
 	EraseRect(&win->portRect);
 
 	if (conn.state == CONN_STATE_CONNECTED) {
-		char title[64];
+		char title[80];
 		Str255 ptitle;
 		short i, len;
 
-		len = sprintf(title, "Flynn - %s", conn.host);
+		if (terminal.window_title[0])
+			len = sprintf(title, "Flynn - %s",
+			    terminal.window_title);
+		else
+			len = sprintf(title, "Flynn - %s", conn.host);
 		ptitle[0] = len;
 		for (i = 0; i < len; i++)
 			ptitle[i + 1] = title[i];
@@ -685,6 +781,10 @@ do_paste(void)
 
 		HLock(h);
 		p = *h;
+
+		if (terminal.bracketed_paste)
+			conn_send(&conn, "\033[200~", 6);
+
 		sent = 0;
 		while (sent < len) {
 			short chunk;
@@ -695,6 +795,10 @@ do_paste(void)
 			conn_send(&conn, p + sent, chunk);
 			sent += chunk;
 		}
+
+		if (terminal.bracketed_paste)
+			conn_send(&conn, "\033[201~", 6);
+
 		HUnlock(h);
 	}
 	DisposeHandle(h);

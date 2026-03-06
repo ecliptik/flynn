@@ -53,6 +53,7 @@ typedef struct {
 	unsigned char	opts[TELOPT_COUNT];	/* per-option flags */
 	short		cols;			/* terminal columns */
 	short		rows;			/* terminal rows */
+	short		ttype_count;		/* TTYPE responses sent */
 } TelnetState;
 
 /* Initialize telnet state, zeroing everything */

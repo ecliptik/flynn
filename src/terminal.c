@@ -34,6 +34,10 @@ static void term_process_esc(Terminal *term, unsigned char ch);
 static void term_process_csi(Terminal *term, unsigned char ch);
 static void term_execute_csi(Terminal *term, unsigned char cmd);
 static void term_set_attr(Terminal *term, short param);
+static void term_process_osc(Terminal *term, unsigned char ch);
+static void term_finish_osc(Terminal *term);
+static void term_switch_to_alt(Terminal *term);
+static void term_switch_to_main(Terminal *term);
 static void term_dirty_row(Terminal *term, short row);
 static void term_dirty_range(Terminal *term, short r1, short r2);
 static void term_dirty_all(Terminal *term);
@@ -53,6 +57,20 @@ terminal_init(Terminal *term)
 	term->cur_attr = ATTR_NORMAL;
 	term->parse_state = PARSE_NORMAL;
 	term->cursor_visible = 1;
+
+	/* Character sets */
+	term->g0_charset = 'B';
+	term->g1_charset = 'B';
+	term->gl_charset = 0;
+
+	/* DEC modes */
+	term->autowrap = 1;
+	term->cursor_key_mode = 0;
+	term->origin_mode = 0;
+	term->insert_mode = 0;
+
+	/* Alternate screen */
+	term->alt_active = 0;
 
 	/* Fill screen with spaces */
 	term_clear_region(term, 0, 0, TERM_ROWS - 1, TERM_COLS - 1);
@@ -105,11 +123,16 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 			} else if (ch == 0x07) {
 				/* Bell */
 				SysBeep(5);
+			} else if (ch == 0x0E) {
+				/* SO - Shift Out: activate G1 */
+				term->gl_charset = 1;
+			} else if (ch == 0x0F) {
+				/* SI - Shift In: activate G0 */
+				term->gl_charset = 0;
 			} else if (ch >= 0x20) {
 				/* Printable character */
 				term_put_char(term, ch);
 			}
-			/* Characters 0x00-0x06, 0x0E-0x1A, 0x1C-0x1F ignored */
 			break;
 
 		case PARSE_ESC:
@@ -120,6 +143,20 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 		case PARSE_CSI_PARAM:
 		case PARSE_CSI_INTERMEDIATE:
 			term_process_csi(term, ch);
+			break;
+
+		case PARSE_OSC:
+		case PARSE_OSC_ESC:
+			term_process_osc(term, ch);
+			break;
+
+		case PARSE_DCS:
+			/* Consume DCS payload until ST (ESC \) */
+			if (ch == 0x1B)
+				term->parse_state = PARSE_OSC_ESC;
+			/* BEL also terminates DCS (like xterm) */
+			else if (ch == 0x07)
+				term->parse_state = PARSE_NORMAL;
 			break;
 		}
 	}
@@ -336,8 +373,8 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 	if (count > (bottom - top + 1))
 		count = bottom - top + 1;
 
-	/* Save lines scrolled off top into scrollback */
-	if (top == 0) {
+	/* Save lines scrolled off top into scrollback (not on alt screen) */
+	if (top == 0 && !term->alt_active) {
 		for (r = 0; r < count; r++)
 			term_save_scrollback(term, r);
 	}
@@ -396,15 +433,40 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 static void
 term_put_char(Terminal *term, unsigned char ch)
 {
+	unsigned char active_set;
+	unsigned char attr;
+	short c;
+
 	/* If wrap is pending, do the wrap now */
 	if (term->wrap_pending) {
-		term->wrap_pending = 0;
-		term_carriage_return(term);
-		term_newline(term);
+		if (term->autowrap) {
+			term->wrap_pending = 0;
+			term_carriage_return(term);
+			term_newline(term);
+		} else {
+			/* No autowrap: overwrite at right margin */
+			term->wrap_pending = 0;
+			term->cur_col = TERM_COLS - 1;
+		}
+	}
+
+	/* Determine character attributes with charset translation */
+	attr = term->cur_attr;
+	active_set = (term->gl_charset == 0) ?
+	    term->g0_charset : term->g1_charset;
+	if (active_set == '0' && ch >= 0x60 && ch <= 0x7E)
+		attr |= ATTR_DEC_GRAPHICS;
+
+	/* Insert mode: shift line right before placing character */
+	if (term->insert_mode) {
+		for (c = TERM_COLS - 1; c > term->cur_col; c--) {
+			term->screen[term->cur_row][c] =
+			    term->screen[term->cur_row][c - 1];
+		}
 	}
 
 	term->screen[term->cur_row][term->cur_col].ch = ch;
-	term->screen[term->cur_row][term->cur_col].attr = term->cur_attr;
+	term->screen[term->cur_row][term->cur_col].attr = attr;
 	term_dirty_row(term, term->cur_row);
 
 	if (term->cur_col < TERM_COLS - 1) {
@@ -458,17 +520,27 @@ term_process_esc(Terminal *term, unsigned char ch)
 		return;
 
 	case '7':
-		/* Save cursor position and attributes */
+		/* DECSC - save cursor position, attributes, and charsets */
 		term->saved_row = term->cur_row;
 		term->saved_col = term->cur_col;
 		term->saved_attr = term->cur_attr;
+		term->saved_g0_charset = term->g0_charset;
+		term->saved_g1_charset = term->g1_charset;
+		term->saved_gl_charset = term->gl_charset;
+		term->saved_origin_mode = term->origin_mode;
+		term->saved_autowrap = term->autowrap;
 		break;
 
 	case '8':
-		/* Restore cursor position and attributes */
+		/* DECRC - restore cursor position, attributes, and charsets */
 		term->cur_row = term_clamp(term->saved_row, 0, TERM_ROWS - 1);
 		term->cur_col = term_clamp(term->saved_col, 0, TERM_COLS - 1);
 		term->cur_attr = term->saved_attr;
+		term->g0_charset = term->saved_g0_charset;
+		term->g1_charset = term->saved_g1_charset;
+		term->gl_charset = term->saved_gl_charset;
+		term->origin_mode = term->saved_origin_mode;
+		term->autowrap = term->saved_autowrap;
 		term->wrap_pending = 0;
 		break;
 
@@ -499,25 +571,42 @@ term_process_esc(Terminal *term, unsigned char ch)
 		terminal_reset(term);
 		return;
 
+	case ']':
+		/* OSC introducer */
+		term->osc_len = 0;
+		term->osc_param = -1;
+		term->parse_state = PARSE_OSC;
+		return;
+
+	case 'P':
+		/* DCS introducer - consume until ST */
+		term->parse_state = PARSE_DCS;
+		return;
+
 	case '(':
 	case ')':
 	case '#':
 		/*
 		 * Character set designation / DEC double-width etc.
-		 * These consume one more byte which we simply discard.
-		 * Stay in ESC state to eat that byte, then return to
-		 * NORMAL.  We use intermediate to track this.
+		 * These consume one more byte.  Store the intermediate
+		 * and stay in PARSE_ESC to eat the follow-up byte.
 		 */
 		term->intermediate = ch;
-		/* Stay in PARSE_ESC; next byte will fall through default */
 		return;
 
 	default:
+		if (term->intermediate == '(') {
+			/* ESC ( X - designate G0 charset */
+			term->g0_charset = ch;
+		} else if (term->intermediate == ')') {
+			/* ESC ) X - designate G1 charset */
+			term->g1_charset = ch;
+		}
 		/*
-		 * If we stored an intermediate from ESC ( / ) / # above,
-		 * this is the consumed follow-up byte.  Otherwise it is
-		 * an unrecognised sequence.  Either way, return to normal.
+		 * For '#' or unrecognised sequences, just consume
+		 * and return to normal.
 		 */
+		term->intermediate = 0;
 		break;
 	}
 
@@ -570,9 +659,9 @@ term_process_csi(Terminal *term, unsigned char ch)
 		return;
 	}
 
-	if (ch == '?') {
-		/* Private mode introducer (e.g. ESC[?25h for cursor) */
-		term->intermediate = '?';
+	if (ch == '?' || ch == '>') {
+		/* Private mode introducer (? for DECSET, > for secondary DA) */
+		term->intermediate = ch;
 		return;
 	}
 
@@ -649,7 +738,12 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 	case 'f':
 		/* CUP / HVP - cursor position (row;col, 1-based) */
 		term->wrap_pending = 0;
-		term->cur_row = term_clamp(p1 - 1, 0, TERM_ROWS - 1);
+		if (term->origin_mode) {
+			term->cur_row = term_clamp(p1 - 1 + term->scroll_top,
+			    term->scroll_top, term->scroll_bottom);
+		} else {
+			term->cur_row = term_clamp(p1 - 1, 0, TERM_ROWS - 1);
+		}
 		term->cur_col = term_clamp(p2 - 1, 0, TERM_COLS - 1);
 		break;
 
@@ -773,7 +867,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->scroll_bottom = TERM_ROWS - 1;
 		}
 		/* Cursor moves to home after setting scroll region */
-		term->cur_row = 0;
+		term->cur_row = term->origin_mode ? term->scroll_top : 0;
 		term->cur_col = 0;
 		term->wrap_pending = 0;
 		break;
@@ -785,8 +879,23 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term_set_attr(term, 0);
 		} else {
 			short i;
-			for (i = 0; i < term->num_params; i++)
+			for (i = 0; i < term->num_params; i++) {
+				if (term->params[i] == 38 ||
+				    term->params[i] == 48) {
+					/* Extended color: skip sub-params */
+					if (i + 1 < term->num_params &&
+					    term->params[i + 1] == 5) {
+						/* 256-color: 38;5;N */
+						i += 2;
+					} else if (i + 1 < term->num_params &&
+					    term->params[i + 1] == 2) {
+						/* Truecolor: 38;2;R;G;B */
+						i += 4;
+					}
+					continue;
+				}
 				term_set_attr(term, term->params[i]);
+			}
 		}
 		break;
 
@@ -836,26 +945,176 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 	case 'h':
 		/* SM - set mode */
 		if (term->intermediate == '?') {
-			p1 = (term->num_params >= 1) ? term->params[0] : 0;
-			if (p1 == 25)
-				term->cursor_visible = 1;
+			short i;
+			for (i = 0; i < term->num_params; i++) {
+				switch (term->params[i]) {
+				case 1:
+					term->cursor_key_mode = 1;
+					break;
+				case 6:
+					term->origin_mode = 1;
+					term->cur_row = term->scroll_top;
+					term->cur_col = 0;
+					term->wrap_pending = 0;
+					break;
+				case 7:
+					term->autowrap = 1;
+					break;
+				case 25:
+					term->cursor_visible = 1;
+					break;
+				case 47:
+				case 1047:
+					term_switch_to_alt(term);
+					break;
+				case 1048:
+					/* Save cursor */
+					term->saved_row = term->cur_row;
+					term->saved_col = term->cur_col;
+					term->saved_attr = term->cur_attr;
+					break;
+				case 1049:
+					/* Save cursor + switch to alt */
+					term->saved_row = term->cur_row;
+					term->saved_col = term->cur_col;
+					term->saved_attr = term->cur_attr;
+					term_switch_to_alt(term);
+					break;
+				case 2004:
+					term->bracketed_paste = 1;
+					break;
+				}
+			}
+		} else if (term->intermediate == 0) {
+			short i;
+			for (i = 0; i < term->num_params; i++) {
+				switch (term->params[i]) {
+				case 4:
+					term->insert_mode = 1;
+					break;
+				}
+			}
 		}
 		break;
 
 	case 'l':
 		/* RM - reset mode */
 		if (term->intermediate == '?') {
-			p1 = (term->num_params >= 1) ? term->params[0] : 0;
-			if (p1 == 25)
-				term->cursor_visible = 0;
+			short i;
+			for (i = 0; i < term->num_params; i++) {
+				switch (term->params[i]) {
+				case 1:
+					term->cursor_key_mode = 0;
+					break;
+				case 6:
+					term->origin_mode = 0;
+					term->cur_row = 0;
+					term->cur_col = 0;
+					term->wrap_pending = 0;
+					break;
+				case 7:
+					term->autowrap = 0;
+					break;
+				case 25:
+					term->cursor_visible = 0;
+					break;
+				case 47:
+				case 1047:
+					term_switch_to_main(term);
+					break;
+				case 1048:
+					/* Restore cursor */
+					term->cur_row = term_clamp(
+					    term->saved_row, 0,
+					    TERM_ROWS - 1);
+					term->cur_col = term_clamp(
+					    term->saved_col, 0,
+					    TERM_COLS - 1);
+					term->cur_attr = term->saved_attr;
+					term->wrap_pending = 0;
+					break;
+				case 1049:
+					/* Switch to main + restore cursor */
+					term_switch_to_main(term);
+					term->cur_row = term_clamp(
+					    term->saved_row, 0,
+					    TERM_ROWS - 1);
+					term->cur_col = term_clamp(
+					    term->saved_col, 0,
+					    TERM_COLS - 1);
+					term->cur_attr = term->saved_attr;
+					term->wrap_pending = 0;
+					break;
+				case 2004:
+					term->bracketed_paste = 0;
+					break;
+				}
+			}
+		} else if (term->intermediate == 0) {
+			short i;
+			for (i = 0; i < term->num_params; i++) {
+				switch (term->params[i]) {
+				case 4:
+					term->insert_mode = 0;
+					break;
+				}
+			}
 		}
 		break;
 
 	case 'c':
-		/* DA - device attributes: respond as VT100 */
-		if (term->intermediate == 0 || term->intermediate == '?') {
-			memcpy(term->response, "\033[?1;2c", 7);
-			term->response_len = 7;
+		/* DA - device attributes */
+		if (term->intermediate == '>') {
+			/* Secondary DA: respond as VT220 */
+			memcpy(term->response, "\033[>1;10;0c", 10);
+			term->response_len = 10;
+		} else if (term->intermediate == 0 ||
+		    term->intermediate == '?') {
+			/* Primary DA: respond as VT220 */
+			memcpy(term->response, "\033[?62;1;6c", 10);
+			term->response_len = 10;
+		}
+		break;
+
+	case 's':
+		/* SCOSC - save cursor position (like ESC 7) */
+		if (term->intermediate == 0) {
+			term->saved_row = term->cur_row;
+			term->saved_col = term->cur_col;
+			term->saved_attr = term->cur_attr;
+		}
+		break;
+
+	case 'u':
+		/* SCORC - restore cursor position (like ESC 8) */
+		if (term->intermediate == 0) {
+			term->cur_row = term_clamp(term->saved_row,
+			    0, TERM_ROWS - 1);
+			term->cur_col = term_clamp(term->saved_col,
+			    0, TERM_COLS - 1);
+			term->cur_attr = term->saved_attr;
+			term->wrap_pending = 0;
+		}
+		break;
+
+	case 'p':
+		/* DECSTR - soft reset (CSI ! p) */
+		if (term->intermediate == '!') {
+			term->cur_attr = ATTR_NORMAL;
+			term->g0_charset = 'B';
+			term->g1_charset = 'B';
+			term->gl_charset = 0;
+			term->origin_mode = 0;
+			term->autowrap = 1;
+			term->cursor_key_mode = 0;
+			term->insert_mode = 0;
+			term->cursor_visible = 1;
+			term->scroll_top = 0;
+			term->scroll_bottom = TERM_ROWS - 1;
+			term->saved_row = 0;
+			term->saved_col = 0;
+			term->saved_attr = ATTR_NORMAL;
+			term->wrap_pending = 0;
 		}
 		break;
 
@@ -882,6 +1141,9 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 
 /*
  * term_set_attr - apply a single SGR parameter
+ *
+ * Note: 256-color (38;5;N) and truecolor (38;2;R;G;B) sequences
+ * are skipped in the SGR loop in term_execute_csi, not here.
  */
 static void
 term_set_attr(Terminal *term, short param)
@@ -895,32 +1157,187 @@ term_set_attr(Terminal *term, short param)
 		/* Bold */
 		term->cur_attr |= ATTR_BOLD;
 		break;
+	case 2:
+		/* Dim - on monochrome, clear bold */
+		term->cur_attr &= ~ATTR_BOLD;
+		break;
+	case 3:
+		/* Italic - map to underline on monochrome */
+		term->cur_attr |= ATTR_UNDERLINE;
+		break;
 	case 4:
 		/* Underline */
 		term->cur_attr |= ATTR_UNDERLINE;
+		break;
+	case 5:
+	case 6:
+		/* Blink / rapid blink - map to bold on monochrome */
+		term->cur_attr |= ATTR_BOLD;
 		break;
 	case 7:
 		/* Inverse / reverse video */
 		term->cur_attr |= ATTR_INVERSE;
 		break;
 	case 22:
-		/* Normal intensity (un-bold) */
+		/* Normal intensity (un-bold, un-dim) */
 		term->cur_attr &= ~ATTR_BOLD;
+		break;
+	case 23:
+		/* Not italic - clear underline (since we mapped italic there) */
+		term->cur_attr &= ~ATTR_UNDERLINE;
 		break;
 	case 24:
 		/* Not underlined */
 		term->cur_attr &= ~ATTR_UNDERLINE;
+		break;
+	case 25:
+		/* Blink off - clear bold (since we mapped blink to bold) */
+		term->cur_attr &= ~ATTR_BOLD;
 		break;
 	case 27:
 		/* Not inverse */
 		term->cur_attr &= ~ATTR_INVERSE;
 		break;
 	default:
+		/* Bright foreground 90-97: map to bold on monochrome */
+		if (param >= 90 && param <= 97)
+			term->cur_attr |= ATTR_BOLD;
 		/*
-		 * Ignore colour codes (30-37, 40-47, 38, 48, 90-97,
-		 * 100-107) and anything else we don't support.
-		 * This is a monochrome terminal.
+		 * Ignore standard fg/bg (30-37, 40-47, 100-107, 39, 49)
+		 * and anything else — this is a monochrome terminal.
 		 */
 		break;
 	}
+}
+
+/*
+ * term_process_osc - accumulate OSC sequence bytes
+ *
+ * OSC format: ESC ] Ps ; Pt BEL   (or ESC ] Ps ; Pt ESC \)
+ * Ps = numeric parameter, Pt = text payload
+ */
+static void
+term_process_osc(Terminal *term, unsigned char ch)
+{
+	if (term->parse_state == PARSE_OSC_ESC) {
+		/* Previous byte was ESC inside OSC */
+		if (ch == '\\') {
+			/* ST (String Terminator) - finish OSC */
+			term_finish_osc(term);
+		}
+		/* Any other byte after ESC in OSC: abort */
+		term->parse_state = PARSE_NORMAL;
+		return;
+	}
+
+	/* PARSE_OSC state */
+	if (ch == 0x07) {
+		/* BEL terminates OSC */
+		term_finish_osc(term);
+		term->parse_state = PARSE_NORMAL;
+		return;
+	}
+
+	if (ch == 0x1B) {
+		/* ESC inside OSC: look for \ next */
+		term->parse_state = PARSE_OSC_ESC;
+		return;
+	}
+
+	/* Parse the numeric parameter before ';' */
+	if (term->osc_param == -1) {
+		if (ch >= '0' && ch <= '9') {
+			if (term->osc_len == 0)
+				term->osc_param = 0;
+			term->osc_param = term->osc_param * 10 + (ch - '0');
+			return;
+		}
+		if (ch == ';') {
+			/* End of parameter, start of payload */
+			if (term->osc_param == -1)
+				term->osc_param = 0;
+			term->osc_len = 0;
+			return;
+		}
+		/* Unexpected byte in param area - discard */
+		term->parse_state = PARSE_NORMAL;
+		return;
+	}
+
+	/* Accumulate payload text */
+	if (term->osc_len < (short)(sizeof(term->osc_buf) - 1))
+		term->osc_buf[term->osc_len++] = ch;
+}
+
+/*
+ * term_finish_osc - execute a completed OSC sequence
+ */
+static void
+term_finish_osc(Terminal *term)
+{
+	short len;
+
+	term->osc_buf[term->osc_len] = '\0';
+
+	switch (term->osc_param) {
+	case 0:
+	case 2:
+		/* Set window title */
+		len = term->osc_len;
+		if (len > (short)(sizeof(term->window_title) - 1))
+			len = sizeof(term->window_title) - 1;
+		memcpy(term->window_title, term->osc_buf, len);
+		term->window_title[len] = '\0';
+		term->title_changed = 1;
+		break;
+	case 1:
+		/* Icon title only - ignore on Mac */
+		break;
+	default:
+		/* Other OSC sequences: silently discard */
+		break;
+	}
+}
+
+/*
+ * term_switch_to_alt - switch to alternate screen buffer
+ */
+static void
+term_switch_to_alt(Terminal *term)
+{
+	if (term->alt_active)
+		return;
+
+	/* Save main screen contents */
+	memcpy(term->alt_screen, term->screen, sizeof(term->screen));
+	term->alt_cur_row = term->cur_row;
+	term->alt_cur_col = term->cur_col;
+	term->alt_cur_attr = term->cur_attr;
+	term->alt_active = 1;
+
+	/* Clear the screen for alt buffer use */
+	term_clear_region(term, 0, 0, TERM_ROWS - 1, TERM_COLS - 1);
+	term->cur_row = 0;
+	term->cur_col = 0;
+	term->wrap_pending = 0;
+	term_dirty_all(term);
+}
+
+/*
+ * term_switch_to_main - switch back to main screen buffer
+ */
+static void
+term_switch_to_main(Terminal *term)
+{
+	if (!term->alt_active)
+		return;
+
+	/* Restore main screen contents */
+	memcpy(term->screen, term->alt_screen, sizeof(term->screen));
+	term->cur_row = term->alt_cur_row;
+	term->cur_col = term->alt_cur_col;
+	term->cur_attr = term->alt_cur_attr;
+	term->alt_active = 0;
+	term->wrap_pending = 0;
+	term_dirty_all(term);
 }

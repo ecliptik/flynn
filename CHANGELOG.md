@@ -2,6 +2,56 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-03-06
+
+### Added
+- Alternate screen buffer (DECSET ?1049/?1047/?47)
+  - Save/restore main screen (3.8KB static buffer in Terminal struct)
+  - Scrollback frozen during alt screen (vi, nano, less don't pollute history)
+  - Clear on switch, restore on switch back
+- OSC window title (ESC]0;title BEL / ESC]2;title ST)
+  - Window title bar shows "Flynn - <title>" when set by remote host
+  - Reverts to "Flynn - <host>" when title is empty
+- DCS string consumption (PARSE_DCS state, consumed until ST)
+- Application cursor keys (DECCKM, DECSET ?1)
+  - Arrow keys send ESC O A/B/C/D when enabled (vi, tmux navigation)
+- Auto-wrap toggle (DECAWM, DECSET ?7)
+  - No-autowrap mode overwrites at right margin instead of wrapping
+- Origin mode (DECOM, DECSET ?6)
+  - Cursor positioning relative to scroll region when enabled
+- Insert/Replace mode (IRM, CSI 4 h/l)
+  - Insert mode shifts line right before placing characters
+- Character set designation (ESC ( 0/B, ESC ) 0/B)
+  - G0/G1 charset tracking, ATTR_DEC_GRAPHICS bit (0x08) in TermCell.attr
+- SI/SO charset switching (0x0E/0x0F)
+  - Shift Out activates G1, Shift In activates G0
+- DECSC/DECRC extended (ESC 7/8 now save/restore charsets, origin mode, autowrap)
+- Secondary DA response (CSI > c → ESC[>1;10;0c, VT220)
+- Primary DA upgraded to VT220 (ESC[?62;1;6c, was VT100 ESC[?1;2c)
+- Soft reset (DECSTR, CSI ! p)
+  - Resets attributes, charsets, modes, scroll region, cursor
+- CSI s/u cursor save/restore (ANSI alternative to ESC 7/8)
+- Bracketed paste mode (DECSET ?2004)
+  - Pasted text wrapped in ESC[200~/ESC[201~ markers when enabled
+- F-key support (F1-F12)
+  - ADB virtual keycodes for extended keyboards
+  - Cmd+1..0 sends F1-F10 for M0110 keyboards without function keys
+- SGR extended color fix
+  - 256-color (38;5;N) and truecolor (38;2;R;G;B) sub-parameters now skipped
+    cleanly instead of misinterpreted as blink/underline
+- Additional SGR attribute mappings for monochrome
+  - Dim (2) clears bold, italic (3) maps to underline, blink (5/6) maps to bold
+  - Bright foreground (90-97) maps to bold
+  - Reset codes: not-italic (23), blink-off (25)
+
+### Changed
+- Version: 0.6.1 → 0.7.0
+- DA response identifies as VT220 (was VT100)
+- 8-state parser (added PARSE_OSC, PARSE_OSC_ESC, PARSE_DCS)
+- Terminal struct gains ~4KB for alternate screen buffer, charset state,
+  DEC modes, OSC buffer, and window title fields
+- Build size: ~78KB (up from ~70KB)
+
 ## [0.6.1] - 2026-03-06
 
 ### Changed

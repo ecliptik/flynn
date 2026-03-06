@@ -67,7 +67,6 @@
 #define OPT_NEWENV	39
 
 /* Terminal identity */
-static const char ttype_str[] = "VT100";
 static const char tspeed_str[] = "19200,19200";
 
 /*
@@ -290,15 +289,21 @@ handle_sb(TelnetState *ts, unsigned char *send, short *sendlen)
 
 	switch (ts->sb_buf[0]) {
 	case OPT_TTYPE:
-		/* Server sent SB TTYPE SEND -- respond with our terminal type */
+		/* Server sent SB TTYPE SEND -- respond with terminal type */
 		if (ts->sb_buf[1] == SB_SEND) {
+			const char *ttype;
+
+			/* First request: VT220, subsequent: VT100 */
+			ttype = (ts->ttype_count == 0) ? "VT220" : "VT100";
+			ts->ttype_count++;
+
 			buf[0] = IAC;
 			buf[1] = SB;
 			buf[2] = OPT_TTYPE;
 			buf[3] = SB_IS;
 			len = 4;
-			for (i = 0; ttype_str[i] != '\0'; i++)
-				buf[len++] = (unsigned char)ttype_str[i];
+			for (i = 0; ttype[i] != '\0'; i++)
+				buf[len++] = (unsigned char)ttype[i];
 			buf[len++] = IAC;
 			buf[len++] = SE;
 			send_bytes(send, sendlen, buf, len);

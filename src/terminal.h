@@ -34,6 +34,7 @@
 #define ATTR_BOLD		0x01
 #define ATTR_UNDERLINE		0x02
 #define ATTR_INVERSE		0x04
+#define ATTR_DEC_GRAPHICS	0x08
 
 /* Parser states */
 #define PARSE_NORMAL		0
@@ -41,6 +42,9 @@
 #define PARSE_CSI		2	/* got ESC[ */
 #define PARSE_CSI_PARAM		3	/* reading CSI numeric params */
 #define PARSE_CSI_INTERMEDIATE	4	/* got intermediate byte(s) */
+#define PARSE_OSC		5	/* got ESC] */
+#define PARSE_OSC_ESC		6	/* got ESC inside OSC, looking for \ */
+#define PARSE_DCS		7	/* got ESC P, consume until ST */
 
 /* A single terminal cell */
 typedef struct {
@@ -62,10 +66,22 @@ typedef struct {
 	short		cur_row;
 	short		cur_col;
 
+	/* Alternate screen buffer */
+	TermCell	alt_screen[TERM_ROWS][TERM_COLS];
+	short		alt_cur_row;
+	short		alt_cur_col;
+	unsigned char	alt_cur_attr;
+	unsigned char	alt_active;
+
 	/* Saved cursor (ESC 7 / ESC 8) */
 	short		saved_row;
 	short		saved_col;
 	unsigned char	saved_attr;
+	unsigned char	saved_g0_charset;
+	unsigned char	saved_g1_charset;
+	unsigned char	saved_gl_charset;
+	unsigned char	saved_origin_mode;
+	unsigned char	saved_autowrap;
 
 	/* Current text attributes */
 	unsigned char	cur_attr;
@@ -73,6 +89,18 @@ typedef struct {
 	/* Scroll region (top and bottom, inclusive, 0-based) */
 	short		scroll_top;
 	short		scroll_bottom;
+
+	/* Character sets */
+	unsigned char	g0_charset;	/* 'B' = US ASCII, '0' = DEC Special Graphics */
+	unsigned char	g1_charset;	/* 'B' = US ASCII, '0' = DEC Special Graphics */
+	unsigned char	gl_charset;	/* GL points to: 0 = G0, 1 = G1 */
+
+	/* DEC modes */
+	unsigned char	cursor_key_mode;	/* DECCKM: 0=normal, 1=application */
+	unsigned char	autowrap;		/* DECAWM: 1=on (default), 0=off */
+	unsigned char	origin_mode;		/* DECOM: 0=absolute, 1=relative */
+	unsigned char	insert_mode;		/* IRM: 0=replace, 1=insert */
+	unsigned char	bracketed_paste;	/* 0=off, 1=on */
 
 	/* Auto-wrap state */
 	unsigned char	wrap_pending;	/* cursor at right margin, next char wraps */
@@ -95,6 +123,15 @@ typedef struct {
 	/* Response buffer for DA/DSR replies */
 	char		response[32];
 	short		response_len;
+
+	/* OSC buffer */
+	char		osc_buf[128];
+	short		osc_len;
+	short		osc_param;
+
+	/* OSC window title */
+	unsigned char	title_changed;
+	char		window_title[64];
 } Terminal;
 
 /* Initialize terminal to default state */

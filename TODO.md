@@ -84,9 +84,33 @@
 - [x] Cache selection active flag per row in draw_row()
 - [x] Cache TextFace() value to avoid redundant Toolbox calls
 
+## Phase 9: Terminal Foundations
+- [x] Alternate screen buffer (DECSET ?1049/?1047/?47)
+- [x] OSC window title (ESC]0;title BEL, ESC]2;title ST)
+- [x] DCS string consumption (PARSE_DCS state)
+- [x] Application cursor keys (DECCKM, DECSET ?1)
+- [x] Auto-wrap toggle (DECAWM, DECSET ?7)
+- [x] Origin mode (DECOM, DECSET ?6)
+- [x] Insert/Replace mode (IRM, CSI 4 h/l)
+- [x] Character set designation (ESC ( 0/B, ESC ) 0/B)
+- [x] SI/SO charset switching (0x0E/0x0F)
+- [x] ATTR_DEC_GRAPHICS bit (0x08) in TermCell.attr
+- [x] Secondary DA response (CSI > c → VT220)
+- [x] Primary DA upgraded to VT220 (ESC[?62;1;6c)
+- [x] Soft reset (DECSTR, CSI ! p)
+- [x] CSI s/u cursor save/restore
+- [x] Bracketed paste mode (DECSET ?2004)
+- [x] F-key support (F1-F12, ADB keycodes + Cmd+1..0 for M0110)
+- [x] SGR extended color fix (38;5;N, 38;2;R;G;B skipped cleanly)
+- [x] Additional SGR mappings (dim, italic, blink, bright fg for monochrome)
+
+## Phase 10: DEC Special Graphics + VT220 Identity
+- [ ] draw_line_char() in terminal_ui.c (QuickDraw box-drawing)
+- [ ] Change TTYPE from "VT100" to "VT220" in telnet.c
+
 ## Future
 - [ ] Session bookmarks (named host/port list in prefs)
-- [ ] Alternate screen buffer (DECSET 1049 for vi/nano/less)
 - [ ] Font/size settings (Monaco 9/12, Chicago 12, Geneva 9/10)
+- [ ] Application keypad mode (ESC = / ESC >)
 - [ ] Color support (for System 7 / color Macs)
 - [ ] SSH support
