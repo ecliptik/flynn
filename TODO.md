@@ -112,5 +112,6 @@
 - [ ] Session bookmarks (named host/port list in prefs)
 - [ ] Font/size settings (Monaco 9/12, Chicago 12, Geneva 9/10)
 - [ ] Application keypad mode (ESC = / ESC >)
+- [ ] UTF-8 box-drawing mapping (tmux sends Unicode on UTF-8 servers)
 - [ ] Color support (for System 7 / color Macs)
 - [ ] SSH support

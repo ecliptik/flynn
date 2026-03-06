@@ -15,10 +15,15 @@ All notable changes to this project will be documented in this file.
   - Unknown graphic characters fall back to regular text rendering
 - TUI apps now display proper box-drawing borders (tmux, mc, dialog)
 
+### Fixed
+- OSC title parsing: semicolon separator was included in title string
+  (e.g. ";Test Title" instead of "Test Title") due to osc_param being
+  modified during digit parsing, causing the semicolon check to be skipped
+
 ### Changed
 - Version: 0.7.0 → 0.8.0
 - terminal_ui.c draw_row() dispatches ATTR_DEC_GRAPHICS runs to draw_line_char()
-- Build size: ~80KB (up from ~78KB)
+- Build size: ~77KB (up from ~76KB)
 
 ## [0.7.0] - 2026-03-06
 
