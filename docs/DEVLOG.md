@@ -1,5 +1,177 @@
 # Development Log
 
+## 2026-03-06: v0.9.1 — Finder Icon, Read Me, Font Menu, BinHex
+
+### Custom Finder Icon (ICN# 128)
+
+Designed a 32x32 monochrome pixel art icon depicting a Macintosh Plus with a white screen showing a black `>_` prompt. Three iterations: first attempt was too dark (solid CRT), second used dark screen with white prompt, final version matched Flynn's actual white-background aesthetic.
+
+The icon is defined as raw hex `data 'ICN#'` in telnet.r (not as a Rez `resource` — Retro68's Rez doesn't support the `ICN#` type directly). The mask bitmap mirrors the icon outline so the Finder composites it correctly against any desktop pattern.
+
+Associated resources for Finder registration:
+- `FREF` (128) — maps file type 'APPL' to icon local ID 0
+- `BNDL` (128) — associates creator code 'FLYN' with ICN# and FREF resources
+- `FLYN` (0) — signature resource with Pascal string "Flynn - Telnet Client"
+
+Desktop database rebuild (Cmd+Option during boot) is required after adding BNDL resources for the Finder to pick up the new icon.
+
+### TeachText Read Me
+
+Created `docs/Flynn Read Me` — 274 lines of plain ASCII documentation covering usage, features, keyboard shortcuts, M0110 keyboard notes, bookmarks, font selection, troubleshooting, credits, and contact info. Deployed to the HFS image as type 'TEXT', creator 'ttxt' so it opens with TeachText (the System 6 built-in text viewer).
+
+TeachText wasn't installed on the System 6.0.8 HDD image. Mounted the System Tools floppy via hfsutils and copied TeachText to the system volume.
+
+Line endings converted from Unix LF to Mac CR via `tr '\n' '\r'` in build.sh.
+
+### Settings Menu → Font Menu
+
+Renamed MENU 131 from "Settings" to "Font" since it only contains Monaco 9/12 font choices. Updated all constants (`SETTINGS_MENU_ID` → `FONT_MENU_ID`, etc.) and the global variable (`settings_menu` → `font_menu`) in main.h and main.c.
+
+### BinHex Archive Output
+
+Added BinHex (.hqx) generation to build.sh using the `binhex` command from the `macutils` apt package. BinHex 4.0 is a text-safe encoding that preserves both data and resource forks, making it suitable for distribution via email, web, or BBS where binary transfers might corrupt Mac files. The input is Flynn.bin (MacBinary II format, already produced by Retro68's MakeAPPL).
+
+### Folder-Based Deployment
+
+Changed HFS deployment from loose files at the volume root to a `:Flynn:` folder via `hmkdir :Flynn`. The folder contains Flynn (application), Flynn Prefs (created at runtime), and Flynn Read Me (TeachText document).
+
+### About Dialog Update
+
+Added ecliptik.com URL as a new StaticText item in DITL 130. Bumped dialog height and repositioned OK button to accommodate. Version string updated to 0.9.1.
+
+---
+
+## 2026-03-06: Phases 11-14 — Bookmarks, Font, xterm, UTF-8 (v0.9.0)
+
+### Session Bookmarks (Phase 11)
+
+New bookmark manager dialog (DLOG 131) with a UserItem-based list display, Add/Edit/Delete/Connect buttons. Up to 8 bookmarks stored in preferences (version bumped from 1 to 3 with migration). Each bookmark has name, host, port fields.
+
+Key implementation details:
+- `bm_list_draw()` — UserItem draw proc renders bookmark list with inverse highlight for selection
+- `bm_filter()` — ModalDialog filter handles clicks in the list area
+- `bm_edit_dialog()` — Separate DLOG 132 for adding/editing bookmarks
+- Dynamic Session menu: bookmarks appear below a separator after Quit, using `AppendMenu()`/`SetMenuItemText()` at startup and after bookmark changes
+- `conn_connect()` extracted from `conn_open_dialog()` to allow direct connection from bookmark selection without opening the connect dialog
+
+Preferences migration: `prefs_load()` handles v1 (host/port only), v2 (+ bookmarks), and v3 (+ font) gracefully with field-by-field reads.
+
+### Font Selection (Phase 12)
+
+Added Font menu (MENU 131, initially called "Settings") with Monaco 9pt and Monaco 12pt options:
+- `term_ui_set_font()` — Changes font, calls `GetFontInfo()` to measure actual glyph metrics, recomputes cell dimensions and grid size
+- `active_cols`/`active_rows` in Terminal struct replace ~40 hardcoded `TERM_COLS`/`TERM_ROWS` references
+- `SizeWindow()` resizes the window to fit the computed grid
+- NAWS renegotiation sent to server on font change (if connected)
+- Font preference saved in FlynnPrefs v3 (font_id, font_size fields)
+- Checkmark on active font menu item via `CheckItem()`
+
+### xterm Compatibility (Phase 13)
+
+Extended terminal emulation for better compatibility with modern Linux programs:
+- TTYPE cycling: first sub-negotiation returns "xterm", then "VT220", then "VT100" — matches what tmux/vim expect
+- Application keypad mode (DECKPAM `ESC =` / DECKPNM `ESC >`) — numpad keys send SS3 sequences in application mode
+- Silent consumption of mouse reporting modes (?1000-1006), focus events (?1004), cursor blink (?12)
+
+### UTF-8 Support (Phase 14)
+
+Added a UTF-8 decoder state machine to `terminal_process()`:
+- 2/3/4-byte UTF-8 sequences decoded to Unicode codepoints
+- Box-drawing (U+2500-U+257F) → DEC Special Graphics characters (33 mappings)
+- Latin-1 Supplement (U+0080-U+00FF) → Mac Roman via 128-entry lookup table
+- Common symbols → Mac Roman (em/en dash, curly quotes, bullet, ellipsis, euro, pi, delta, trademark, etc.)
+- Wide characters and emoji → 2-cell `??` placeholder with modifier/ZWJ/skin-tone sequence absorption
+- Unmapped codepoints render as `?` fallback
+
+### Bug Fixes in v0.9.0
+
+- Screen not cleared on disconnect: `do_disconnect()` now calls `terminal_reset()`, `telnet_init()`, redraws
+- Overlapping `strncpy` UB in `conn_connect()` when host parameter pointed to same buffer as `conn.host`
+- UTF-8 fallback was Mac Roman 0xB7 (Σ sigma) — changed to `?`
+
+---
+
+## 2026-03-06: Phase 10 — DEC Special Graphics (v0.8.0)
+
+### Line-Drawing Characters via QuickDraw
+
+Implemented `draw_line_char()` in terminal_ui.c — renders box-drawing glyphs using QuickDraw `MoveTo()`/`LineTo()` primitives instead of font characters. 18 character mappings: corners (┌┐└┘), tees (├┤┬┴), cross (┼), horizontal (─), vertical (│), diamond (◆), checkerboard (▒), centered dot (·), degree (°), plus/minus (±).
+
+Bold attribute renders thicker lines (`PenSize(2,1)`). Inverse renders white-on-black via `PaintRect` + `patBic`. Unknown DEC graphic characters fall back to regular text. The `draw_row()` function dispatches `ATTR_DEC_GRAPHICS` runs to `draw_line_char()`.
+
+This enables proper box-drawing borders in tmux, Midnight Commander, dialog, and other TUI applications.
+
+### OSC Title Bug Fix
+
+Fixed semicolon appearing in window title (";Test Title" instead of "Test Title"). The `osc_param` variable was modified during digit parsing, causing the semicolon separator check to be skipped.
+
+---
+
+## 2026-03-06: Phase 9 — Alt Screen, DEC Modes, Charsets, F-keys (v0.7.0)
+
+### Alternate Screen Buffer
+
+`DECSET ?1049/?1047/?47` saves main screen to a 3.8KB static buffer, clears the alt screen, and restores on switch back. Scrollback is frozen during alt screen — vi, nano, and less don't pollute history.
+
+### New Terminal Modes
+
+- Application cursor keys (DECCKM ?1): arrows send `ESC O A/B/C/D` for vi/tmux
+- Auto-wrap toggle (DECAWM ?7): overwrites at right margin instead of wrapping
+- Origin mode (DECOM ?6): cursor positioning relative to scroll region
+- Insert/Replace mode (IRM): insert shifts line right before placing characters
+- Bracketed paste mode (?2004): wraps pasted text in `ESC[200~`/`ESC[201~`
+- Soft reset (DECSTR, `CSI ! p`): resets attributes, charsets, modes, scroll region
+
+### Character Sets
+
+G0/G1 charset tracking with `ESC ( 0/B` and `ESC ) 0/B` designation. SI/SO (0x0E/0x0F) switches between G0 and G1. `ATTR_DEC_GRAPHICS` bit (0x08) in TermCell.attr flags cells for line-drawing rendering.
+
+### F-Key Support
+
+ADB virtual keycodes for extended keyboards (F1-F12 native). Cmd+1..0 sends F1-F10 for M0110 keyboards. Sends standard xterm-style `ESC[11~` through `ESC[24~` sequences.
+
+### Parser and DA Upgrades
+
+- 8-state parser: added PARSE_OSC, PARSE_OSC_ESC, PARSE_DCS states
+- OSC window title: `ESC]0;title BEL` / `ESC]2;title ST` sets "Flynn - <title>" in title bar
+- DCS string consumption (consumed until ST)
+- Primary DA upgraded to VT220 (`ESC[?62;1;6c`)
+- Secondary DA response (`CSI > c → ESC[>1;10;0c`)
+- Extended DECSC/DECRC saves/restores charsets, origin mode, autowrap
+- SGR extended color: 256-color and truecolor sub-parameters now skipped cleanly
+
+---
+
+## 2026-03-06: Phase 8 — Performance Optimizations (v0.6.1)
+
+Reduced WaitNextEvent timeout from 5 ticks (83ms) to 1 tick (17ms) for faster character echo. Replaced `memset` in `_TCPStatus()` with explicit field initialization (~200 bytes saved per event loop iteration). Cached `sel.active` flag per row in `draw_row()` to avoid 80 `term_ui_sel_contains()` calls per row. Cached `TextFace()` value to skip redundant Toolbox calls for consecutive same-style attribute runs.
+
+---
+
+## 2026-03-06: Phase 7 — Mouse Text Selection (v0.6.0)
+
+### Selection Model
+
+Added `Selection` struct to terminal_ui with start/end coordinates, active flag, and anchoring state. Three selection modes:
+
+- **Click-drag**: Stream selection from mouseDown through mouseDrag to mouseUp. Tracks `sel_start` and extends to current mouse position.
+- **Double-click**: Word selection — expands both directions from click point through contiguous non-space characters. Uses `GetDblTime` via low-memory global 0x02F0 (Retro68 compat).
+- **Shift-click**: Extends existing selection from original anchor to new click point.
+
+### Rendering
+
+Selection renders as inverse video — XORs `ATTR_INVERSE` per cell in `draw_row()`. Already-inverse cells (e.g., status bars) render as normal when selected (double inversion). Cursor blink suppressed during active selection.
+
+### Copy Integration
+
+Cmd+C now checks for active selection first: if present, copies only selected text (partial first/last rows); if none, copies entire visible 80x24 screen (existing behavior). Selection cleared on keypress or incoming server data.
+
+### Session Menu Rename
+
+Renamed "File" menu to "Session" to better reflect its purpose (Connect, Disconnect, Bookmarks, Quit).
+
+---
+
 ## 2026-03-05: Phase 6 — Polish, Preferences, Keyboard Fixes
 
 ### Menu State Management (main.c)

@@ -4,6 +4,132 @@ A living document recording the development of Flynn, a Telnet client for classi
 
 ---
 
+## 2026-03-06 — v0.9.1: The Finishing Touches
+
+### What Changed
+
+Four small but meaningful improvements that make Flynn feel like a real shipping application:
+
+1. **Custom Finder icon** — A 32x32 monochrome pixel art Macintosh Plus with a white screen and black `>_` prompt. This took three iterations to get right. The first attempt was too dark (a solid CRT monitor shape). The second used a dark screen with white text, but the user pointed out that Flynn actually uses a white background — so the final version shows a Mac Plus with a white screen, exactly as Flynn looks when running. The icon is registered via BNDL/FREF resources so the Finder displays it instead of the generic application diamond.
+
+2. **TeachText Read Me** — A 274-line documentation file covering usage, features, all keyboard shortcuts (including M0110 mappings), bookmarks, font selection, troubleshooting, and credits. Deployed as a TEXT/ttxt file so it opens with TeachText. Had to install TeachText itself onto the System 6 image first (it wasn't included in the base install — copied from the System Tools floppy via hfsutils).
+
+3. **Font menu rename** — The "Settings" menu was renamed to "Font" since it only contains Monaco 9 and Monaco 12 options. Simple but accurate.
+
+4. **BinHex archive** — build.sh now generates Flynn.hqx alongside Flynn.bin. BinHex 4.0 is a text-safe encoding that preserves resource forks, useful for distributing Mac files via email or web.
+
+### Deployment in a Folder
+
+Moved from loose files at the HFS volume root to a `:Flynn:` folder containing the application, Read Me, and preferences file. Updated build.sh with the new deployment instructions.
+
+### Icon Design Process
+
+Designing a 32x32 monochrome icon as hex data was an interesting exercise. Used Python to generate the bitmap data and ASCII preview, then hand-tuned pixels for recognizability. The icon needed to read as "Macintosh Plus" at the tiny Finder grid size — the key elements are the CRT outline, white screen area, `>_` cursor prompt, floppy disk slot, and two small feet at the bottom.
+
+### Team Structure
+
+Used a five-agent team: Team Lead, Software Architect, Build Engineer, Technical Writer, and QA Engineer. The strict Snow emulator ownership rule (only QA Engineer touches the emulator) continued to prevent conflicts. One near-miss when the Build Engineer almost took a screenshot — caught and redirected.
+
+### Git Signing Disabled
+
+Discovered that git commit signing was configured but the RSA hardware token wasn't in the ssh-agent. Permanently disabled signing per user preference (`git config --global commit.gpgsign false`).
+
+---
+
+## 2026-03-06 — Phases 11-14: Bookmarks, Font, xterm, UTF-8 (v0.9.0)
+
+### The Big Features
+
+Four phases implemented together to bring Flynn to feature-complete status:
+
+**Session Bookmarks (Phase 11)** — The most complex UI work in the project. A bookmark manager dialog with a UserItem-based list (the classic Mac way to do custom list rendering), Add/Edit/Delete/Connect buttons, and up to 8 stored bookmarks. Bookmarks also appear directly in the Session menu for one-click connection. This required extracting `conn_connect()` from the dialog-based connection flow so bookmarks could connect without showing the connect dialog.
+
+The preferences file format migrated through three versions: v1 (host/port), v2 (+ bookmarks), v3 (+ font). The migration code handles reading older formats gracefully.
+
+**Font Selection (Phase 12)** — Monaco 9pt (the default, giving 80x24) and Monaco 12pt (larger text, fewer columns). The Font menu shows a checkmark on the active choice. Changing fonts calls `GetFontInfo()` to measure actual glyph metrics, recomputes cell dimensions, resizes the window with `SizeWindow()`, and if connected, sends a NAWS update to the server so it knows the new terminal size.
+
+**xterm Compatibility (Phase 13)** — TTYPE cycling (xterm → VT220 → VT100), application keypad mode for numpad keys, and silent consumption of mouse reporting and focus event modes that modern shells enable but a 1-bit Mac can't use.
+
+**UTF-8 Support (Phase 14)** — A decode-and-translate approach. The UTF-8 decoder state machine feeds Unicode codepoints through three lookup paths: box-drawing → DEC Special Graphics (for tmux/mc borders), Latin-1 → Mac Roman (for accented characters), and a symbol table (em dash, curly quotes, bullet, etc.). Wide characters and emoji get a 2-cell `??` placeholder with modifier sequence absorption. This means Flynn can display most real-world UTF-8 terminal output meaningfully, even on a 1986 Mac Plus.
+
+### Bug Fixes
+
+- **Screen not cleared on disconnect** — `do_disconnect()` wasn't resetting terminal state, leaving the last screen contents visible after disconnecting.
+- **Overlapping strncpy** — `conn_connect()` was called with `host` pointing into the same `conn.host` buffer it was copying to. Undefined behavior that happened to work on some calls but not others.
+- **UTF-8 fallback character** — Was using Mac Roman 0xB7 which displays as Σ (sigma) instead of a sensible fallback. Changed to `?`.
+
+### Memory Budget
+
+The complete Flynn application with all Phase 11-14 features uses ~30KB of RAM — 0.7% of the Mac Plus's 4MB. The largest consumers are the scrollback ring buffer (15.4KB), alternate screen buffer (3.8KB), and TCP buffer (12.3KB).
+
+---
+
+## 2026-03-06 — Phase 10: DEC Special Graphics (v0.8.0)
+
+### Box-Drawing via QuickDraw
+
+The most visually impactful single feature: rendering box-drawing characters using QuickDraw line primitives instead of trying to find them in a font. `draw_line_char()` handles 18 glyphs — corners, tees, cross, horizontal/vertical lines, diamond, checkerboard, and a few symbols. Bold lines render thicker via `PenSize(2,1)`. Inverse renders white-on-black.
+
+After this phase, tmux borders, Midnight Commander panels, and dialog boxes all render with proper line-drawing instead of question marks or garbled characters. This was the single biggest improvement in visual fidelity.
+
+### OSC Title Bug
+
+A subtle parsing bug: the semicolon separator in OSC sequences (e.g., `ESC]0;Window Title BEL`) was being included in the accumulated title string because `osc_param` was modified during digit parsing before the semicolon check ran. Fixed by restructuring the parse order.
+
+---
+
+## 2026-03-06 — Phase 9: Alt Screen, DEC Modes, and F-Keys (v0.7.0)
+
+### Terminal Foundations
+
+The largest single commit in the project — Phase 9 added all the terminal modes and features needed for full-screen applications:
+
+- **Alternate screen buffer**: vi, nano, less, and tmux use `DECSET ?1049` to switch to a clean screen and restore the original on exit. A 3.8KB static buffer in the Terminal struct stores the main screen contents during alt-screen mode. Scrollback is frozen so alt-screen programs don't pollute history.
+
+- **Application cursor keys (DECCKM)**: When enabled, arrow keys send `ESC O A/B/C/D` instead of `ESC [ A/B/C/D`. This is how vi and tmux distinguish cursor movement from typed escape sequences.
+
+- **Character sets**: G0/G1 charset designation and SI/SO switching, with `ATTR_DEC_GRAPHICS` bit in TermCell.attr flagging cells for line-drawing rendering. This is the protocol-level mechanism that Phase 10's `draw_line_char()` renders.
+
+- **Bracketed paste**: Wraps pasted text in `ESC[200~`/`ESC[201~` when the mode is enabled, so shells can distinguish pasted text from typed input.
+
+- **F-keys**: ADB virtual keycodes for extended keyboards (native F1-F12) plus Cmd+1..0 for M0110 keyboards that lack function keys entirely.
+
+- **Soft reset (DECSTR)**: `CSI ! p` resets terminal to a sane default state — used by programs that want a clean slate without a full reset.
+
+The parser grew from 5 to 8 states (adding OSC, OSC_ESC, and DCS), and the DA response was upgraded from VT100 to VT220 identity.
+
+---
+
+## 2026-03-06 — Phase 8: Performance (v0.6.1)
+
+A focused optimization pass. The key changes:
+
+- **WaitNextEvent timeout**: 5 ticks → 1 tick (83ms → 17ms). Characters now echo almost instantly instead of having a perceptible delay.
+- **_TCPStatus() field init**: Replaced `memset` with explicit field initialization, saving ~200 bytes of zeroing per event loop iteration.
+- **draw_row() caching**: `sel.active` flag cached once per row (avoids 80 function calls when no selection exists), and `TextFace()` value cached to skip redundant Toolbox calls for consecutive same-style runs.
+
+Small changes, but they add up when the event loop runs 60 times per second.
+
+---
+
+## 2026-03-06 — Phase 7: Mouse Text Selection (v0.6.0)
+
+### Teaching a 1986 Mac to Select Text
+
+Added three selection modes to the terminal window:
+
+1. **Click-drag**: Stream selection following the text flow (not rectangular block selection). Tracks mouse position during `mouseDrag` events and continuously redraws the selection highlight.
+
+2. **Double-click word selection**: Expands both directions from the click point through contiguous non-space characters. Uses the Mac Toolbox's `GetDblTime` interval for double-click detection — accessed via a low-memory global at 0x02F0 since Retro68 doesn't expose it through the normal API.
+
+3. **Shift-click extend**: Extends an existing selection to the new click point, keeping the original anchor fixed.
+
+Selection renders as inverse video — each selected cell gets its `ATTR_INVERSE` flag XORed, so already-inverse cells (like status bars) appear normal when selected. Cmd+C copies only the selected text when a selection exists, or the full screen otherwise. Selection auto-clears on keypress or new server data.
+
+Also renamed the "File" menu to "Session" — better reflecting its actual contents (Connect, Disconnect, Bookmarks, Quit).
+
+---
+
 ## 2026-03-05 — Phase 6: Polish, Preferences, and the M0110 Keyboard
 
 ### Six-Agent Team
