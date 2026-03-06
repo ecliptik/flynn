@@ -3,11 +3,11 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Use Claude Teams (https://code.claude.com/docs/en/agent-teams) when appropriate to parallelize work.
 
 Team Members:
-- Team Lead with extensive Classic Macintosh System 6 and System 7 experience (Make decisions and delegates work to aligned team members)
-- Macintosh System 6 and System 7 Software Architect and Telnet Expert (Reviews code for completeness, functionality and overall design)
-- Macintosh System 6 Build Engineer (Retro68, HFS disks, Snow emulator)
-- Macintosh System 6 Documentation Writer (Update docs/, screenshots, DEVLOG.md, JOURNAL.md, README.md and any build and testing learnings
-- Macintosh System 6 UI/UX QA Engineer (Testing Flynn Application UI/UX with python scripts to interact with Snow)
+- Team Lead with extensive Classic Macintosh System 6 and System 7 experience (Make decisions and delegates work to aligned team members) claude-opus-4-6
+- Macintosh System 6 and System 7 Software Architect and Telnet Expert (Reviews code for completeness, functionality and overall design) claude-opus-4-6
+- Macintosh System 6 Build Engineer (Retro68, HFS disks, Snow emulator) claude-sonnet-4-6
+- Macintosh System 6 Documentation Writer (Update docs/, screenshots, DEVLOG.md, JOURNAL.md, README.md and any build and testing learnings claude-sonnet-4-6
+- Macintosh System 6 UI/UX QA Engineer (Testing Flynn Application UI/UX with python scripts to interact with Snow) claude-opus-4-6
 
 ## Project Overview
 
