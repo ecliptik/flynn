@@ -45,6 +45,8 @@ static short col_left(short col)   { return LEFT_MARGIN + col * CELL_WIDTH; }
 static short col_right(short col)  { return LEFT_MARGIN + (col + 1) * CELL_WIDTH; }
 
 static void draw_row(Terminal *term, short row);
+static void draw_line_char(unsigned char ch, short x, short y,
+	    unsigned char attr);
 static void draw_cursor(Terminal *term, short on);
 static void sel_normalize(short *sr, short *sc, short *er, short *ec);
 static void find_word_bounds(Terminal *term, short row, short col,
@@ -170,6 +172,17 @@ draw_row(Terminal *term, short row)
 				continue;
 		}
 
+		/* DEC Special Graphics: render each cell individually */
+		if (run_attr & ATTR_DEC_GRAPHICS) {
+			short i;
+
+			for (i = 0; i < run_len; i++)
+				draw_line_char(buf[i],
+				    col_left(run_start + i),
+				    row_top(row), run_attr);
+			continue;
+		}
+
 		/* Set text face for this run (cached to avoid redundant calls) */
 		{
 			short face = 0;
@@ -208,6 +221,187 @@ draw_row(Terminal *term, short row)
 
 	/* Restore normal face */
 	TextFace(0);
+}
+
+/*
+ * draw_line_char - render a DEC Special Graphics character
+ *
+ * Draws box-drawing glyphs using QuickDraw primitives (MoveTo/LineTo)
+ * within the cell at pixel position (x, y).  Supports bold (thicker
+ * lines) and inverse (white-on-black) attributes.
+ */
+static void
+draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
+{
+	short cx, cy, right, bottom;
+	Rect cell_r;
+
+	cx = x + CELL_WIDTH / 2;	/* center x = x + 3 */
+	cy = y + CELL_HEIGHT / 2;	/* center y = y + 6 */
+	right = x + CELL_WIDTH - 1;	/* x + 5 */
+	bottom = y + CELL_HEIGHT - 1;	/* y + 11 */
+
+	SetRect(&cell_r, x, y, x + CELL_WIDTH, y + CELL_HEIGHT);
+
+	/* Inverse: paint cell black first, draw lines in white */
+	if (attr & ATTR_INVERSE) {
+		PaintRect(&cell_r);
+		PenMode(patBic);
+	}
+
+	/* Bold: thicker horizontal pen */
+	if (attr & ATTR_BOLD)
+		PenSize(2, 1);
+	else
+		PenSize(1, 1);
+
+	switch (ch) {
+	case 'q':	/* ─ horizontal line */
+		MoveTo(x, cy);
+		LineTo(right, cy);
+		break;
+
+	case 'x':	/* │ vertical line */
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, bottom);
+		break;
+
+	case 'l':	/* ┌ upper-left corner */
+		MoveTo(cx, cy);
+		LineTo(right, cy);
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, cy);
+		LineTo(cx, bottom);
+		break;
+
+	case 'k':	/* ┐ upper-right corner */
+		MoveTo(x, cy);
+		LineTo(cx, cy);
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, cy);
+		LineTo(cx, bottom);
+		break;
+
+	case 'm':	/* └ lower-left corner */
+		MoveTo(cx, cy);
+		LineTo(right, cy);
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, cy);
+		break;
+
+	case 'j':	/* ┘ lower-right corner */
+		MoveTo(x, cy);
+		LineTo(cx, cy);
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, cy);
+		break;
+
+	case 'n':	/* ┼ crossing lines */
+		MoveTo(x, cy);
+		LineTo(right, cy);
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, bottom);
+		break;
+
+	case 't':	/* ├ left tee */
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, bottom);
+		if (attr & ATTR_BOLD)
+			PenSize(2, 1);
+		MoveTo(cx, cy);
+		LineTo(right, cy);
+		break;
+
+	case 'u':	/* ┤ right tee */
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, bottom);
+		if (attr & ATTR_BOLD)
+			PenSize(2, 1);
+		MoveTo(x, cy);
+		LineTo(cx, cy);
+		break;
+
+	case 'w':	/* ┬ top tee */
+		MoveTo(x, cy);
+		LineTo(right, cy);
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, cy);
+		LineTo(cx, bottom);
+		break;
+
+	case 'v':	/* ┴ bottom tee */
+		MoveTo(x, cy);
+		LineTo(right, cy);
+		PenSize((attr & ATTR_BOLD) ? 2 : 1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, cy);
+		break;
+
+	case '`':	/* ◆ diamond */
+		{
+			Rect dr;
+
+			SetRect(&dr, cx - 1, cy - 2, cx + 2, cy + 3);
+			PaintRect(&dr);
+		}
+		break;
+
+	case 'a':	/* ▒ checkerboard */
+		FillRect(&cell_r, &qd.gray);
+		break;
+
+	case '~':	/* · centered dot */
+		MoveTo(cx, cy);
+		LineTo(cx, cy);
+		break;
+
+	case 'f':	/* ° degree symbol */
+		{
+			Rect dr;
+
+			PenSize(1, 1);
+			SetRect(&dr, cx - 1, cy - 3, cx + 2, cy);
+			FrameRect(&dr);
+		}
+		break;
+
+	case 'g':	/* ± plus/minus */
+		/* Plus sign */
+		MoveTo(x + 1, cy - 1);
+		LineTo(right - 1, cy - 1);
+		PenSize(1, 1);
+		MoveTo(cx, cy - 4);
+		LineTo(cx, cy + 1);
+		/* Minus below */
+		if (attr & ATTR_BOLD)
+			PenSize(2, 1);
+		MoveTo(x + 1, cy + 3);
+		LineTo(right - 1, cy + 3);
+		break;
+
+	default:
+		/* Unknown graphic: draw as regular text */
+		{
+			char c = ch;
+			short bl = y + CELL_HEIGHT - 2;
+
+			if (attr & ATTR_INVERSE)
+				TextMode(srcBic);
+			MoveTo(x, bl);
+			DrawText(&c, 0, 1);
+			if (attr & ATTR_INVERSE)
+				TextMode(srcOr);
+		}
+		break;
+	}
+
+	PenNormal();
 }
 
 /*

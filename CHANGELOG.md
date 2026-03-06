@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-03-06
+
+### Added
+- DEC Special Graphics line-drawing characters via QuickDraw
+  - `draw_line_char()` renders box-drawing glyphs using MoveTo/LineTo
+  - 18 character mappings: corners (┌┐└┘), tees (├┤┬┴), cross (┼),
+    horizontal (─), vertical (│), diamond (◆), checkerboard (▒),
+    centered dot (·), degree (°), plus/minus (±)
+  - Bold attribute renders thicker lines (PenSize 2,1)
+  - Inverse attribute renders white-on-black (PaintRect + patBic)
+  - Unknown graphic characters fall back to regular text rendering
+- TUI apps now display proper box-drawing borders (tmux, mc, dialog)
+
+### Changed
+- Version: 0.7.0 → 0.8.0
+- terminal_ui.c draw_row() dispatches ATTR_DEC_GRAPHICS runs to draw_line_char()
+- Build size: ~80KB (up from ~78KB)
+
 ## [0.7.0] - 2026-03-06
 
 ### Added

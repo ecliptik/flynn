@@ -45,13 +45,13 @@ Biggest visual impact for TUI apps (tmux borders, mc panels, dialog boxes).
   - Files: terminal.c
 - [x] ATTR_LINEDRAW bit (0x08) in TermCell.attr *(done in Phase 9, as ATTR_DEC_GRAPHICS)*
   - Files: terminal.h
-- [ ] draw_line_char() in terminal_ui.c
+- [x] draw_line_char() in terminal_ui.c
   - QuickDraw MoveTo/LineTo for box-drawing characters
-  - 15+ character mappings (corners, tees, crosses, horizontal, vertical)
+  - 18 character mappings (corners, tees, crosses, horizontal, vertical, etc.)
   - Files: terminal_ui.c
 - [x] Update DA response to VT220 (ESC[?62;1;6c) *(done in Phase 9)*
   - Files: terminal.c
-- [ ] Change TTYPE from "VT100" to "VT220"
+- [x] Change TTYPE from "VT100" to "VT220" *(done in Phase 9, with cycling)*
   - Files: telnet.c
 
 ## Phase 11: Session Bookmarks (~250 lines, +1.3KB prefs)
@@ -124,7 +124,7 @@ After VT220 is solid — adds xterm-specific features.
 | Phase | Feature | New Code | Memory | Dependencies | Status |
 |-------|---------|----------|--------|-------------|--------|
 | 9 | Terminal Foundations | ~600 lines | +4KB | None | **Done** |
-| 10 | Line Drawing + VT220 | ~100 lines | +0 bytes | Phase 9 | Remaining: draw_line_char, TTYPE |
+| 10 | Line Drawing + VT220 | ~194 lines | +0 bytes | Phase 9 | **Done** |
 | 11 | Bookmarks | ~250 lines | +1.3KB | None (parallel) | Planned |
 | 12 | Font Selection | ~300 lines | +20 bytes | None (parallel) | Planned |
 | 13 | xterm Compat | ~50 lines | +0 bytes | Phase 10 | Remaining: keypad mode, TTYPE, mouse consume |

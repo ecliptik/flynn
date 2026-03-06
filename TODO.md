@@ -105,8 +105,8 @@
 - [x] Additional SGR mappings (dim, italic, blink, bright fg for monochrome)
 
 ## Phase 10: DEC Special Graphics + VT220 Identity
-- [ ] draw_line_char() in terminal_ui.c (QuickDraw box-drawing)
-- [ ] Change TTYPE from "VT100" to "VT220" in telnet.c
+- [x] draw_line_char() in terminal_ui.c (QuickDraw box-drawing)
+- [x] TTYPE changed to VT220 (done in Phase 9, with VT100 fallback cycling)
 
 ## Future
 - [ ] Session bookmarks (named host/port list in prefs)
