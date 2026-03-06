@@ -4,6 +4,100 @@ A living document recording the development of Flynn, a Telnet client for classi
 
 ---
 
+## 2026-03-05 — Phase 6: Polish, Preferences, and the M0110 Keyboard
+
+### Six-Agent Team
+
+Used Claude Teams with six specialized agents, including stricter role separation for emulator access:
+
+- **Team Lead** — Coordinated work, managed task dependencies, made architectural decisions
+- **Software Architect** — Implemented all six Phase 6 sub-tasks (menu states, scrollback, copy/paste, About dialog, settings, polish)
+- **Build Engineer** — Built Flynn with Retro68, deployed to HFS disk image via hfsutils (no emulator access)
+- **QA Engineer** — Sole operator of the Snow emulator, ran all GUI automation and testing
+- **Technical Writer** — Updated all project documentation
+- **UI/UX QA Engineer** — Wrote automated test scripts
+
+A key lesson from Phase 5 was that multiple agents should never control the same emulator instance. The CLAUDE.md was updated to enforce Snow emulator ownership: only the QA Engineer may launch, interact with, or take screenshots of Snow.
+
+### Menu State Management (6A)
+
+Added `update_menus()` to main.c — a simple but important UI polish:
+
+- When connected: Connect grayed out, Disconnect enabled, Copy/Paste enabled
+- When disconnected: Connect enabled, Disconnect grayed out, Copy/Paste grayed out
+- `SystemEdit()` call added for desk accessory support in the Edit menu
+- Called after `do_connect()`, `do_disconnect()`, and connection state changes
+
+Uses `EnableItem()`/`DisableItem()` (Retro68's names for the Toolbox calls).
+
+### Scrollback Viewing (6B)
+
+Extended the Terminal struct with `scroll_offset` and added `terminal_get_display_cell()`:
+
+- `scroll_offset = 0` means live view; `scroll_offset > 0` means scrolled back N lines
+- `terminal_get_display_cell()` maps display rows to either the scrollback ring buffer or the live screen buffer, depending on the offset
+- Cmd+Up/Down scrolls one line, Cmd+Shift+Up/Down scrolls a full page (24 lines)
+- New incoming data resets `scroll_offset` to 0 (returns to live)
+- Window title shows "Flynn [-N]" when scrolled back
+- Cursor is only drawn when `scroll_offset == 0`
+
+The scrollback navigation is intercepted in `handle_key_down()` before `MenuKey()` processing, since Cmd+arrow keys would otherwise be consumed by the menu system.
+
+### Copy/Paste (6C)
+
+Implemented via the classic Mac scrap (clipboard) API:
+
+- **Copy (Cmd+C)**: Iterates the 80x24 display grid using `terminal_get_display_cell()` (scrollback-aware), trims trailing spaces per row, joins with CR, and puts the result on the scrap via `ZeroScrap()`/`PutScrap()`.
+- **Paste (Cmd+V)**: `GetScrap()` retrieves TEXT data, sends it to the connection in 256-byte chunks via `conn_send()`. The chunk size prevents overwhelming the TCP send buffer.
+
+Both operations are wired into the Edit menu handler and only available when connected (enforced by menu state management).
+
+### About Dialog (6D)
+
+Replaced the simple `ParamText()`/`Alert()` with a proper DLOG resource:
+
+- DLOG 130 at `{80, 100, 260, 400}` — centered on screen
+- DITL 130 with OK button and five static text fields: "Flynn", "Version 0.5.0", description, copyright ("2026 Micheal Waltz"), and credits ("Built with Claude Code + Retro68")
+- `do_about()` uses `GetNewDialog()`/`ModalDialog()`/`DisposeDialog()`
+
+### Settings Persistence (6E)
+
+New `settings.c`/`settings.h` module:
+
+- `FlynnPrefs` struct: `version` (short), `host[256]` (char), `port` (short)
+- `prefs_load()`: Opens "Flynn Prefs" file from the current volume, reads the struct, validates the version number, falls back to defaults (empty host, port 23)
+- `prefs_save()`: Deletes and recreates the file with type 'pref', creator 'FLYN'
+- In `do_connect()`: pre-fills `conn.host`/`conn.port` from saved prefs, and saves after a successful connection
+- Uses classic Mac File Manager calls: `GetVol()`, `FSOpen()`, `FSRead()`, `FSWrite()`, `FSClose()`, `Create()`, `FSDelete()`
+
+### Keyboard and Polish (6F)
+
+The most impactful fix addresses a real usability issue reported via BUGS.md:
+
+- **M0110 keyboard fix**: The Macintosh Plus M0110 keyboard has no physical Ctrl key. Added `optionKey` as a Ctrl modifier — `Option+key` now computes `key & 0x1F`, making ESC (via backtick area), Ctrl+C, Ctrl+D, and all other control characters accessible. This was critical for using vi, nano, and shell job control.
+- **Quit confirmation**: When connected, File > Quit shows a `CautionAlert` asking "Disconnect and quit?" with OK/Cancel
+- **Connection lost detection**: `main_event_loop()` tracks `prev_state` and detects when `conn.state` transitions from CONNECTED to IDLE, showing an alert
+- **DECTCEM cursor visibility**: Terminal now tracks `cursor_visible` flag, responding to ESC[?25l (hide) and ESC[?25h (show). The UI layer checks this before drawing the cursor.
+- **DA/DSR responses**: Terminal generates response bytes for Device Attributes (ESC[c → ESC[?1;2c) and Device Status Report (ESC[6n → cursor position, ESC[5n → OK status). These are stored in `response[]`/`response_len` fields on the Terminal struct.
+
+### Automated Testing
+
+The QA engineer created two new test modules:
+
+- **`tests/snow_automation.py`** — Reusable X11 XTEST automation library for Snow emulator. Auto-calibrates framebuffer coordinates via PIL screenshot analysis (coordinates vary per Snow session). Supports XTEST incremental mouse motion, click-hold-drag for Mac menus, Cmd+key and Option+key (Ctrl mapping), and text typing. Uses `scrot` for screenshots (never `import -window root`, which breaks Snow mouse input).
+
+- **`tests/test_phase6.py`** — 20 automated test cases covering all Phase 6 features: menu state management, scrollback navigation, copy/paste, About dialog, settings persistence, keyboard fixes (ESC, Ctrl+C via Option+C), window title changes, and regression tests (echo, arrows, nano, vi). Tests are screenshot-based since Mac screen memory can't be read directly from the host. Run with `python3 tests/test_phase6.py` (requires `FLYNN_TEST_HOST`, `FLYNN_TEST_USER`, `FLYNN_TEST_PASS` env vars).
+
+### Emulator Ownership
+
+A key process improvement: the CLAUDE.md was updated to enforce strict Snow emulator ownership. Only the QA Engineer may launch, interact with, or take screenshots of Snow. The Build Engineer deploys to the HFS image but never runs `snowemu`. This prevents the conflicts that occurred in earlier phases when multiple agents tried to control the same emulator instance.
+
+### Current State
+
+Phases 0–6 complete. Flynn is a fully featured telnet client for classic Macintosh: connects to real servers, negotiates telnet options, renders VT100 terminal output with text attributes, handles full keyboard input (including M0110 via Option-as-Ctrl), provides scrollback viewing and copy/paste, saves preferences, and includes proper dialogs and alerts. Version 0.5.0.
+
+---
+
 ## 2026-03-05 — Phase 5: Terminal UI, Keyboard Mapping, and the TCP Bug
 
 ### Five-Agent Team

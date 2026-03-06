@@ -10,6 +10,7 @@ add_application(Flynn
     src/tcp.c
     src/dnr.c
     src/sysutil.c
+    src/settings.c
     resources/telnet.r
 )
 

@@ -50,10 +50,24 @@
 - [x] Bold/inverse/underline text rendering (TextFace + PaintRect/srcBic)
 - [x] Cursor blink (XOR block cursor, ~30 tick interval)
 - [x] Fix TCP blocking bug (_TCPStatus memset, _TCPRcv timeout 30→1)
-- [ ] Copy/paste support
-- [ ] Scroll with mouse
+- [x] Copy/paste support
+- [x] Scroll with keyboard (Cmd+Up/Down)
 
 ## Phase 6: Polish
-- [ ] Settings persistence
+- [x] Menu state management (Connect/Disconnect enable/disable)
+- [x] Scrollback viewing (Cmd+Up/Down, Cmd+Shift for page)
+- [x] Copy/paste support (Cmd+C/V, clipboard integration)
+- [x] About dialog (DLOG 130, version, credits)
+- [x] Settings persistence ("Flynn Prefs" file, host/port saved)
+- [x] Option key as Ctrl modifier (M0110 keyboard fix)
+- [x] Quit confirmation when connected
+- [x] Connection lost notification alert
+- [x] Cursor hide/show (DECTCEM ESC[?25h/l)
+- [x] Device Attribute response (DA ESC[c → VT100 ID)
+- [x] Device Status Report response (DSR ESC[6n → cursor position)
+
+## Future
 - [ ] Performance optimization
-- [ ] Scrollback viewing (Page Up/Down to scroll back)
+- [ ] Mouse-based text selection
+- [ ] Color support (for System 7 / color Macs)
+- [ ] SSH support

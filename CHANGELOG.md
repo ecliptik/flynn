@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-03-05
+
+### Added
+- Menu state management (`update_menus()` in main.c)
+  - Connect grayed out when connected, Disconnect grayed out when disconnected
+  - Copy/Paste enabled only when connected
+  - `SystemEdit()` call for desk accessory support
+- Scrollback viewing with keyboard navigation
+  - Cmd+Up/Down scrolls one line, Cmd+Shift+Up/Down scrolls one page
+  - Window title shows "[Scroll: -N]" indicator when scrolled back
+  - New incoming data automatically returns to live view
+  - `terminal_get_display_cell()` reads from scrollback ring buffer
+- Copy/paste support via Mac clipboard (scrap)
+  - Cmd+C copies visible 80x24 screen text (trailing spaces trimmed per row)
+  - Cmd+V pastes clipboard text to connection in 256-byte chunks
+  - Copy is scrollback-aware (uses display cells, not live screen)
+- Proper About dialog (DLOG 130)
+  - "Flynn", "Version 0.5.0", description, copyright, credits
+  - Uses `GetNewDialog()`/`ModalDialog()`/`DisposeDialog()`
+- Settings persistence (`settings.c`/`settings.h`)
+  - `FlynnPrefs` struct saved to "Flynn Prefs" file (type 'pref', creator 'FLYN')
+  - Host and port remembered across launches
+  - Connect dialog pre-fills from saved preferences
+- Option key as Ctrl modifier for M0110 keyboard
+  - `optionKey` modifier bit mapped to control characters (`key & 0x1F`)
+  - Fixes ESC and Ctrl+key on real M0110 keyboard (no physical Ctrl key)
+- Quit confirmation alert when connected ("Disconnect and quit?")
+- Connection lost notification alert when remote host closes connection
+- Cursor visibility control (DECTCEM: ESC[?25h / ESC[?25l)
+- Device Attribute response (DA: ESC[c → ESC[?1;2c, VT100 with AVO)
+- Device Status Report response (DSR: ESC[6n → cursor position report, ESC[5n → OK)
+- Generic ALRT 128 resource with OK/Cancel buttons for alerts
+
+### Changed
+- Version: 0.4.0 → 0.5.0
+- New source files: `settings.c`, `settings.h`
+- Resource file expanded with About dialog (DLOG/DITL 130) and alert (ALRT/DITL 128)
+- Terminal struct gains `cursor_visible`, `response[]`, `response_len` fields
+
 ## [0.4.0] - 2026-03-05
 
 ### Added

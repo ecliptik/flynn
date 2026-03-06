@@ -10,11 +10,16 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 - VT100 terminal emulation (cursor movement, screen clearing, text attributes)
 - MacTCP networking for TCP/IP connectivity
 - Designed for interactive terminal use (vi, nano, shell sessions)
+- Scrollback viewing with Cmd+Up/Down keyboard navigation
+- Copy/paste via Mac clipboard (Cmd+C to copy screen, Cmd+V to paste)
+- Settings persistence (host/port saved across launches)
+- Option key as Ctrl modifier for M0110 keyboard
+- Proper About dialog with version and credits
 - Targets Motorola 68000 CPU (Mac Plus compatible)
 
 ## Current Status
 
-Phases 0-5 are complete. Flynn connects to real telnet servers, renders VT100 terminal output including full-screen TUI applications (nano, vi), and handles interactive shell sessions. The application builds at 64KB and runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1.
+Phases 0-6 are complete. Flynn is a fully featured telnet client: connects to real servers, renders VT100 terminal output including full-screen TUI applications (nano, vi), handles interactive shell sessions with copy/paste and scrollback viewing, saves preferences across launches, and supports the M0110 keyboard's Option key as Ctrl. The application runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1.
 
 ## Building
 

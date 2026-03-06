@@ -85,6 +85,16 @@ typedef struct {
 
 	/* Dirty flags: one per row, nonzero means row needs redraw */
 	unsigned char	dirty[TERM_ROWS];
+
+	/* Scrollback view offset: 0 = live, >0 = scrolled back N lines */
+	short		scroll_offset;
+
+	/* Cursor visibility (DECTCEM: ESC[?25h / ESC[?25l) */
+	unsigned char	cursor_visible;
+
+	/* Response buffer for DA/DSR replies */
+	char		response[32];
+	short		response_len;
 } Terminal;
 
 /* Initialize terminal to default state */
@@ -98,6 +108,15 @@ void terminal_reset(Terminal *term);
 
 /* Get cell at given position (returns pointer into screen buffer) */
 TermCell *terminal_get_cell(Terminal *term, short row, short col);
+
+/* Get display cell accounting for scroll_offset (for rendering) */
+TermCell *terminal_get_display_cell(Terminal *term, short row, short col);
+
+/* Scroll back N lines into scrollback buffer */
+void terminal_scroll_back(Terminal *term, short lines);
+
+/* Scroll forward N lines toward live view */
+void terminal_scroll_forward(Terminal *term, short lines);
 
 /* Check if a row is dirty (needs redraw) */
 short terminal_is_row_dirty(Terminal *term, short row);

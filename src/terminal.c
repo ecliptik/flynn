@@ -17,6 +17,7 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include "terminal.h"
 
 /* Forward declarations for internal functions */
@@ -51,6 +52,7 @@ terminal_init(Terminal *term)
 	term->scroll_bottom = TERM_ROWS - 1;
 	term->cur_attr = ATTR_NORMAL;
 	term->parse_state = PARSE_NORMAL;
+	term->cursor_visible = 1;
 
 	/* Fill screen with spaces */
 	term_clear_region(term, 0, 0, TERM_ROWS - 1, TERM_COLS - 1);
@@ -133,6 +135,68 @@ terminal_get_cell(Terminal *term, short row, short col)
 		return &term->screen[0][0];
 
 	return &term->screen[row][col];
+}
+
+/*
+ * terminal_get_display_cell - get cell for display, accounting for scroll offset
+ *
+ * When scroll_offset > 0, the top rows come from the scrollback buffer
+ * and the bottom rows come from the screen buffer.
+ */
+TermCell *
+terminal_get_display_cell(Terminal *term, short row, short col)
+{
+	short sb_row;
+	short sb_idx;
+
+	if (col < 0 || col >= TERM_COLS)
+		return &term->screen[0][0];
+	if (row < 0 || row >= TERM_ROWS)
+		return &term->screen[0][0];
+
+	if (term->scroll_offset == 0)
+		return &term->screen[row][col];
+
+	/*
+	 * With scroll_offset > 0, display row 0 maps to
+	 * scrollback line (sb_count - scroll_offset), and the
+	 * bottom rows map to screen rows.
+	 */
+	sb_row = row - term->scroll_offset;
+	if (sb_row < 0) {
+		/* This row comes from scrollback */
+		sb_idx = term->sb_head + (term->sb_count + sb_row);
+		if (sb_idx >= TERM_SCROLLBACK_LINES)
+			sb_idx -= TERM_SCROLLBACK_LINES;
+		return &term->scrollback[sb_idx][col];
+	}
+
+	/* This row comes from the live screen */
+	return &term->screen[sb_row][col];
+}
+
+/*
+ * terminal_scroll_back - scroll back N lines into scrollback history
+ */
+void
+terminal_scroll_back(Terminal *term, short lines)
+{
+	term->scroll_offset += lines;
+	if (term->scroll_offset > term->sb_count)
+		term->scroll_offset = term->sb_count;
+	term_dirty_all(term);
+}
+
+/*
+ * terminal_scroll_forward - scroll forward N lines toward live view
+ */
+void
+terminal_scroll_forward(Terminal *term, short lines)
+{
+	term->scroll_offset -= lines;
+	if (term->scroll_offset < 0)
+		term->scroll_offset = 0;
+	term_dirty_all(term);
 }
 
 /*
@@ -770,23 +834,44 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		break;
 
 	case 'h':
-		/* SM - set mode (we handle ?25h to show cursor, etc.) */
-		/* Currently no modes tracked; placeholder for future use */
+		/* SM - set mode */
+		if (term->intermediate == '?') {
+			p1 = (term->num_params >= 1) ? term->params[0] : 0;
+			if (p1 == 25)
+				term->cursor_visible = 1;
+		}
 		break;
 
 	case 'l':
-		/* RM - reset mode (we handle ?25l to hide cursor, etc.) */
-		/* Currently no modes tracked; placeholder for future use */
+		/* RM - reset mode */
+		if (term->intermediate == '?') {
+			p1 = (term->num_params >= 1) ? term->params[0] : 0;
+			if (p1 == 25)
+				term->cursor_visible = 0;
+		}
 		break;
 
 	case 'c':
-		/* DA - device attributes request; ignore for now */
-		/* A proper response would be sent back over the connection */
+		/* DA - device attributes: respond as VT100 */
+		if (term->intermediate == 0 || term->intermediate == '?') {
+			memcpy(term->response, "\033[?1;2c", 7);
+			term->response_len = 7;
+		}
 		break;
 
 	case 'n':
-		/* DSR - device status report; ignore for now */
-		/* Response (cursor position report) requires send path */
+		/* DSR - device status report */
+		p1 = (term->num_params >= 1) ? term->params[0] : 0;
+		if (p1 == 6) {
+			/* Cursor position report */
+			term->response_len = sprintf(term->response,
+			    "\033[%d;%dR",
+			    term->cur_row + 1, term->cur_col + 1);
+		} else if (p1 == 5) {
+			/* Status report: OK */
+			memcpy(term->response, "\033[0n", 4);
+			term->response_len = 4;
+		}
 		break;
 
 	default:

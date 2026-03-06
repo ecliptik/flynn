@@ -1,5 +1,52 @@
 # Development Log
 
+## 2026-03-05: Phase 6 — Polish, Preferences, Keyboard Fixes
+
+### Menu State Management (main.c)
+
+`update_menus()` enables/disables Connect, Disconnect, Copy, Paste based on `conn.state`. Uses `EnableItem()`/`DisableItem()`. Called after connect, disconnect, and state changes. `SystemEdit(item - 1)` added for DA support.
+
+### Scrollback Viewing (terminal.c, main.c)
+
+Added `scroll_offset` to Terminal struct. `terminal_get_display_cell()` maps display rows to scrollback ring buffer or live screen. Cmd+Up/Down scrolls 1 line, Cmd+Shift+Up/Down scrolls 24 lines. New data resets offset to 0. Window title shows "Flynn [-N]" when scrolled. Cursor hidden while scrolled back.
+
+### Copy/Paste (main.c)
+
+Copy: iterates 80x24 via `terminal_get_display_cell()`, trims trailing spaces, joins with CR, `ZeroScrap()`/`PutScrap('TEXT')`. Paste: `GetScrap('TEXT')`, sends to connection in 256-byte chunks. Both gated by menu state (connected only).
+
+### About Dialog (telnet.r, main.c)
+
+DLOG 130 with DITL 130: OK button + 5 static text items (name, version 0.5.0, description, copyright, credits). `do_about()` uses `GetNewDialog()`/`ModalDialog()`/`DisposeDialog()`.
+
+### Settings Persistence (settings.c/settings.h)
+
+`FlynnPrefs` struct (version, host[256], port). Saved to "Flynn Prefs" file via `FSOpen`/`FSWrite`/`FSClose`. Type 'pref', creator 'FLYN'. `prefs_load()` at startup, `prefs_save()` after successful connect. Pre-fills connect dialog.
+
+### Keyboard Fix: Option as Ctrl (main.c)
+
+M0110 has no Ctrl key. Added `optionKey` modifier check alongside `ControlKey` — `key & 0x1F` for both. Fixes ESC, Ctrl+C/D/X in vi, nano, bash.
+
+### Polish
+
+- Quit confirmation: `CautionAlert` "Disconnect and quit?" when connected
+- Connection lost: detect CONNECTED→IDLE transition, show alert
+- DECTCEM: `cursor_visible` flag, ESC[?25h/l support in terminal.c and terminal_ui.c
+- DA response: ESC[c → ESC[?1;2c (VT100 with AVO)
+- DSR response: ESC[6n → cursor position report, ESC[5n → OK
+
+### Automated Testing
+
+`tests/snow_automation.py` — reusable X11 XTEST library for Snow. Auto-calibrates framebuffer coordinates via PIL screenshot analysis. `tests/test_phase6.py` — 20 test cases: menu states, scrollback, copy/paste, About dialog, settings persistence, keyboard fixes, regression (echo, arrows, nano, vi). Screenshot-based verification. Run: `python3 tests/test_phase6.py` (needs `FLYNN_TEST_HOST`, `FLYNN_TEST_USER`, `FLYNN_TEST_PASS`).
+
+### New Files
+
+- `src/settings.c`, `src/settings.h` — preferences persistence
+- `tests/snow_automation.py` — X11 XTEST automation library for Snow
+- `tests/test_phase6.py` — 20 automated Phase 6 test cases
+- ALRT 128 resource — generic alert with OK/Cancel
+
+---
+
 ## 2026-03-05: Phase 5 — Terminal UI and TCP Fix
 
 ### Terminal UI Renderer (terminal_ui.c/terminal_ui.h)

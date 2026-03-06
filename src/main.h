@@ -31,6 +31,9 @@
 #define EDIT_MENU_PASTE_ID  5
 #define EDIT_MENU_CLEAR_ID  6
 
+/* Dialog resource IDs */
+#define DLOG_ABOUT_ID       130
+
 /* Terminal window dimensions */
 #define TERM_WIN_WIDTH      500
 #define TERM_WIN_HEIGHT     320

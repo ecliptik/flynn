@@ -17,12 +17,14 @@
 #include <Resources.h>
 #include <Multiverse.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "main.h"
 #include "connection.h"
 #include "telnet.h"
 #include "terminal.h"
 #include "terminal_ui.h"
+#include "settings.h"
 
 /* Globals */
 static MenuHandle apple_menu, file_menu, edit_menu;
@@ -31,11 +33,13 @@ static Boolean running = true;
 static Connection conn;
 static TelnetState telnet;
 static Terminal terminal;
+static FlynnPrefs prefs;
 
 /* Forward declarations */
 static void init_toolbox(void);
 static void init_menus(void);
 static void init_window(void);
+static void update_menus(void);
 static void main_event_loop(void);
 static Boolean handle_menu(long menu_id);
 static void handle_mouse_down(EventRecord *event);
@@ -45,6 +49,8 @@ static void handle_activate(EventRecord *event);
 static void do_about(void);
 static void do_connect(void);
 static void do_disconnect(void);
+static void do_copy(void);
+static void do_paste(void);
 
 int
 main(void)
@@ -57,6 +63,8 @@ main(void)
 	conn_init();
 	telnet_init(&telnet);
 	terminal_init(&terminal);
+	prefs_load(&prefs);
+	update_menus();
 
 	main_event_loop();
 	return 0;
@@ -116,10 +124,37 @@ init_window(void)
 }
 
 static void
+update_menus(void)
+{
+	Boolean connected;
+
+	connected = (conn.state == CONN_STATE_CONNECTED);
+
+	/* File menu: Connect vs Disconnect */
+	if (connected) {
+		DisableItem(file_menu, FILE_MENU_CONNECT_ID);
+		EnableItem(file_menu, FILE_MENU_DISCONNECT_ID);
+	} else {
+		EnableItem(file_menu, FILE_MENU_CONNECT_ID);
+		DisableItem(file_menu, FILE_MENU_DISCONNECT_ID);
+	}
+
+	/* Edit menu: Copy/Paste only when connected */
+	if (connected) {
+		EnableItem(edit_menu, EDIT_MENU_COPY_ID);
+		EnableItem(edit_menu, EDIT_MENU_PASTE_ID);
+	} else {
+		DisableItem(edit_menu, EDIT_MENU_COPY_ID);
+		DisableItem(edit_menu, EDIT_MENU_PASTE_ID);
+	}
+}
+
+static void
 main_event_loop(void)
 {
 	EventRecord event;
 	long wait_ticks;
+	short prev_state;
 
 	while (running) {
 		wait_ticks = 5L;
@@ -127,7 +162,19 @@ main_event_loop(void)
 
 		switch (event.what) {
 		case nullEvent:
+			prev_state = conn.state;
 			conn_idle(&conn);
+
+			/* Detect connection lost */
+			if (prev_state == CONN_STATE_CONNECTED &&
+			    conn.state == CONN_STATE_IDLE) {
+				SetWTitle(term_window, "\pFlynn");
+				update_menus();
+				ParamText("\pConnection closed by remote host",
+				    "\p", "\p", "\p");
+				Alert(128, 0L);
+			}
+
 			if (conn.read_len > 0) {
 				unsigned char out_buf[TCP_READ_BUFSIZ];
 				unsigned char send_buf[256];
@@ -145,8 +192,18 @@ main_event_loop(void)
 				if (out_len > 0) {
 					GrafPtr save;
 
+					terminal.scroll_offset = 0;
 					terminal_process(&terminal, out_buf,
 					    out_len);
+
+					/* Send any terminal responses (DA, DSR) */
+					if (terminal.response_len > 0) {
+						conn_send(&conn,
+						    terminal.response,
+						    terminal.response_len);
+						terminal.response_len = 0;
+					}
+
 					GetPort(&save);
 					SetPort(term_window);
 					term_ui_draw(term_window,
@@ -193,6 +250,46 @@ handle_key_down(EventRecord *event)
 	vkey = (event->message >> 8) & 0xFF;
 
 	if (event->modifiers & cmdKey) {
+		/* Cmd+Up/Down for scrollback navigation */
+		if (vkey == 0x7E || vkey == 0x7D) {
+			GrafPtr save;
+
+			if (vkey == 0x7E) {
+				if (event->modifiers & shiftKey)
+					terminal_scroll_back(&terminal,
+					    TERM_ROWS);
+				else
+					terminal_scroll_back(&terminal, 1);
+			} else {
+				if (event->modifiers & shiftKey)
+					terminal_scroll_forward(&terminal,
+					    TERM_ROWS);
+				else
+					terminal_scroll_forward(&terminal, 1);
+			}
+
+			GetPort(&save);
+			SetPort(term_window);
+			term_ui_draw(term_window, &terminal);
+
+			if (terminal.scroll_offset > 0) {
+				Str255 title;
+				char tmp[32];
+				short i, len;
+
+				len = sprintf(tmp, "Flynn [-%d]",
+				    terminal.scroll_offset);
+				title[0] = len;
+				for (i = 0; i < len; i++)
+					title[i + 1] = tmp[i];
+				SetWTitle(term_window, title);
+			} else {
+				SetWTitle(term_window, "\pFlynn");
+			}
+
+			SetPort(save);
+			return;
+		}
 		handle_menu(MenuKey(key));
 		return;
 	}
@@ -248,7 +345,27 @@ handle_key_down(EventRecord *event)
 		return;
 	}
 
-	/* Ctrl+key: compute control character */
+	/* Option as Ctrl on M0110 keyboard (no physical Ctrl key).
+	 * Mac OS remaps char codes when Option is held, so use the
+	 * virtual keycode to recover the unmodified base key. */
+	if (event->modifiers & optionKey) {
+		static const char vkey_to_base[48] = {
+			'a','s','d','f','h','g','z','x',   /* 0x00 */
+			'c','v',  0,'b','q','w','e','r',   /* 0x08 */
+			'y','t',  0,  0,  0,  0,  0,  0,   /* 0x10 */
+			  0,  0,  0,  0,  0,  0,']','o',   /* 0x18 */
+			'u','[','i','p',  0,'l','j',  0,   /* 0x20 */
+			'k',  0,'\\', 0,  0,'n','m',  0,   /* 0x28 */
+		};
+
+		if (vkey < 48 && vkey_to_base[vkey]) {
+			key = vkey_to_base[vkey] & 0x1F;
+			conn_send(&conn, &key, 1);
+			return;
+		}
+	}
+
+	/* Ctrl+key with physical Control key (extended keyboards) */
 	if (event->modifiers & ControlKey) {
 		key = key & 0x1F;
 		conn_send(&conn, &key, 1);
@@ -279,6 +396,12 @@ handle_mouse_down(EventRecord *event)
 		break;
 	case inGoAway:
 		if (TrackGoAway(win, event->where)) {
+			if (conn.state == CONN_STATE_CONNECTED) {
+				ParamText("\pDisconnect and quit?",
+				    "\p", "\p", "\p");
+				if (CautionAlert(128, 0L) != 1)
+					break;
+			}
 			do_disconnect();
 			running = false;
 		}
@@ -305,15 +428,15 @@ handle_update(EventRecord *event)
 	EraseRect(&win->portRect);
 
 	if (conn.state == CONN_STATE_CONNECTED) {
-		char status[64];
-		Str255 pstatus;
-		short i;
+		char title[64];
+		Str255 ptitle;
+		short i, len;
 
-		conn_status_str(&conn, status, sizeof(status));
-		pstatus[0] = strlen(status);
-		for (i = 0; i < pstatus[0]; i++)
-			pstatus[i + 1] = status[i];
-		SetWTitle(term_window, pstatus);
+		len = sprintf(title, "Flynn - %s", conn.host);
+		ptitle[0] = len;
+		for (i = 0; i < len; i++)
+			ptitle[i + 1] = title[i];
+		SetWTitle(term_window, ptitle);
 
 		/* Mark all rows dirty for full update repaints */
 		for (i = 0; i < TERM_ROWS; i++)
@@ -365,13 +488,28 @@ handle_menu(long menu_id)
 			do_disconnect();
 			break;
 		case FILE_MENU_QUIT_ID:
+			if (conn.state == CONN_STATE_CONNECTED) {
+				ParamText("\pDisconnect and quit?",
+				    "\p", "\p", "\p");
+				if (CautionAlert(128, 0L) != 1)
+					break;
+			}
 			do_disconnect();
 			running = false;
 			break;
 		}
 		break;
 	case EDIT_MENU_ID:
-		/* TODO: handle edit menu for DA support */
+		if (!SystemEdit(item - 1)) {
+			switch (item) {
+			case EDIT_MENU_COPY_ID:
+				do_copy();
+				break;
+			case EDIT_MENU_PASTE_ID:
+				do_paste();
+				break;
+			}
+		}
 		break;
 	default:
 		handled = false;
@@ -385,22 +523,101 @@ handle_menu(long menu_id)
 static void
 do_about(void)
 {
-	ParamText("\pFlynn\r\rA Telnet client for classic Macintosh",
-	    "\p", "\p", "\p");
-	Alert(128, 0L);
+	DialogPtr dlg;
+	short item;
+
+	dlg = GetNewDialog(DLOG_ABOUT_ID, 0L, (WindowPtr)-1L);
+	if (!dlg)
+		return;
+
+	ModalDialog(0L, &item);
+	DisposeDialog(dlg);
 }
 
 static void
 do_connect(void)
 {
+	/* Pre-fill from saved prefs */
+	if (!conn.host[0] && prefs.host[0]) {
+		strcpy(conn.host, prefs.host);
+		conn.port = prefs.port;
+	}
+
 	if (conn_open_dialog(&conn)) {
 		telnet_init(&telnet);
 		terminal_reset(&terminal);
+
+		/* Save last-used host/port */
+		strcpy(prefs.host, conn.host);
+		prefs.port = conn.port;
+		prefs_save(&prefs);
 	}
+	update_menus();
 }
 
 static void
 do_disconnect(void)
 {
 	conn_close(&conn);
+	update_menus();
+}
+
+static void
+do_copy(void)
+{
+	char buf[TERM_ROWS * (TERM_COLS + 1)];
+	short row, col, len, last_nonspace;
+	TermCell *cell;
+
+	len = 0;
+	for (row = 0; row < TERM_ROWS; row++) {
+		last_nonspace = -1;
+		for (col = 0; col < TERM_COLS; col++) {
+			cell = terminal_get_display_cell(&terminal, row, col);
+			buf[len + col] = cell->ch;
+			if (cell->ch != ' ')
+				last_nonspace = col;
+		}
+		len += last_nonspace + 1;
+		if (row < TERM_ROWS - 1)
+			buf[len++] = '\r';
+	}
+
+	ZeroScrap();
+	PutScrap(len, 'TEXT', buf);
+}
+
+static void
+do_paste(void)
+{
+	Handle h;
+	long offset, len;
+
+	if (conn.state != CONN_STATE_CONNECTED)
+		return;
+
+	h = NewHandle(0);
+	if (!h)
+		return;
+
+	len = GetScrap(h, 'TEXT', &offset);
+	if (len > 0) {
+		char *p;
+		long sent;
+
+		HLock(h);
+		p = *h;
+		sent = 0;
+		while (sent < len) {
+			short chunk;
+
+			chunk = len - sent;
+			if (chunk > 256)
+				chunk = 256;
+			conn_send(&conn, p + sent, chunk);
+			sent += chunk;
+		}
+		HUnlock(h);
+	}
+	DisposeHandle(h);
 }

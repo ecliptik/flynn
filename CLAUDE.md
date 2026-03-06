@@ -5,9 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Spawn a team with members:
 - Team Lead (claude-opus-4-6) - Extensive Classic Macintosh System 6 Application experience, make decisions and delegate work
 - Software Architect (claude-opus-4-6) - System 6 and Telnet Expert, reviews code for completeness, functionality, bug fixes, overall design
-- Build Engineer (claude-sonnet-4-6) - build releases with Retro68, copy to HFS disks and prepare Snow emulator
-- Technical Writer (claude-sonnet-4-6) - create and update documenation, take screenshots, record any learnings for future use
-- UI/UX QA Engineer (claude-sonnet-4-6) - test Flynn Application UI/UX with python scripts to interact with Snow in a fully automated fashion
+- Build Engineer (claude-sonnet-4-6) - build releases with Retro68, copy to HFS disks. Does NOT launch or interact with Snow emulator — only builds and deploys to HFS image
+- Technical Writer (claude-sonnet-4-6) - create and update documentation, take screenshots, record any learnings for future use
+- UI/UX QA Engineer (claude-sonnet-4-6) - SOLE operator of Snow emulator. Boots Snow, runs all GUI automation and testing with python scripts. No other agent should launch or interact with Snow
+
+**Snow emulator ownership**: Only the QA Engineer may launch, interact with, or take screenshots of Snow. The Build Engineer deploys to the HFS disk image (`hmount`/`hcopy`/`humount`) but must NOT run `snowemu` or use xdotool/scrot. This prevents conflicts from multiple agents controlling the same emulator instance.
 
 ## Project Overview
 

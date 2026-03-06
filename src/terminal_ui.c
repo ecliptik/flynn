@@ -99,8 +99,9 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 	terminal_clear_dirty(term);
 
-	/* Draw cursor */
-	draw_cursor(term, 1);
+	/* Draw cursor only when viewing live terminal and cursor enabled */
+	if (term->scroll_offset == 0 && term->cursor_visible)
+		draw_cursor(term, 1);
 }
 
 /*
@@ -122,14 +123,14 @@ draw_row(Terminal *term, short row)
 
 	col = 0;
 	while (col < TERM_COLS) {
-		cell = terminal_get_cell(term, row, col);
+		cell = terminal_get_display_cell(term, row, col);
 		run_attr = cell->attr;
 		run_start = col;
 		run_len = 0;
 
 		/* Collect run of cells with same attributes */
 		while (col < TERM_COLS) {
-			cell = terminal_get_cell(term, row, col);
+			cell = terminal_get_display_cell(term, row, col);
 			if (cell->attr != run_attr)
 				break;
 			buf[run_len] = cell->ch;
@@ -299,7 +300,7 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	short crow, ccol;
 	Rect cur_r;
 
-	if (!cursor_initialized)
+	if (!cursor_initialized || !term->cursor_visible)
 		return;
 
 	now = TickCount();
