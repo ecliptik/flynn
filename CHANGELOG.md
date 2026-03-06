@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1] - 2026-03-06
+
+### Changed
+- Reduced WaitNextEvent timeout from 5 ticks (83ms) to 1 tick (17ms) for faster
+  character echo and improved interactive responsiveness
+- Replaced `memset(pb, 0, sizeof(*pb))` in `_TCPStatus()` with explicit field
+  initialization, eliminating ~200 bytes of unnecessary zeroing per event loop
+  iteration (matches wallops-146 reference pattern)
+- Cached `sel.active` flag per row in `draw_row()`, avoiding 80 function calls
+  to `term_ui_sel_contains()` per row when no selection is active
+- Cached `TextFace()` value in `draw_row()` to skip redundant Toolbox calls
+  for consecutive attribute runs with the same style
+- Version: 0.6.0 → 0.6.1
+
 ## [0.6.0] - 2026-03-06
 
 ### Added

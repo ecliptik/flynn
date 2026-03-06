@@ -369,11 +369,11 @@ _TCPStatus(TCPiopb *pb, StreamPtr stream, struct TCPStatusPB *status,
 {
 	OSErr osErr;
 
-	memset(pb, 0, sizeof(*pb));
-
 	pb->ioCompletion = ioCompletion;
-	pb->ioCRefNum = gIPPDriverRefNum;
 	pb->ioResult = 1;
+	pb->ioNamePtr = 0;
+	pb->ioVRefNum = 0;
+	pb->ioCRefNum = gIPPDriverRefNum;
 	pb->csCode = TCPStatus;
 	pb->tcpStream = stream;
 	pb->csParam.status.userDataPtr = userData;

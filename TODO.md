@@ -78,7 +78,15 @@
 - [x] Selection-aware Cmd+C copy (stream selection)
 - [x] Selection cleared on keypress or incoming data
 
+## Phase 8: Performance Optimization
+- [x] Reduce WaitNextEvent timeout (5 ticks → 1 tick, 83ms → 17ms)
+- [x] Optimize _TCPStatus() hot-path memset (explicit field init)
+- [x] Cache selection active flag per row in draw_row()
+- [x] Cache TextFace() value to avoid redundant Toolbox calls
+
 ## Future
-- [ ] Performance optimization
+- [ ] Session bookmarks (named host/port list in prefs)
+- [ ] Alternate screen buffer (DECSET 1049 for vi/nano/less)
+- [ ] Font/size settings (Monaco 9/12, Chicago 12, Geneva 9/10)
 - [ ] Color support (for System 7 / color Macs)
 - [ ] SSH support

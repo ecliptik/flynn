@@ -161,7 +161,7 @@ main_event_loop(void)
 	short prev_state;
 
 	while (running) {
-		wait_ticks = 5L;
+		wait_ticks = 1L;
 		WaitNextEvent(everyEvent, &event, wait_ticks, 0L);
 
 		switch (event.what) {

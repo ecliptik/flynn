@@ -124,8 +124,11 @@ draw_row(Terminal *term, short row)
 	unsigned char run_attr;
 	TermCell *cell;
 	short baseline;
+	short sel_active;
+	short last_face = -1;
 
 	baseline = row_top(row) + CELL_HEIGHT - 2;	/* baseline ~2px from bottom */
+	sel_active = sel.active;
 
 	col = 0;
 	while (col < TERM_COLS) {
@@ -133,7 +136,7 @@ draw_row(Terminal *term, short row)
 
 		cell = terminal_get_display_cell(term, row, col);
 		cell_attr = cell->attr;
-		if (term_ui_sel_contains(row, col))
+		if (sel_active && term_ui_sel_contains(row, col))
 			cell_attr ^= ATTR_INVERSE;
 		run_attr = cell_attr;
 		run_start = col;
@@ -143,7 +146,7 @@ draw_row(Terminal *term, short row)
 		while (col < TERM_COLS) {
 			cell = terminal_get_display_cell(term, row, col);
 			cell_attr = cell->attr;
-			if (term_ui_sel_contains(row, col))
+			if (sel_active && term_ui_sel_contains(row, col))
 				cell_attr ^= ATTR_INVERSE;
 			if (cell_attr != run_attr)
 				break;
@@ -167,7 +170,7 @@ draw_row(Terminal *term, short row)
 				continue;
 		}
 
-		/* Set text face for this run */
+		/* Set text face for this run (cached to avoid redundant calls) */
 		{
 			short face = 0;
 
@@ -175,7 +178,10 @@ draw_row(Terminal *term, short row)
 				face |= bold;
 			if (run_attr & ATTR_UNDERLINE)
 				face |= underline;
-			TextFace(face);
+			if (face != last_face) {
+				TextFace(face);
+				last_face = face;
+			}
 		}
 
 		if (run_attr & ATTR_INVERSE) {
