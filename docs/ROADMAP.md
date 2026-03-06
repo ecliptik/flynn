@@ -119,6 +119,37 @@ After VT220 is solid — adds xterm-specific features.
   - Mouse reporting (?1000-1006), focus events (?1004), cursor blink (?12)
   - Files: terminal.c
 
+## Phase 14: UTF-8 Support (~150 lines, +~1KB code)
+
+Decode UTF-8 multi-byte sequences and translate to the best single-byte
+representation. Keeps TermCell at 2 bytes (no memory increase for buffers).
+See `docs/PLAN-UTF8.md` for complete design.
+
+- [ ] UTF-8 decoder state machine in terminal.c (2/3/4-byte sequences)
+  - utf8_buf[4], utf8_len, utf8_expect in Terminal struct
+  - Intercept bytes >= 0x80 in PARSE_NORMAL before term_put_char
+  - Files: terminal.h, terminal.c
+- [ ] Unicode box-drawing → DEC Special Graphics mapping
+  - U+2500-U+257F → existing draw_line_char() glyphs (33 mappings)
+  - Light, heavy, and double-line variants all map to same glyphs
+  - Fixes tmux/htop/mc borders on UTF-8 servers
+  - Files: terminal.c
+- [ ] Unicode → Mac Roman translation (Latin-1 Supplement)
+  - 128-entry lookup table for U+0080-U+00FF
+  - Accented characters, currency symbols, common punctuation
+  - Files: terminal.c
+- [ ] Unicode symbol → Mac Roman mapping
+  - Em/en dash, curly quotes, bullet, ellipsis, euro, math symbols
+  - ~18 common codepoints in U+2000-U+20FF range
+  - Files: terminal.c
+- [ ] Wide character handling (CJK, emoji)
+  - Render as 2-cell placeholder `??`
+  - Emoji modifier/ZWJ sequence absorption (don't render extra placeholders)
+  - Files: terminal.c
+- [ ] Fallback for unmapped codepoints
+  - Middle dot (·) as replacement character
+  - Files: terminal.c
+
 ## Summary
 
 | Phase | Feature | New Code | Memory | Dependencies | Status |
@@ -128,9 +159,12 @@ After VT220 is solid — adds xterm-specific features.
 | 11 | Bookmarks | ~250 lines | +1.3KB | None (parallel) | Planned |
 | 12 | Font Selection | ~300 lines | +20 bytes | None (parallel) | Planned |
 | 13 | xterm Compat | ~50 lines | +0 bytes | Phase 10 | Remaining: keypad mode, TTYPE, mouse consume |
+| 14 | UTF-8 Support | ~150 lines | +~1KB code | Phase 10 | Planned |
 
 Phase 9 was larger than estimated (~600 vs ~200 lines) because it pulled in charset
 designation, SI/SO, ATTR_DEC_GRAPHICS, F-keys, bracketed paste, and OSC window title
 from Phases 10 and 13. This reduces the remaining work for those phases.
 
-Phases 11 and 12 are independent and can be developed in parallel with 10.
+Phases 11, 12, and 14 are independent and can be developed in parallel.
+Phase 14 benefits from Phase 13 (xterm TTYPE triggers more UTF-8 content)
+but does not depend on it — the box-drawing fix alone is valuable immediately.

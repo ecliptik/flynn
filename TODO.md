@@ -108,10 +108,17 @@
 - [x] draw_line_char() in terminal_ui.c (QuickDraw box-drawing)
 - [x] TTYPE changed to VT220 (done in Phase 9, with VT100 fallback cycling)
 
+## Phase 14: UTF-8 Support
+- [ ] UTF-8 decoder state machine (2/3/4-byte sequences)
+- [ ] Unicode box-drawing (U+2500-U+257F) → DEC Special Graphics
+- [ ] Unicode Latin-1 (U+0080-U+00FF) → Mac Roman translation
+- [ ] Unicode symbols (dashes, quotes, bullet, euro) → Mac Roman
+- [ ] Wide character / emoji → 2-cell placeholder
+- [ ] Emoji modifier/ZWJ sequence absorption
+
 ## Future
 - [ ] Session bookmarks (named host/port list in prefs)
 - [ ] Font/size settings (Monaco 9/12, Chicago 12, Geneva 9/10)
 - [ ] Application keypad mode (ESC = / ESC >)
-- [ ] UTF-8 box-drawing mapping (tmux sends Unicode on UTF-8 servers)
 - [ ] Color support (for System 7 / color Macs)
 - [ ] SSH support
