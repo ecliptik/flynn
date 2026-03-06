@@ -18,6 +18,32 @@ cd "$BUILD_DIR"
 cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
 make "$@"
 
+# Generate BinHex (.hqx) archive if macutils is available
+if command -v binhex >/dev/null 2>&1; then
+    binhex "$BUILD_DIR/Flynn.bin" > "$BUILD_DIR/Flynn.hqx"
+    echo "BinHex archive created: Flynn.hqx"
+else
+    echo "Note: Install macutils for BinHex output: sudo apt install macutils"
+fi
+
 echo ""
 echo "Build complete. Output:"
 ls -la "$BUILD_DIR"/Flynn.* 2>/dev/null || echo "  (no output files found)"
+
+# Convert Read Me line endings to Mac CR format
+README_SRC="$SCRIPT_DIR/docs/Flynn Read Me"
+README_OUT="$BUILD_DIR/Flynn Read Me"
+if [ -f "$README_SRC" ]; then
+    tr '\n' '\r' < "$README_SRC" > "$README_OUT"
+    echo "  Read Me: $README_OUT"
+fi
+
+echo ""
+echo "To deploy to HFS image:"
+echo "  hmount diskimages/snow-sys608.img"
+echo "  hmkdir :Flynn"
+echo "  hcopy -m build/Flynn.bin ':Flynn:Flynn'"
+echo "  hattrib -t APPL -c FLYN ':Flynn:Flynn'"
+echo "  hcopy -r 'build/Flynn Read Me' ':Flynn:Flynn Read Me'"
+echo "  hattrib -t TEXT -c ttxt ':Flynn:Flynn Read Me'"
+echo "  humount"

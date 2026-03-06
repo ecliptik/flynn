@@ -27,7 +27,7 @@
 #include "settings.h"
 
 /* Globals */
-static MenuHandle apple_menu, file_menu, edit_menu, settings_menu;
+static MenuHandle apple_menu, file_menu, edit_menu, font_menu;
 static WindowPtr term_window;
 static Boolean running = true;
 static Connection conn;
@@ -136,7 +136,7 @@ init_menus(void)
 
 	file_menu = GetMenuHandle(FILE_MENU_ID);
 	edit_menu = GetMenuHandle(EDIT_MENU_ID);
-	settings_menu = GetMenuHandle(SETTINGS_MENU_ID);
+	font_menu = GetMenuHandle(FONT_MENU_ID);
 
 	DrawMenuBar();
 }
@@ -746,12 +746,12 @@ handle_menu(long menu_id)
 			}
 		}
 		break;
-	case SETTINGS_MENU_ID:
+	case FONT_MENU_ID:
 		switch (item) {
-		case SETTINGS_FONT_9_ID:
+		case FONT_MENU_9_ID:
 			do_font_change(4, 9);
 			break;
-		case SETTINGS_FONT_12_ID:
+		case FONT_MENU_12_ID:
 			do_font_change(4, 12);
 			break;
 		}
@@ -1186,11 +1186,11 @@ do_font_change(short font_id, short font_size)
 static void
 update_font_menu(void)
 {
-	if (!settings_menu)
+	if (!font_menu)
 		return;
-	CheckItem(settings_menu, SETTINGS_FONT_9_ID,
+	CheckItem(font_menu, FONT_MENU_9_ID,
 	    prefs.font_size == 9);
-	CheckItem(settings_menu, SETTINGS_FONT_12_ID,
+	CheckItem(font_menu, FONT_MENU_12_ID,
 	    prefs.font_size == 12);
 }
 

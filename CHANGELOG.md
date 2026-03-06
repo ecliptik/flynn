@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.1] - 2026-03-06
+
+### Added
+- Custom Finder icon (ICN#/BNDL/FREF resources)
+  - 32x32 monochrome CRT terminal with >_ prompt
+  - BNDL and FREF associate icon with creator code 'FLYN'
+  - Signature resource ('FLYN' 0) for Finder identification
+- "Flynn Read Me" TeachText documentation
+  - Usage guide, features, keyboard shortcuts, M0110 key mappings
+  - Troubleshooting, bookmarks, font selection, credits
+  - Deployed as TEXT/ttxt to HFS image alongside Flynn
+- BinHex (.hqx) archive output in build
+  - build.sh generates Flynn.hqx for cross-platform distribution
+  - Text-safe encoding preserves resource fork via email/web/BBS
+- About dialog now shows https://www.ecliptik.com
+- Flynn deployed in its own folder on HFS disk (:Flynn:)
+
+### Changed
+- Version: 0.9.0 → 0.9.1
+- Settings menu renamed to "Font" (only contains font options)
+  - MENU 131 title, all constants and variables renamed
+- build.sh now converts Read Me to Mac CR line endings and prints
+  folder-based deployment instructions
+- Build size: ~88KB (up from ~87KB, icon resources added)
+
 ## [0.9.0] - 2026-03-06
 
 ### Added

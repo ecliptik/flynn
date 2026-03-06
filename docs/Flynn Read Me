@@ -1,0 +1,273 @@
+=====================================================
+                      Flynn
+              Telnet Client for Macintosh
+                    Version 0.9.1
+=====================================================
+
+Connect your classic Macintosh to the modern world.
+
+
+About Flynn
+-----------
+
+Flynn is a Telnet client for the Apple Macintosh Plus
+and later models running System 6.0.8. It connects to
+remote hosts over TCP/IP using MacTCP, providing a
+full-featured terminal for interactive sessions with
+Linux, Unix, and other Telnet-capable servers.
+
+Flynn emulates a VT220/xterm terminal with support for
+full-screen applications like vi, nano, tmux, and
+Midnight Commander. It renders box-drawing characters,
+handles UTF-8 text, and provides all the keyboard
+mappings needed to work comfortably on the original
+Macintosh keyboard.
+
+
+System Requirements
+-------------------
+
+  - Macintosh Plus or later (68000 CPU)
+  - System 6.0.8 or later
+  - MacTCP 2.1 (configured with a valid TCP/IP
+    connection)
+  - 4 MB RAM recommended
+  - Network connection (Ethernet or compatible)
+
+
+Getting Started
+---------------
+
+1. Make sure MacTCP is installed and configured in
+   your Control Panel. You will need a working TCP/IP
+   connection to your network.
+
+2. Double-click the Flynn application to launch it.
+
+3. Choose "Connect..." from the Session menu, or
+   press Command-N.
+
+4. Enter the hostname or IP address of the server
+   you wish to connect to. The default port is 23
+   (standard Telnet).
+
+5. Click Connect. Flynn will resolve the hostname
+   and establish a TCP connection.
+
+6. You should see a login prompt from the remote
+   host. Type your username and password to begin
+   your session.
+
+7. To disconnect, choose "Disconnect" from the
+   Session menu, or simply close the window.
+
+
+Features
+--------
+
+  - Client-side Telnet protocol with full IAC
+    negotiation (BINARY, ECHO, SGA, TTYPE, NAWS)
+  - VT220 terminal emulation with xterm compatibility
+  - DEC Special Graphics for box-drawing characters
+    (tmux borders, dialog boxes, Midnight Commander)
+  - UTF-8 support for accented characters, curly
+    quotes, em dashes, and other Unicode symbols
+  - Alternate screen buffer for full-screen apps
+    (vi, nano, less, tmux)
+  - 96-line scrollback buffer
+  - Mouse text selection with copy and paste
+  - Session bookmarks for one-click connections
+  - Font selection (Monaco 9pt or Monaco 12pt)
+  - Application cursor keys and keypad mode
+  - Bracketed paste mode
+  - Settings saved across launches
+
+
+Keyboard Shortcuts
+------------------
+
+Flynn is designed for the Apple M0110 and M0110A
+keyboards. All shortcuts also work on extended ADB
+and USB keyboards.
+
+  Menu Commands
+  ~~~~~~~~~~~~~
+  Command-N       Connect to a host
+  Command-B       Open Bookmark Manager
+  Command-C       Copy (selection or full screen)
+  Command-V       Paste clipboard to connection
+  Command-Q       Quit Flynn
+
+  Scrollback
+  ~~~~~~~~~~
+  Command-Up      Scroll up one line
+  Command-Down    Scroll down one line
+  Cmd-Shift-Up    Scroll up one page
+  Cmd-Shift-Down  Scroll down one page
+
+  Special Keys
+  ~~~~~~~~~~~~
+  Command-.       Send Escape
+  Clear key       Send Escape (M0110A keypad)
+  Esc key         Send Escape (extended keyboards)
+  Option+letter   Send Ctrl+letter
+  Command-1..0    Send F1 through F10
+
+  Text Selection
+  ~~~~~~~~~~~~~~
+  Click-drag      Select text
+  Double-click    Select a word
+  Shift-click     Extend selection to click point
+
+
+M0110 Keyboard Notes
+--------------------
+
+The original Macintosh keyboard (M0110) and the
+M0110A with numeric keypad do not have Escape,
+Control, or Function keys. Flynn provides complete
+mappings for all of these:
+
+  Escape:  The M0110 has no Escape key. Press
+  Command-. (Command-period) to send Escape. This
+  follows the standard Macintosh convention for
+  "Cancel." On the M0110A, the Clear key on the
+  numeric keypad also sends Escape.
+
+  Control:  The M0110 has no Control key. Hold
+  the Option key and press a letter to send the
+  corresponding control character. For example,
+  Option-C sends Ctrl-C (interrupt), and Option-D
+  sends Ctrl-D (end of file).
+
+  Function Keys:  The M0110 has no function keys.
+  Press Command-1 through Command-0 to send F1
+  through F10. On extended ADB keyboards, the
+  physical function keys F1-F12 work natively.
+
+  Arrow Keys:  Arrow keys send standard VT100
+  cursor sequences. When an application enables
+  cursor key mode (vi, tmux), Flynn automatically
+  switches to application cursor sequences.
+
+
+Session Bookmarks
+-----------------
+
+Flynn can store up to 8 session bookmarks for
+servers you connect to frequently.
+
+  Adding a Bookmark:
+  1. Choose "Bookmarks..." from the Session menu,
+     or press Command-B.
+  2. Click the "Add" button.
+  3. Enter a name, hostname, and port (default 23).
+  4. Click OK.
+
+  Connecting via Bookmark:
+  - Your bookmarks appear at the bottom of the
+    Session menu. Simply choose one to connect.
+  - You can also select a bookmark in the manager
+    and click "Connect."
+
+  Editing or Deleting:
+  - Select a bookmark in the list, then click
+    "Edit" or "Delete."
+
+Bookmarks and all preferences are saved to a file
+called "Flynn Prefs" in the System Folder.
+
+
+Font Selection
+--------------
+
+Flynn supports two font sizes:
+
+  Monaco 9pt   80 columns x 24 rows (default)
+  Monaco 12pt  Larger text, fewer columns/rows
+
+To change the font, choose "Monaco 9" or
+"Monaco 12" from the Font menu. The terminal
+grid is automatically recomputed, and if you are
+connected, the server is notified of the new
+window size.
+
+Your font preference is saved across launches.
+
+
+Troubleshooting
+---------------
+
+  "Application is busy or damaged"
+  Make sure Flynn was copied to the hard drive
+  correctly. Try deleting and recopying the file.
+
+  Cannot connect / connection refused
+  Verify that MacTCP is installed and properly
+  configured in the Control Panel. Check that you
+  can reach the remote host. Make sure the Telnet
+  service is running on the server (port 23).
+
+  DNS resolution fails
+  Check that a DNS server is configured in MacTCP.
+  You can also try connecting by IP address instead
+  of hostname.
+
+  No response after connecting
+  Some servers require you to press Return after
+  connecting. If the screen remains blank, try
+  pressing Return or Command-. (Escape).
+
+  Garbled display
+  If the screen becomes garbled, try disconnecting
+  and reconnecting. This resets the terminal state.
+  Some programs that use 256 colors or truecolor
+  may not display correctly on a monochrome screen,
+  but text should remain readable.
+
+  Box-drawing characters look wrong
+  Flynn renders box-drawing via QuickDraw. If you
+  see question marks instead, the remote program
+  may be sending characters that Flynn does not
+  yet map.
+
+
+Credits
+-------
+
+Flynn was created by Micheal Waltz with assistance
+from Claude, an AI by Anthropic.
+
+Flynn is cross-compiled on Linux using Retro68, the
+68k Macintosh cross-compilation toolchain by
+Wolfgang Thaller.
+
+This project incorporates code from two open-source
+classic Macintosh applications by joshua stein:
+
+  wallops - IRC client for classic Macintosh
+  MacTCP wrapper, DNS resolution, and utility
+  functions are used directly from this project.
+
+  subtext - BBS server for classic Macintosh
+  The Telnet protocol implementation served as the
+  reference for Flynn's client-side telnet engine.
+
+Both projects are released under the ISC license.
+
+
+License
+-------
+
+Flynn is released under the ISC license.
+Copyright (c) 2026 Flynn contributors.
+See the LICENSE file for details.
+
+
+Contact
+-------
+
+  https://www.ecliptik.com
+  https://github.com/ecliptik/flynn
+
+=====================================================

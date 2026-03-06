@@ -13,7 +13,7 @@
 #define APPLE_MENU_ID       128
 #define FILE_MENU_ID        129
 #define EDIT_MENU_ID        130
-#define SETTINGS_MENU_ID    131
+#define FONT_MENU_ID        131
 
 /* Apple menu items */
 #define APPLE_MENU_ABOUT_ID 1
@@ -35,9 +35,9 @@
 #define EDIT_MENU_PASTE_ID  5
 #define EDIT_MENU_CLEAR_ID  6
 
-/* Settings menu items */
-#define SETTINGS_FONT_9_ID  1
-#define SETTINGS_FONT_12_ID 2
+/* Font menu items */
+#define FONT_MENU_9_ID      1
+#define FONT_MENU_12_ID     2
 
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130

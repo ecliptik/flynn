@@ -41,8 +41,8 @@ resource 'MENU' (130, "Edit") {
 	}
 };
 
-resource 'MENU' (131, "Settings") {
-	131, textMenuProc, allEnabled, enabled, "Settings",
+resource 'MENU' (131, "Font") {
+	131, textMenuProc, allEnabled, enabled, "Font",
 	{
 		"Monaco 9", noIcon, noKey, check, plain;
 		"Monaco 12", noIcon, noKey, noMark, plain
@@ -93,7 +93,7 @@ resource 'DITL' (129, "Connect") {
 
 /* About dialog */
 resource 'DLOG' (130, "About Flynn") {
-	{80, 100, 260, 400},
+	{80, 100, 280, 400},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -106,7 +106,7 @@ resource 'DLOG' (130, "About Flynn") {
 resource 'DITL' (130, "About Flynn") {
 	{
 		/* OK button */
-		{145, 115, 165, 185},
+		{165, 115, 185, 185},
 		Button { enabled, "OK" };
 
 		/* App name */
@@ -115,7 +115,7 @@ resource 'DITL' (130, "About Flynn") {
 
 		/* Version */
 		{40, 60, 56, 240},
-		StaticText { disabled, "Version 0.9.0" };
+		StaticText { disabled, "Version 0.9.1" };
 
 		/* Description */
 		{65, 20, 81, 280},
@@ -128,6 +128,10 @@ resource 'DITL' (130, "About Flynn") {
 		/* Credits */
 		{115, 30, 131, 270},
 		StaticText { disabled, "Built with Claude Code + Retro68" };
+
+		/* Website */
+		{138, 30, 154, 270},
+		StaticText { disabled, "https://www.ecliptik.com" };
 	}
 };
 
@@ -247,6 +251,68 @@ resource 'DITL' (132, "Edit Bookmark") {
 		{85, 65, 101, 135},
 		EditText { enabled, "23" };
 	}
+};
+
+/* Application icon - Macintosh Plus with >_ prompt */
+data 'ICN#' (128) {
+	/* Icon bitmap (32x32) - Mac Plus, white screen, black >_ */
+	$"00000000 03FFFF00"
+	$"07FFFF80 0FFFFFC0"
+	$"0E0001C0 0C0000C0"
+	$"0C0000C0 0C8000C0"
+	$"0CC000C0 0C6000C0"
+	$"0CC000C0 0C8000C0"
+	$"0C0000C0 0C0F80C0"
+	$"0C0000C0 0E0001C0"
+	$"0FFFFFC0 0C0000C0"
+	$"0C0000C0 0C7FF0C0"
+	$"0C7FF0C0 0C0000C0"
+	$"0C0000C0 0FFFFFC0"
+	$"07FFFF80 03FFFF00"
+	$"00000000 01C01C00"
+	$"01C01C00 00000000"
+	$"00000000 00000000"
+	/* Mask bitmap (32x32) */
+	$"00000000 03FFFF00"
+	$"07FFFF80 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"0FFFFFC0 0FFFFFC0"
+	$"07FFFF80 03FFFF00"
+	$"00000000 01C01C00"
+	$"01C01C00 00000000"
+	$"00000000 00000000"
+};
+
+/* File reference - APPL type, icon 0 */
+data 'FREF' (128) {
+	$"4150 504C 0000 00"                                  /* APPL... */
+};
+
+/* Bundle - associates creator 'FLYN' with icon and file ref */
+data 'BNDL' (128) {
+	$"464C 594E"                                          /* FLYN */
+	$"0000"                                               /* owner ID */
+	$"0001"                                               /* 2 types */
+	$"4652 4546"                                          /* FREF */
+	$"0000"                                               /* 1 entry */
+	$"0000 0080"                                          /* local 0 -> res 128 */
+	$"4943 4E23"                                          /* ICN# */
+	$"0000"                                               /* 1 entry */
+	$"0000 0080"                                          /* local 0 -> res 128 */
+};
+
+/* Application signature string */
+data 'FLYN' (0, "Owner resource") {
+	$"15"                                                 /* Pascal string length */
+	"Flynn - Telnet Client"
 };
 
 resource 'SIZE' (-1) {
