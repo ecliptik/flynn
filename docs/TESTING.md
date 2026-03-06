@@ -57,6 +57,15 @@ Snow supports BlueSCSI Toolbox protocol:
 - **Mouse**: Absolute positioning by default (patches Mac globals)
 - Keyboard layout: Set to "U.S." in guest Control Panel for best results
 
+**Mac Plus M0110 Keyboard Limitations**: The original M0110 keyboard has NO Escape key and NO Control key. Snow faithfully emulates this — X11 `XK_Escape` and `XK_Control_L` do NOT map to Mac key events when emulating a Mac Plus. Flynn provides workarounds:
+
+| Action | Physical Key (M0110) | Flynn Mapping | X11 Automation |
+|--------|---------------------|---------------|----------------|
+| Escape | Cmd + . | main.c:399-403 sends 0x1B | Right Alt + period |
+| Ctrl+letter | Option + letter | main.c:570-588 maps to Ctrl code | Left Alt + letter |
+
+For extended keyboards (M0115, ADB), physical Escape and Control keys work normally.
+
 ### Workspaces
 
 Save/load entire emulator state (machine type, ROMs, disks, window layout) via `Workspace` menu. Paths are relative to workspace file.
@@ -324,6 +333,56 @@ Test screenshots are saved in `screenshots/` (gitignored):
 Flynn in Finder list view: Mac coordinates (100, 137) = screen (266, 363).
 Flynn File menu: Cmd+N for Connect (preferred over menu drag).
 Framebuffer: FB_LEFT=116, FB_TOP=158, SCALE=1.5.
+
+## Phase 11-14 Test Results (2026-03-06)
+
+Build: `./build.sh` — clean compile. Tested in Snow v1.3.1, Mac Plus, System 6.0.8.
+Test server: telnetd on Linux host, user/password auth.
+
+### Reusable Test Script
+
+A Python XTEST automation script is saved at `tests/qa_snow_test.py`. It includes the `SnowAuto` class with correct M0110 keyboard handling (Cmd+. for Escape, Option+key for Ctrl) and tests for nano, arrow keys, tmux, and UTF-8 accented characters.
+
+### Test Results
+
+| Phase | Feature | Test | Result |
+|-------|---------|------|--------|
+| 11 | Bookmarks | Open dialog (Cmd+B) | PASS |
+| 11 | Bookmarks | Add bookmark (Name + Host fields) | PASS |
+| 11 | Bookmarks | Persistence across dialog open/close | PASS |
+| 11 | Bookmarks | Connect via bookmark menu | PASS |
+| 12 | Font Selection | Monaco 9 ↔ Monaco 12 switching | PASS |
+| 12 | Font Selection | Grid recalculation after font change | PASS |
+| 13 | xterm Compat | `echo $TERM` → "xterm" | PASS |
+| 13 | xterm Compat | vi: open, insert, Escape (Cmd+.), :wq, verify | PASS |
+| 13 | xterm Compat | nano: open, Ctrl+X exit (Option+X) | PASS |
+| 13 | xterm Compat | Arrow key history recall | PARTIAL |
+| 14 | UTF-8 | `LANG=C tmux` (ASCII status bar) | PASS |
+| 14 | UTF-8 | `tmux` default (UTF-8 locale) | PASS |
+| 14 | UTF-8 | `printf '\xc3\xa9\xc3\xa8\xc3\xab\n'` (accented chars) | PASS |
+| 14 | UTF-8 | `echo 'hello world'` | PASS |
+
+### Known Bug: Screen Not Cleared on Disconnect
+
+When disconnecting (Session > Disconnect), the old terminal content remains visible. New login prompts overlay on top of the previous session's screen.
+
+**Root cause**: `do_disconnect()` in main.c:1098-1103 only calls `conn_close()` and `update_menus()` — it does not reset the terminal buffer or force a window redraw.
+
+**Fix**: Add `terminal_reset()`, `telnet_init()`, and `InvalRect()` to `do_disconnect()`.
+
+### Known Cosmetic Issue: UTF-8 tmux Exit
+
+After exiting tmux in a UTF-8 locale, the exit message renders as `Σ[exited]` instead of `[exited]`. This is a minor UTF-8 rendering artifact where a stray byte gets translated to a Greek sigma.
+
+### Timing Notes for Automated Testing
+
+The 68000 CPU at 8MHz processes telnet data slowly. Automated test scripts need generous delays:
+- **5-10 seconds** between shell commands (for TCP round-trip + screen rendering)
+- **100ms per character** when typing (to avoid TCP buffer overflow)
+- **8-15 seconds** after launching full-screen apps (vi, nano, tmux)
+- **25 seconds** after login (for neofetch/MOTD rendering)
+
+Keyboard input gets buffered in the TCP queue when the Mac can't process fast enough — characters appear "lost" but replay later.
 
 ## Troubleshooting
 

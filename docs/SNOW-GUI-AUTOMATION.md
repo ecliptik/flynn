@@ -299,6 +299,79 @@ for _ in range(5):
     time.sleep(0.5)
 ```
 
+## Mac Plus M0110 Keyboard
+
+The Mac Plus M0110 keyboard has **no Escape key** and **no Control key**. Snow faithfully emulates this — `XK_Escape` and `XK_Control_L` are not mapped to Mac key events.
+
+Flynn provides workarounds that must be used in automation:
+
+| Action | Flynn Handler | Automation Method |
+|--------|--------------|-------------------|
+| Escape | Cmd+. (main.c:399) | `cmd_key('period')` — Right Alt + period |
+| Ctrl+letter | Option+letter (main.c:570) | `option_key('x')` — Left Alt + letter |
+
+### Automation Methods
+
+```python
+def option_key(self, key_char):
+    """Left Alt (= Mac Option) + key. Sends Ctrl+key on M0110."""
+    alt_l_kc = self.d.keysym_to_keycode(XK.XK_Alt_L)
+    key_sym = XK.string_to_keysym(key_char)
+    key_kc = self.d.keysym_to_keycode(key_sym)
+    xtest.fake_input(self.d, X.KeyPress, alt_l_kc, X.CurrentTime)
+    self.d.sync(); time.sleep(0.1)
+    xtest.fake_input(self.d, X.KeyPress, key_kc, X.CurrentTime)
+    self.d.sync(); time.sleep(0.1)
+    xtest.fake_input(self.d, X.KeyRelease, key_kc, X.CurrentTime)
+    self.d.sync(); time.sleep(0.1)
+    xtest.fake_input(self.d, X.KeyRelease, alt_l_kc, X.CurrentTime)
+    self.d.sync()
+
+def type_escape(self):
+    """Send Escape via Cmd+. (M0110 convention)."""
+    self.cmd_key('period')
+
+def ctrl_key(self, key_char):
+    """Send Ctrl+key via Option+key (M0110 convention)."""
+    self.option_key(key_char)
+```
+
+### Examples
+
+```python
+# Exit vi: Escape then :wq
+snow.type_escape()       # Cmd+. sends ESC
+time.sleep(5)
+snow.type_text(":wq")
+snow.type_return()
+
+# Exit nano: Ctrl+X
+snow.ctrl_key('x')       # Option+X sends Ctrl+X
+```
+
+Extended keyboards (M0115, ADB) have physical Escape and Control keys that work normally.
+
+## Timing for 68000 Telnet Testing
+
+The Mac Plus 68000 at 8MHz processes telnet data slowly. Automated scripts need generous delays:
+
+| Action | Minimum Wait |
+|--------|-------------|
+| Between shell commands | 5-10 seconds |
+| After launching vi/nano/tmux | 8-15 seconds |
+| After login (neofetch/MOTD) | 25 seconds |
+| Between typed characters | 100ms |
+| After Escape/Ctrl key | 5-8 seconds |
+
+Keyboard input gets TCP-buffered when the Mac can't keep up — characters appear "lost" but replay later when the Mac catches up.
+
+## Reusable Test Script
+
+A complete QA automation script is saved at `tests/qa_snow_test.py` with:
+- `SnowAuto` class with all M0110 keyboard workarounds
+- Tests for nano, vi, arrow keys, tmux (LANG=C and UTF-8), accented characters
+- Correct coordinate mapping and timing
+
 ## Snow Source Code References
 
 Key files in the Snow source that affect automation behavior:
@@ -339,7 +412,9 @@ The `.snoww` workspace file affects coordinate mapping:
 
 **Keyboard not working**: Click inside the framebuffer first to give Snow X11 focus. Verify `map_cmd_ralt: true` in workspace config.
 
-**Wrong coordinates**: Re-measure FB_LEFT and FB_TOP if the window size or viewport_scale changes. The values above are for a 1000x750 window at viewport_scale=1.5.
+**Escape/Ctrl keys don't work on Mac Plus**: Snow emulates the M0110 keyboard which has no Escape or Control keys. X11 `XK_Escape` and `XK_Control_L` are NOT mapped. Use Cmd+. (Right Alt + period) for Escape and Option+letter (Left Alt + letter) for Ctrl+letter. See the M0110 Keyboard section below.
+
+**Wrong coordinates**: Re-measure FB_LEFT and FB_TOP if the window size or viewport_scale changes. Known values: (116, 158) for 1000x750 window, (195, 191) for full-viewport window. Always verify with a screenshot.
 
 **`ui_active` blocking input**: If a Snow dialog (file picker, about box) is open, all emulator input is blocked. Close the dialog first.
 
