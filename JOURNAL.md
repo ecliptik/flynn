@@ -4,6 +4,78 @@ A living document recording the development of Flynn, a Telnet client for classi
 
 ---
 
+## 2026-03-05 — Phase 5: Terminal UI, Keyboard Mapping, and the TCP Bug
+
+### Five-Agent Team
+
+Used Claude Teams with five specialized agents working in parallel:
+
+- **Team Lead** — Coordinated work, made architectural decisions, managed git
+- **Software Architect** — Designed and implemented `terminal_ui.c`/`terminal_ui.h` (rendering module, text attributes, cursor blink, dirty-region invalidation)
+- **Build Engineer** — Built Flynn, deployed to HDD image via hfsutils, launched Snow emulator, ran automated GUI tests via X11 XTEST
+- **Documentation Writer** — Updated TESTING.md, README.md, and other docs
+- **QA Engineer** — Wrote `test_launch.py` automated test script using python-xlib for X11 XTEST mouse/keyboard simulation
+
+### Terminal UI Renderer (terminal_ui.c)
+
+The architect created a dedicated rendering module separating display logic from the terminal emulator:
+
+- **Font**: Monaco 9pt (the classic Mac monospace font), 6×12 pixel cells with 2px margins
+- **Dirty tracking**: Per-row dirty flags — only redraws rows that changed
+- **Attribute runs**: Scans each row for contiguous spans of identical attributes, issues one `DrawText()` call per span. Bold and underline use `TextFace()`. Inverse video uses `PaintRect()` + `srcBic` transfer mode (paints the cell black, then XORs the text).
+- **Cursor**: XOR block cursor that blinks every ~30 ticks (~0.5 seconds)
+- **Drawing strategy**: Direct `term_ui_draw()` calls from the null event handler, bypassing the `InvalRect` → `BeginUpdate`/`EndUpdate` mechanism. This was a key fix — the update event approach had timing issues with dirty flags being cleared before the update handler could read them.
+
+### Keyboard Mapping
+
+The build engineer implemented full VT100 keyboard mapping in `handle_key_down()`:
+
+- Mac virtual keycodes (from `event->message`) mapped to VT100 escape sequences
+- Arrow keys send `ESC[A`/`B`/`C`/`D`, Home/End send `ESC[H`/`ESC[F`
+- Page Up/Down and Forward Delete send extended sequences (`ESC[5~`, `ESC[6~`, `ESC[3~`)
+- Delete/Backspace sends DEL (0x7F), which is what Unix expects
+- Ctrl+key computes the control character (`key & 0x1F`)
+- Cmd+key is intercepted before any of this for menu shortcuts
+- Retro68 uses `ControlKey` (capital C) — discovered during compilation
+
+### The TCP Blocking Bug
+
+After the initial deployment, Flynn connected to the telnet server and rendered the login banner and neofetch output perfectly — all 24 rows of ASCII art. But then the screen froze. Typing worked (characters were sent to the server), but no new output appeared on screen.
+
+**Initial hypothesis (wrong)**: The `InvalRect()` → `updateEvt` invalidation path wasn't generating repaints after scrolling past row 24. Switched to direct drawing — this helped with responsiveness but didn't fix the freeze.
+
+**Root cause**: The build engineer discovered it was a complete event loop hang, not a rendering issue. `_TCPStatus()` in `tcp.c` was the **only** TCP function that didn't `memset(pb, 0, sizeof(*pb))` before use. Stale data in the parameter block caused Snow's MacTCP emulation to return incorrect `amtUnreadData` values. When `conn_idle()` then called `_TCPRcv()` with its 30-second `commandTimeoutValue`, the entire application blocked — no events processed, no screen updates, nothing.
+
+**Fix**: Two lines:
+1. Added `memset(pb, 0, sizeof(*pb))` to `_TCPStatus()` (matching every other TCP function)
+2. Reduced `_TCPRcv()` `commandTimeoutValue` from 30 to 1 second (safety net)
+
+After the fix, all 14 test scenarios passed: echo commands, arrow keys for shell history, Ctrl+C to interrupt processes, `ls --color` with bold text, and full-screen TUI applications (nano with inverse status bars, vi with insert/normal mode switching).
+
+### Automated Testing
+
+The QA engineer created `test_launch.py`, a python-xlib script that drives the Snow emulator through X11 XTEST:
+
+- Clicks on Flynn in the Finder list, opens it with Cmd+O
+- Opens File > Connect, types the server IP, presses Return
+- Types username/password at the login prompt
+- Runs through 12 test scenarios (echo, arrows, Ctrl+C, nano, vi, disconnect)
+- Takes screenshots at each step for verification
+- Uses environment variables (`FLYNN_TEST_HOST`, `FLYNN_TEST_USER`, `FLYNN_TEST_PASS`) to avoid hardcoded credentials
+
+### Repository Made Public
+
+Before making the repo public on GitHub (as a read-only mirror of the Forgejo origin):
+- Scrubbed all hardcoded credentials and private URLs from source and git history using `git-filter-repo`
+- Replaced with placeholders in docs, env vars in test scripts
+- Stored real credentials in local Claude memory (not committed)
+
+### Current State
+
+Phases 0–5 complete. Flynn is a functional telnet client: connects to real servers, negotiates telnet options, renders VT100 terminal output with text attributes, handles keyboard input with full arrow key / Ctrl / escape support, and runs full-screen TUI applications. Build size is 64KB.
+
+---
+
 ## 2026-03-05 — Telnet Protocol and VT100 Terminal Engine
 
 ### Rebuilding Retro68 and Fixing Compatibility

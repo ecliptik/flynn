@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-05
+
+### Added
+- Dedicated terminal UI renderer (`terminal_ui.c`/`terminal_ui.h`)
+  - Monaco 9pt font, 6×12 pixel character cells with 2px margins
+  - Batched `DrawText()` calls scanning for attribute runs per row
+  - Bold via `TextFace(bold)`, underline via `TextFace(underline)`
+  - Inverse video via `PaintRect` + `srcBic` transfer mode
+  - XOR block cursor with ~30-tick blink interval
+  - Per-row dirty flags for efficient partial redraw
+  - Direct drawing in null event handler (bypasses BeginUpdate/EndUpdate)
+- Full keyboard input mapping in `handle_key_down()`
+  - Arrow keys → VT100 escape sequences (`ESC[A`/`B`/`C`/`D`)
+  - Home, End, Page Up, Page Down, Forward Delete
+  - Delete/Backspace → DEL (0x7F), Return → CR (0x0D), Tab → HT (0x09)
+  - Escape key (0x1B), Ctrl+key combinations
+  - Cmd+key menu shortcuts preserved
+
+### Fixed
+- **Screen freeze after row 24 (critical)**: `_TCPStatus()` was the only
+  TCP function missing `memset(pb, 0, sizeof(*pb))`. Stale parameter block
+  data caused incorrect `amtUnreadData` reporting, which led `_TCPRcv()`
+  (30-second blocking timeout) to hang the entire event loop after the
+  terminal scrolled. Fixed by adding the memset and reducing the timeout
+  to 1 second.
+- Switched from `term_ui_invalidate()` (InvalRect → updateEvt) to direct
+  `term_ui_draw()` calls in the null event handler for immediate rendering
+
+### Changed
+- Build size: 64KB (up from 61KB)
+- All 14 test scenarios now pass (echo, arrow keys, Ctrl+C, nano, vi)
+
 ## [0.3.0] - 2026-03-05
 
 ### Added

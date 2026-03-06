@@ -1,5 +1,29 @@
 # Development Log
 
+## 2026-03-05: Phase 5 — Terminal UI and TCP Fix
+
+### Terminal UI Renderer (terminal_ui.c/terminal_ui.h)
+
+New dedicated rendering module. Monaco 9pt font, 6×12 character cells, 2px margins. Per-row dirty flags for efficient partial redraw. Attribute runs scanned per row — one `DrawText()` per contiguous span. Bold/underline via `TextFace()`, inverse via `PaintRect` + `srcBic`. XOR block cursor blinks every ~30 ticks.
+
+### Keyboard Mapping (main.c handle_key_down)
+
+Full VT100 keyboard mapping: arrows → `ESC[A`–`ESC[D`, Home/End/PgUp/PgDn/FwdDel, Delete→DEL (0x7F), Ctrl+key→control chars (`& 0x1F`), Cmd+key preserved for menus. Retro68 header uses `ControlKey` not `controlKey`.
+
+### TCP Blocking Bug Fix (tcp.c)
+
+`_TCPStatus()` was missing `memset(pb, 0, sizeof(*pb))` — the only TCP function without it. Stale parameter block data caused bad `amtUnreadData` values. `_TCPRcv()` then blocked for 30 seconds (`commandTimeoutValue`), hanging the entire event loop. Fixed by adding memset and reducing timeout to 1 second.
+
+### Drawing Strategy
+
+Switched from `InvalRect()` → `updateEvt` to direct `term_ui_draw()` in the null event handler. The update event path had timing issues with dirty flags being cleared before the handler read them.
+
+### Test Results
+
+All 14 scenarios pass: launch, connect, login, echo, arrows, Ctrl+C, ls --color, nano, vi, disconnect, quit. Build size: 64KB.
+
+---
+
 ## 2026-03-05: Telnet Protocol Engine and VT100 Terminal
 
 ### Retro68 Toolchain Rebuild

@@ -41,17 +41,19 @@
 - [x] Scrollback buffer (4 pages, 96 lines)
 - [x] Wired into main event loop (telnet→terminal→display pipeline)
 - [x] Basic inline text rendering (Monaco 9pt)
-- [ ] Test with actual telnet server
+- [x] Test with actual telnet server (192.168.7.230 — login, neofetch, shell)
 
 ## Phase 5: Terminal UI
-- [ ] Dedicated terminal_ui.c rendering module
-- [ ] Efficient dirty-region redraw
-- [ ] Keyboard input mapping (arrow keys, function keys, ESC, Ctrl)
-- [ ] Bold/inverse/underline text rendering
+- [x] Dedicated terminal_ui.c rendering module (Monaco 9pt, batched DrawText)
+- [x] Efficient dirty-region redraw (per-row dirty flags, direct drawing)
+- [x] Keyboard input mapping (arrow keys, function keys, ESC, Ctrl, Delete)
+- [x] Bold/inverse/underline text rendering (TextFace + PaintRect/srcBic)
+- [x] Cursor blink (XOR block cursor, ~30 tick interval)
+- [x] Fix TCP blocking bug (_TCPStatus memset, _TCPRcv timeout 30→1)
 - [ ] Copy/paste support
 - [ ] Scroll with mouse
 
 ## Phase 6: Polish
 - [ ] Settings persistence
 - [ ] Performance optimization
-- [ ] Comprehensive testing with vi, nano, etc.
+- [ ] Scrollback viewing (Page Up/Down to scroll back)
