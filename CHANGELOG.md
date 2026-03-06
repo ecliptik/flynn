@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2026-03-06
+
+### Added
+- Cmd+. sends Escape to remote host (classic Mac "Cancel" convention)
+- Clear/NumLock key (vkey 0x47) sends Escape (available on M0110A keypad)
+- charCode 0x1B fallback sends Escape from any source (USB/ADB keyboards)
+
+### Fixed
+- Escape key had no effect in Snow emulator — the M0110A keyboard has no
+  physical Escape key, so Snow's `akm0110::translate` drops host Escape
+  key events entirely. Cmd+. and Clear key now provide Escape functionality.
+- Host Ctrl key had no effect in Snow — the M0110 has no physical Ctrl key.
+  Option+letter (existing fix from 0.5.0) remains the correct way to send
+  control characters on M0110/M0110A keyboards.
+
 ## [0.5.0] - 2026-03-05
 
 ### Added

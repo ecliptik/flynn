@@ -60,6 +60,9 @@
 - [x] About dialog (DLOG 130, version, credits)
 - [x] Settings persistence ("Flynn Prefs" file, host/port saved)
 - [x] Option key as Ctrl modifier (M0110 keyboard fix)
+- [x] Cmd+. sends Escape (classic Mac convention for Cancel)
+- [x] Clear/NumLock key sends Escape (M0110A keypad)
+- [x] charCode 0x1B fallback (USB/ADB keyboards with physical Escape key)
 - [x] Quit confirmation when connected
 - [x] Connection lost notification alert
 - [x] Cursor hide/show (DECTCEM ESC[?25h/l)

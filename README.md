@@ -14,12 +14,28 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 - Copy/paste via Mac clipboard (Cmd+C to copy screen, Cmd+V to paste)
 - Settings persistence (host/port saved across launches)
 - Option key as Ctrl modifier for M0110 keyboard
+- Cmd+. sends Escape (classic Mac convention), Clear key also sends Escape
 - Proper About dialog with version and credits
 - Targets Motorola 68000 CPU (Mac Plus compatible)
 
 ## Current Status
 
 Phases 0-6 are complete. Flynn is a fully featured telnet client: connects to real servers, renders VT100 terminal output including full-screen TUI applications (nano, vi), handles interactive shell sessions with copy/paste and scrollback viewing, saves preferences across launches, and supports the M0110 keyboard's Option key as Ctrl. The application runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1.
+
+## Keyboard Shortcuts
+
+Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Control keys. These mappings also work on modern USB/ADB keyboards.
+
+| Action | Keys | Notes |
+|--------|------|-------|
+| Escape | Cmd+. | Classic Mac "Cancel" convention |
+| Escape | Clear (keypad) | M0110A numeric keypad key |
+| Escape | Esc key | Modern keyboards only (not on M0110) |
+| Ctrl+key | Option+key | e.g., Option+C = Ctrl+C |
+| Scroll up/down | Cmd+Up/Down | One line at a time |
+| Scroll page | Cmd+Shift+Up/Down | One page at a time |
+| Copy screen | Cmd+C | Copies visible 80x24 text |
+| Paste | Cmd+V | Sends clipboard to connection |
 
 ## Building
 

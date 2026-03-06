@@ -290,6 +290,13 @@ handle_key_down(EventRecord *event)
 			SetPort(save);
 			return;
 		}
+		/* Cmd+. sends Escape (classic Mac convention) */
+		if (key == '.' && conn.state == CONN_STATE_CONNECTED) {
+			char esc = 0x1B;
+			conn_send(&conn, &esc, 1);
+			return;
+		}
+
 		handle_menu(MenuKey(key));
 		return;
 	}
@@ -341,6 +348,16 @@ handle_key_down(EventRecord *event)
 		return;
 	case 0x30:	/* Tab */
 		key = 0x09;
+		conn_send(&conn, &key, 1);
+		return;
+	case 0x47:	/* Clear/NumLock → Escape (M0110A keypad) */
+		key = 0x1B;
+		conn_send(&conn, &key, 1);
+		return;
+	}
+
+	/* ESC character from any source (keyboard adapters, Clear key) */
+	if (key == 0x1B) {
 		conn_send(&conn, &key, 1);
 		return;
 	}
