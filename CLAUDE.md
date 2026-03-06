@@ -2,16 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Use Claude Teams (https://code.claude.com/docs/en/agent-teams) when appropriate to parallelize work.
 
-Team Members:
-- Team Lead with extensive Classic Macintosh System 6 and System 7 experience (Make decisions and delegates work to aligned team members) claude-opus-4-6
-- Macintosh System 6 and System 7 Software Architect and Telnet Expert (Reviews code for completeness, functionality and overall design) claude-opus-4-6
-- Macintosh System 6 Build Engineer (Retro68, HFS disks, Snow emulator) claude-sonnet-4-6
-- Macintosh System 6 Documentation Writer (Update docs/, screenshots, DEVLOG.md, JOURNAL.md, README.md and any build and testing learnings claude-sonnet-4-6
-- Macintosh System 6 UI/UX QA Engineer (Testing Flynn Application UI/UX with python scripts to interact with Snow) claude-opus-4-6
+Spawn a team with members:
+- Team Lead (claude-opus-4-6) - Extensive Classic Macintosh System 6 Application experience, make decisions and delegate work
+- Software Architect (claude-opus-4-6) - System 6 and Telnet Expert, reviews code for completeness, functionality, bug fixes, overall design
+- Build Engineer (claude-sonnet-4-6) - build releases with Retro68, copy to HFS disks and prepare Snow emulator
+- Technical Writer (claude-sonnet-4-6) - create and update documenation, take screenshots, record any learnings for future use
+- UI/UX QA Engineer (claude-sonnet-4-6) - test Flynn Application UI/UX with python scripts to interact with Snow in a fully automated fashion
 
 ## Project Overview
 
-Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus) written in C, targeting System 6.0.8 with MacTCP 2.1. The primary use case is connecting to modern Linux telnetd servers for interactive terminal sessions (vi, nano, etc.).
+Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus) written in C, targeting System 6.0.8 with MacTCP 2.1. The primary use case is connecting to modern Linux telnetd servers for interactive terminal sessions (vi, nano, tmux, etc.).
 
 ## Target Platform Constraints
 
