@@ -1244,19 +1244,23 @@ term_process_osc(Terminal *term, unsigned char ch)
 		return;
 	}
 
-	/* Parse the numeric parameter before ';' */
+	/* Semicolon: end of parameter, start of payload */
+	if (ch == ';' && term->osc_param == -1) {
+		short i;
+
+		term->osc_param = 0;
+		for (i = 0; i < term->osc_len; i++)
+			term->osc_param = term->osc_param * 10 +
+			    (term->osc_buf[i] - '0');
+		term->osc_len = 0;
+		return;
+	}
+
+	/* Accumulate digits for numeric parameter */
 	if (term->osc_param == -1) {
 		if (ch >= '0' && ch <= '9') {
-			if (term->osc_len == 0)
-				term->osc_param = 0;
-			term->osc_param = term->osc_param * 10 + (ch - '0');
-			return;
-		}
-		if (ch == ';') {
-			/* End of parameter, start of payload */
-			if (term->osc_param == -1)
-				term->osc_param = 0;
-			term->osc_len = 0;
+			if (term->osc_len < (short)(sizeof(term->osc_buf) - 1))
+				term->osc_buf[term->osc_len++] = ch;
 			return;
 		}
 		/* Unexpected byte in param area - discard */
