@@ -5,11 +5,24 @@
  */
 
 #include <Traps.h>
-#include <Folders.h>
-#include <GestaltEqu.h>
 #include <OSUtils.h>
 #include <Memory.h>
-#include <Multiverse.h>
+
+/* Retro68 Multiverse.h uses kOSTrapType/kToolboxTrapType instead of OSTrap/ToolTrap */
+#ifndef OSTrap
+#define OSTrap kOSTrapType
+#define ToolTrap kToolboxTrapType
+#endif
+
+/* _GestaltDispatch trap number (0xA0AD) */
+#ifndef _GestaltDispatch
+#define _GestaltDispatch _Gestalt
+#endif
+
+/* kOnSystemDisk = boot volume (-1) */
+#ifndef kOnSystemDisk
+#define kOnSystemDisk ((short)-1)
+#endif
 #include <stdbool.h>
 
 #include "sysutil.h"

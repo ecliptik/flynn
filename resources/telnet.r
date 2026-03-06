@@ -3,6 +3,7 @@
  */
 
 #include "Menus.r"
+#include "Dialogs.r"
 #include "Processes.r"
 
 resource 'MBAR' (128) {
@@ -46,7 +47,8 @@ resource 'DLOG' (129, "Connect") {
 	noGoAway,
 	0x0,
 	129,
-	"Connect"
+	"Connect",
+	noAutoCenter
 };
 
 resource 'DITL' (129, "Connect") {

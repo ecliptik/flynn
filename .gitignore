@@ -12,6 +12,10 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 
+# Retro68 toolchain (built from source locally, not committed)
+Retro68/
+Retro68-build/
+
 # Tools - binary artifacts (kept locally, not committed)
 tools/snow/
 tools/floppies/

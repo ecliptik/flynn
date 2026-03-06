@@ -19,7 +19,9 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 ## Build System
 
 - Cross-compile on Linux using [Retro68](https://github.com/autc04/Retro68) toolchain
-- Toolchain installed at `/opt/Retro68-build/toolchain/` (m68k-apple-macos-gcc 12.2.0)
+- Toolchain built from source, installed at `Retro68-build/toolchain/` (in-repo, gitignored)
+- Source cloned at `Retro68/` (in-repo, gitignored)
+- Build: `./build.sh` (configures + makes), or manually: `mkdir build && cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=../Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake && make`
 - CMake flag: `-m68000` for Mac Plus compatibility
 - MacTCP.h is NOT in Retro68's Multiversal Interfaces — copied from wallops-146
 - Retro68 API quirks vs classic Toolbox: `qd.thePort` not `thePort`, `GetMenuHandle` not `GetMHandle`, `AppendResMenu` not `AddResMenu`, `LMGetApplLimit()` not `GetApplLimit`

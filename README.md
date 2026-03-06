@@ -12,12 +12,19 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 
 ## Building
 
-Requires the [Retro68](https://github.com/autc04/Retro68) cross-compilation toolchain installed on Linux.
+Requires the [Retro68](https://github.com/autc04/Retro68) cross-compilation toolchain. Build it from source (68k only):
 
 ```bash
-mkdir build && cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=/path/to/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake
-make
+git clone https://github.com/autc04/Retro68.git
+cd Retro68 && git submodule update --init && cd ..
+mkdir Retro68-build && cd Retro68-build
+bash ../Retro68/build-toolchain.bash --no-ppc --no-carbon --prefix=$(pwd)/toolchain
+```
+
+Then build Flynn:
+
+```bash
+./build.sh
 ```
 
 ## Testing

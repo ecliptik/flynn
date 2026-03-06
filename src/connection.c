@@ -52,18 +52,18 @@ conn_open_dialog(Connection *conn)
 
 	/* Pre-fill with last-used values */
 	if (conn->host[0]) {
-		GetDItem(dlg, DLOG_HOST_FIELD, &item_type, &item_h, &item_rect);
+		GetDialogItem(dlg, DLOG_HOST_FIELD, &item_type, &item_h, &item_rect);
 		/* Convert C string to Pascal string */
 		host_str[0] = strlen(conn->host);
 		for (i = 0; i < host_str[0]; i++)
 			host_str[i + 1] = conn->host[i];
-		SetIText(item_h, host_str);
+		SetDialogItemText(item_h, host_str);
 	}
 	if (conn->port > 0) {
-		GetDItem(dlg, DLOG_PORT_FIELD, &item_type, &item_h, &item_rect);
+		GetDialogItem(dlg, DLOG_PORT_FIELD, &item_type, &item_h, &item_rect);
 		sprintf((char *)&port_str[1], "%d", conn->port);
 		port_str[0] = strlen((char *)&port_str[1]);
-		SetIText(item_h, port_str);
+		SetDialogItemText(item_h, port_str);
 	}
 
 	ShowWindow(dlg);
@@ -72,7 +72,7 @@ conn_open_dialog(Connection *conn)
 		ModalDialog(0L, &item_hit);
 
 		if (item_hit == DLOG_CANCEL) {
-			DisposDialog(dlg);
+			DisposeDialog(dlg);
 			return false;
 		}
 
@@ -81,10 +81,10 @@ conn_open_dialog(Connection *conn)
 	}
 
 	/* Extract host */
-	GetDItem(dlg, DLOG_HOST_FIELD, &item_type, &item_h, &item_rect);
-	GetIText(item_h, host_str);
+	GetDialogItem(dlg, DLOG_HOST_FIELD, &item_type, &item_h, &item_rect);
+	GetDialogItemText(item_h, host_str);
 	if (host_str[0] == 0) {
-		DisposDialog(dlg);
+		DisposeDialog(dlg);
 		return false;
 	}
 	for (i = 0; i < host_str[0] && i < 255; i++)
@@ -92,8 +92,8 @@ conn_open_dialog(Connection *conn)
 	conn->host[i] = '\0';
 
 	/* Extract port */
-	GetDItem(dlg, DLOG_PORT_FIELD, &item_type, &item_h, &item_rect);
-	GetIText(item_h, port_str);
+	GetDialogItem(dlg, DLOG_PORT_FIELD, &item_type, &item_h, &item_rect);
+	GetDialogItemText(item_h, port_str);
 	if (port_str[0] > 0) {
 		/* Convert Pascal string to number */
 		port_str[port_str[0] + 1] = '\0';
@@ -103,7 +103,7 @@ conn_open_dialog(Connection *conn)
 		conn->port = DEFAULT_PORT;
 	}
 
-	DisposDialog(dlg);
+	DisposeDialog(dlg);
 
 	/* Resolve hostname */
 	conn->state = CONN_STATE_RESOLVING;
@@ -139,7 +139,7 @@ conn_open_dialog(Connection *conn)
 	    TCP_RCV_BUFSIZ, 0L, 0L, 0L, false);
 	if (err != noErr) {
 		conn->state = CONN_STATE_IDLE;
-		DisposPtr(conn->rcv_buf);
+		DisposePtr(conn->rcv_buf);
 		conn->rcv_buf = 0L;
 		ParamText("\pFailed to create TCP stream", "\p", "\p", "\p");
 		Alert(128, 0L);
@@ -156,7 +156,7 @@ conn_open_dialog(Connection *conn)
 	if (err != noErr) {
 		conn->state = CONN_STATE_IDLE;
 		_TCPRelease(&conn->pb, conn->stream, 0L, 0L, false);
-		DisposPtr(conn->rcv_buf);
+		DisposePtr(conn->rcv_buf);
 		conn->rcv_buf = 0L;
 		conn->stream = 0L;
 		ParamText("\pFailed to connect", "\p", "\p", "\p");
@@ -225,7 +225,7 @@ conn_close(Connection *conn)
 	}
 
 	if (conn->rcv_buf) {
-		DisposPtr(conn->rcv_buf);
+		DisposePtr(conn->rcv_buf);
 		conn->rcv_buf = 0L;
 	}
 
