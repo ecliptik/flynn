@@ -23,9 +23,13 @@
 #include <Windows.h>
 #include "terminal.h"
 
-/* Monaco 9pt cell metrics */
+/* Default cell metrics (Monaco 9pt) */
 #define CELL_WIDTH		6
 #define CELL_HEIGHT		12
+
+/* Runtime cell dimensions (set by term_ui_set_font) */
+extern short g_cell_width;
+extern short g_cell_height;
 
 /* Margins within the terminal window */
 #define LEFT_MARGIN		2
@@ -53,6 +57,9 @@ typedef struct {
 
 /* Initialize terminal UI (set font, store references) */
 void term_ui_init(WindowPtr win, Terminal *term);
+
+/* Set terminal font and update cell metrics via GetFontInfo */
+void term_ui_set_font(WindowPtr win, short font_id, short font_size);
 
 /* Draw terminal contents (only dirty rows + cursor) */
 void term_ui_draw(WindowPtr win, Terminal *term);

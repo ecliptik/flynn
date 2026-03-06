@@ -108,17 +108,39 @@
 - [x] draw_line_char() in terminal_ui.c (QuickDraw box-drawing)
 - [x] TTYPE changed to VT220 (done in Phase 9, with VT100 fallback cycling)
 
+## Phase 11: Session Bookmarks
+- [x] Bookmark struct (name[32], host[128], port), max 8 in prefs
+- [x] Extended FlynnPrefs with v1→v2→v3 migration
+- [x] Dynamic Session menu bookmark items (AppendMenu + SetMenuItemText)
+- [x] Bookmark manager dialog (DLOG 131, UserItem list, Add/Edit/Delete/Connect)
+- [x] Add/Edit bookmark dialog (DLOG 132, Name/Host/Port fields)
+- [x] One-click connect from bookmark menu item
+- [x] Extract conn_connect() from conn_open_dialog()
+
+## Phase 12: Font Selection
+- [x] Runtime cell dimensions via GetFontInfo() measurement
+- [x] term_ui_set_font() with font change and grid recompute
+- [x] active_cols/active_rows in Terminal struct (~40 refs updated)
+- [x] Settings menu (MENU 131) with Monaco 9/Monaco 12
+- [x] Font fields in FlynnPrefs (font_id, font_size)
+- [x] NAWS renegotiation on font/grid change
+- [x] Window resizing for new grid dimensions
+
+## Phase 13: xterm Compatibility
+- [x] Application keypad mode (DECKPAM/DECKPNM, ESC =/ESC >)
+- [x] TTYPE cycling: xterm → VT220 → VT100
+- [x] Silent consume of mouse reporting (?1000-1006), focus (?1004), cursor blink (?12)
+
 ## Phase 14: UTF-8 Support
-- [ ] UTF-8 decoder state machine (2/3/4-byte sequences)
-- [ ] Unicode box-drawing (U+2500-U+257F) → DEC Special Graphics
-- [ ] Unicode Latin-1 (U+0080-U+00FF) → Mac Roman translation
-- [ ] Unicode symbols (dashes, quotes, bullet, euro) → Mac Roman
-- [ ] Wide character / emoji → 2-cell placeholder
-- [ ] Emoji modifier/ZWJ sequence absorption
+- [x] UTF-8 decoder state machine (2/3/4-byte sequences)
+- [x] Unicode box-drawing (U+2500-U+257F) → DEC Special Graphics
+- [x] Unicode Latin-1 (U+0080-U+00FF) → Mac Roman translation
+- [x] Unicode symbols (dashes, quotes, bullet, euro) → Mac Roman
+- [x] Wide character / emoji → 2-cell placeholder
+- [x] Emoji modifier/ZWJ sequence absorption
 
 ## Future
-- [ ] Session bookmarks (named host/port list in prefs)
-- [ ] Font/size settings (Monaco 9/12, Chicago 12, Geneva 9/10)
-- [ ] Application keypad mode (ESC = / ESC >)
 - [ ] Color support (for System 7 / color Macs)
 - [ ] SSH support
+- [ ] Additional fonts (Chicago 12, Geneva 9/10, Courier 10)
+- [ ] Configurable scroll region / window resizing

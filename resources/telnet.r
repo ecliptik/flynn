@@ -7,7 +7,7 @@
 #include "Processes.r"
 
 resource 'MBAR' (128) {
-	{ 128, 129, 130 }
+	{ 128, 129, 130, 131 }
 };
 
 resource 'MENU' (128, "Apple") {
@@ -23,6 +23,8 @@ resource 'MENU' (129, "Session") {
 		"Connect\311", noIcon, "N", noMark, plain;
 		"Disconnect", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
+		"Bookmarks\311", noIcon, "B", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
 		"Quit", noIcon, "Q", noMark, plain
 	}
 };
@@ -36,6 +38,14 @@ resource 'MENU' (130, "Edit") {
 		"Copy", noIcon, "C", noMark, plain;
 		"Paste", noIcon, "V", noMark, plain;
 		"Clear", noIcon, noKey, noMark, plain
+	}
+};
+
+resource 'MENU' (131, "Settings") {
+	131, textMenuProc, allEnabled, enabled, "Settings",
+	{
+		"Monaco 9", noIcon, noKey, check, plain;
+		"Monaco 12", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -105,7 +115,7 @@ resource 'DITL' (130, "About Flynn") {
 
 		/* Version */
 		{40, 60, 56, 240},
-		StaticText { disabled, "Version 0.5.0" };
+		StaticText { disabled, "Version 0.9.0" };
 
 		/* Description */
 		{65, 20, 81, 280},
@@ -131,7 +141,7 @@ resource 'ALRT' (128) {
 		OK, visible, sound1,
 		OK, visible, sound1
 	},
-	alertPositionMainScreen
+	noAutoCenter
 };
 
 resource 'DITL' (128, "Alert") {
@@ -147,6 +157,95 @@ resource 'DITL' (128, "Alert") {
 		/* Text */
 		{15, 75, 70, 325},
 		StaticText { disabled, "^0" };
+	}
+};
+
+/* Bookmark manager dialog */
+resource 'DLOG' (131, "Bookmarks") {
+	{40, 60, 290, 430},
+	dBoxProc,
+	visible,
+	noGoAway,
+	0x0,
+	131,
+	"Bookmarks",
+	noAutoCenter
+};
+
+resource 'DITL' (131, "Bookmarks") {
+	{
+		/* Done button */
+		{220, 280, 240, 350},
+		Button { enabled, "Done" };
+
+		/* Add button */
+		{15, 280, 35, 350},
+		Button { enabled, "Add" };
+
+		/* Edit button */
+		{45, 280, 65, 350},
+		Button { enabled, "Edit" };
+
+		/* Delete button */
+		{75, 280, 95, 350},
+		Button { enabled, "Delete" };
+
+		/* Connect button */
+		{115, 280, 135, 350},
+		Button { enabled, "Connect" };
+
+		/* Label */
+		{5, 15, 21, 120},
+		StaticText { disabled, "Bookmarks:" };
+
+		/* List area (UserItem) */
+		{25, 15, 210, 265},
+		UserItem { disabled };
+	}
+};
+
+/* Bookmark add/edit dialog */
+resource 'DLOG' (132, "Edit Bookmark") {
+	{70, 90, 230, 420},
+	dBoxProc,
+	visible,
+	noGoAway,
+	0x0,
+	132,
+	"Edit Bookmark",
+	noAutoCenter
+};
+
+resource 'DITL' (132, "Edit Bookmark") {
+	{
+		/* OK button */
+		{125, 245, 145, 315},
+		Button { enabled, "OK" };
+
+		/* Cancel button */
+		{125, 155, 145, 225},
+		Button { enabled, "Cancel" };
+
+		/* Name label + field */
+		{15, 15, 31, 60},
+		StaticText { disabled, "Name:" };
+
+		{15, 65, 31, 315},
+		EditText { enabled, "" };
+
+		/* Host label + field */
+		{50, 15, 66, 60},
+		StaticText { disabled, "Host:" };
+
+		{50, 65, 66, 315},
+		EditText { enabled, "" };
+
+		/* Port label + field */
+		{85, 15, 101, 60},
+		StaticText { disabled, "Port:" };
+
+		{85, 65, 101, 135},
+		EditText { enabled, "23" };
 	}
 };
 

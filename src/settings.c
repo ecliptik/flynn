@@ -16,6 +16,8 @@ prefs_defaults(FlynnPrefs *prefs)
 	prefs->version = PREFS_VERSION;
 	prefs->host[0] = '\0';
 	prefs->port = 23;
+	prefs->font_id = 4;	/* Monaco */
+	prefs->font_size = 9;
 }
 
 void
@@ -40,7 +42,32 @@ prefs_load(FlynnPrefs *prefs)
 	err = FSRead(refNum, &count, (Ptr)prefs);
 	FSClose(refNum);
 
-	if (err != noErr || prefs->version != PREFS_VERSION)
+	if (err != noErr && err != eofErr) {
+		prefs_defaults(prefs);
+		return;
+	}
+
+	if (prefs->version == 1) {
+		/* v1→v2 migration: host/port already read, zero bookmark fields */
+		prefs->bookmark_count = 0;
+		memset(prefs->bookmarks, 0, sizeof(prefs->bookmarks));
+		prefs->font_id = 4;
+		prefs->font_size = 9;
+		prefs->version = PREFS_VERSION;
+		prefs_save(prefs);
+		return;
+	}
+
+	if (prefs->version == 2) {
+		/* v2→v3 migration: add font fields */
+		prefs->font_id = 4;
+		prefs->font_size = 9;
+		prefs->version = PREFS_VERSION;
+		prefs_save(prefs);
+		return;
+	}
+
+	if (prefs->version != PREFS_VERSION)
 		prefs_defaults(prefs);
 }
 

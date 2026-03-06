@@ -2,6 +2,58 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-03-06
+
+### Added
+- Session bookmarks (Phase 11)
+  - Bookmark struct (name, host, port) stored in preferences, max 8
+  - Bookmark manager dialog (DLOG 131) with Add/Edit/Delete/Connect buttons
+  - UserItem-based list display with click selection and inverse highlight
+  - Add/Edit bookmark dialog (DLOG 132) with Name/Host/Port fields
+  - Dynamic Session menu: bookmarks appear below Quit separator
+  - One-click connect from Session menu bookmark items
+  - Preferences v1→v2→v3 migration for bookmark and font fields
+  - Extracted `conn_connect()` from `conn_open_dialog()` for direct connect
+- Font selection (Phase 12)
+  - Settings menu (MENU 131) with Monaco 9 and Monaco 12 options
+  - Runtime cell dimensions via `GetFontInfo()` measurement
+  - `term_ui_set_font()` changes font and recomputes grid
+  - `active_cols`/`active_rows` in Terminal struct for dynamic grid sizing
+  - Window resized with `SizeWindow()` to fit computed grid
+  - NAWS renegotiation sent on font change while connected
+  - Font preference saved/restored across launches (font_id, font_size)
+  - Checkmark on active font in Settings menu
+- xterm compatibility (Phase 13)
+  - Application keypad mode (DECKPAM/DECKPNM, ESC =/ESC >)
+  - Numpad keys send SS3 sequences in application mode
+  - TTYPE cycling: xterm → VT220 → VT100 (first response is "xterm")
+  - Silent consumption of mouse reporting modes (?1000-1006)
+  - Silent consumption of focus events (?1004) and cursor blink (?12)
+- UTF-8 support (Phase 14)
+  - UTF-8 decoder state machine (2/3/4-byte sequences)
+  - Unicode box-drawing (U+2500-U+257F) → DEC Special Graphics (33 mappings)
+  - Unicode Latin-1 Supplement (U+0080-U+00FF) → Mac Roman (128-entry table)
+  - Unicode symbols → Mac Roman (em/en dash, curly quotes, bullet, ellipsis,
+    euro, pi, delta, sqrt, infinity, trademark, not-equal, etc.)
+  - Wide character/emoji → 2-cell `??` placeholder
+  - Emoji modifier/ZWJ/skin-tone/variation-selector sequence absorption
+  - Unmapped codepoints render as `?` fallback
+
+### Fixed
+- Screen not cleared on disconnect: `do_disconnect()` now calls
+  `terminal_reset()`, `telnet_init()`, and redraws window
+- Overlapping `strncpy` UB in `conn_connect()` when called from
+  `conn_open_dialog()` — host parameter pointed to same buffer
+- UTF-8 fallback character was Mac Roman 0xB7 (Σ sigma) instead of `?`
+
+### Changed
+- Version: 0.8.0 → 0.9.0
+- Session menu expanded: Connect, Disconnect, Bookmarks, Quit + dynamic bookmarks
+- MBAR resource updated to include Settings menu (128, 129, 130, 131)
+- Prefs version bumped to 3 (bookmark_count, bookmarks[8], font_id, font_size)
+- ~40 TERM_COLS/TERM_ROWS references in terminal.c changed to active_cols/active_rows
+- Build size: ~87KB (up from ~77KB)
+
 ## [0.8.0] - 2026-03-06
 
 ### Added

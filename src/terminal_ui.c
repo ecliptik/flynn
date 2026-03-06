@@ -38,11 +38,18 @@ static short		cursor_initialized;
 /* Selection state */
 static Selection	sel;
 
+/* Runtime cell dimensions */
+short			g_cell_width = CELL_WIDTH;
+short			g_cell_height = CELL_HEIGHT;
+static short		g_cell_baseline = CELL_HEIGHT - 2;
+static short		g_font_id = 4;
+static short		g_font_size = 9;
+
 /* Row pixel helpers */
-static short row_top(short row)    { return TOP_MARGIN + row * CELL_HEIGHT; }
-static short row_bottom(short row) { return TOP_MARGIN + (row + 1) * CELL_HEIGHT; }
-static short col_left(short col)   { return LEFT_MARGIN + col * CELL_WIDTH; }
-static short col_right(short col)  { return LEFT_MARGIN + (col + 1) * CELL_WIDTH; }
+static short row_top(short row)    { return TOP_MARGIN + row * g_cell_height; }
+static short row_bottom(short row) { return TOP_MARGIN + (row + 1) * g_cell_height; }
+static short col_left(short col)   { return LEFT_MARGIN + col * g_cell_width; }
+static short col_right(short col)  { return LEFT_MARGIN + (col + 1) * g_cell_width; }
 
 static void draw_row(Terminal *term, short row);
 static void draw_line_char(unsigned char ch, short x, short y,
@@ -63,8 +70,8 @@ term_ui_init(WindowPtr win, Terminal *term)
 	GetPort(&old_port);
 	SetPort(win);
 
-	TextFont(4);		/* Monaco */
-	TextSize(9);
+	TextFont(g_font_id);
+	TextSize(g_font_size);
 	TextFace(0);		/* normal */
 	TextMode(srcOr);
 
@@ -73,6 +80,36 @@ term_ui_init(WindowPtr win, Terminal *term)
 	cursor_prev_row = 0;
 	cursor_prev_col = 0;
 	cursor_initialized = 1;
+
+	SetPort(old_port);
+}
+
+/*
+ * term_ui_set_font - change terminal font and update cell metrics
+ *
+ * Uses GetFontInfo to measure the font and sets global cell dimensions.
+ */
+void
+term_ui_set_font(WindowPtr win, short font_id, short font_size)
+{
+	FontInfo fi;
+	GrafPtr old_port;
+
+	GetPort(&old_port);
+	SetPort(win);
+
+	TextFont(font_id);
+	TextSize(font_size);
+	GetFontInfo(&fi);
+
+	g_cell_width = fi.widMax;
+	g_cell_height = fi.ascent + fi.descent + fi.leading;
+	g_cell_baseline = fi.ascent + fi.leading;
+	g_font_id = font_id;
+	g_font_size = font_size;
+
+	TextFace(0);
+	TextMode(srcOr);
 
 	SetPort(old_port);
 }
@@ -90,16 +127,17 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	short row;
 	Rect r;
 
-	TextFont(4);
-	TextSize(9);
+	TextFont(g_font_id);
+	TextSize(g_font_size);
 
-	for (row = 0; row < TERM_ROWS; row++) {
+	for (row = 0; row < term->active_rows; row++) {
 		if (!terminal_is_row_dirty(term, row))
 			continue;
 
 		/* Erase the row background */
 		SetRect(&r, LEFT_MARGIN, row_top(row),
-		    LEFT_MARGIN + TERM_COLS * CELL_WIDTH, row_bottom(row));
+		    LEFT_MARGIN + term->active_cols * g_cell_width,
+		    row_bottom(row));
 		EraseRect(&r);
 
 		draw_row(term, row);
@@ -129,11 +167,11 @@ draw_row(Terminal *term, short row)
 	short sel_active;
 	short last_face = -1;
 
-	baseline = row_top(row) + CELL_HEIGHT - 2;	/* baseline ~2px from bottom */
+	baseline = row_top(row) + g_cell_baseline;
 	sel_active = sel.active;
 
 	col = 0;
-	while (col < TERM_COLS) {
+	while (col < term->active_cols) {
 		unsigned char cell_attr;
 
 		cell = terminal_get_display_cell(term, row, col);
@@ -145,7 +183,7 @@ draw_row(Terminal *term, short row)
 		run_len = 0;
 
 		/* Collect run of cells with same effective attributes */
-		while (col < TERM_COLS) {
+		while (col < term->active_cols) {
 			cell = terminal_get_display_cell(term, row, col);
 			cell_attr = cell->attr;
 			if (sel_active && term_ui_sel_contains(row, col))
@@ -203,7 +241,7 @@ draw_row(Terminal *term, short row)
 			/* Paint background black for inverse region */
 			SetRect(&inv_r,
 			    col_left(run_start), row_top(row),
-			    col_left(run_start) + run_len * CELL_WIDTH,
+			    col_left(run_start) + run_len * g_cell_width,
 			    row_bottom(row));
 			PaintRect(&inv_r);
 
@@ -236,12 +274,12 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 	short cx, cy, right, bottom;
 	Rect cell_r;
 
-	cx = x + CELL_WIDTH / 2;	/* center x = x + 3 */
-	cy = y + CELL_HEIGHT / 2;	/* center y = y + 6 */
-	right = x + CELL_WIDTH - 1;	/* x + 5 */
-	bottom = y + CELL_HEIGHT - 1;	/* y + 11 */
+	cx = x + g_cell_width / 2;
+	cy = y + g_cell_height / 2;
+	right = x + g_cell_width - 1;
+	bottom = y + g_cell_height - 1;
 
-	SetRect(&cell_r, x, y, x + CELL_WIDTH, y + CELL_HEIGHT);
+	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
 	/* Inverse: paint cell black first, draw lines in white */
 	if (attr & ATTR_INVERSE) {
@@ -389,7 +427,7 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 		/* Unknown graphic: draw as regular text */
 		{
 			char c = ch;
-			short bl = y + CELL_HEIGHT - 2;
+			short bl = y + g_cell_baseline;
 
 			if (attr & ATTR_INVERSE)
 				TextMode(srcBic);
@@ -450,10 +488,10 @@ term_ui_invalidate(WindowPtr win, Terminal *term)
 	SetPort(win);
 
 	any_dirty = 0;
-	for (row = 0; row < TERM_ROWS; row++) {
+	for (row = 0; row < term->active_rows; row++) {
 		if (terminal_is_row_dirty(term, row)) {
 			SetRect(&r, LEFT_MARGIN, row_top(row),
-			    LEFT_MARGIN + TERM_COLS * CELL_WIDTH,
+			    LEFT_MARGIN + term->active_cols * g_cell_width,
 			    row_bottom(row));
 			InvalRect(&r);
 			any_dirty = 1;
@@ -466,13 +504,13 @@ term_ui_invalidate(WindowPtr win, Terminal *term)
 	    (crow != cursor_prev_row || ccol != cursor_prev_col)) {
 		/* Invalidate old cursor position row */
 		SetRect(&r, LEFT_MARGIN, row_top(cursor_prev_row),
-		    LEFT_MARGIN + TERM_COLS * CELL_WIDTH,
+		    LEFT_MARGIN + term->active_cols * g_cell_width,
 		    row_bottom(cursor_prev_row));
 		InvalRect(&r);
 
 		/* Invalidate new cursor position row */
 		SetRect(&r, LEFT_MARGIN, row_top(crow),
-		    LEFT_MARGIN + TERM_COLS * CELL_WIDTH,
+		    LEFT_MARGIN + term->active_cols * g_cell_width,
 		    row_bottom(crow));
 		InvalRect(&r);
 
@@ -589,7 +627,7 @@ find_word_bounds(Terminal *term, short row, short col,
 	}
 
 	e = col;
-	while (e < TERM_COLS - 1) {
+	while (e < term->active_cols - 1) {
 		cell = terminal_get_display_cell(term, row, e + 1);
 		if (cell->ch == ' ')
 			break;
@@ -792,7 +830,7 @@ term_ui_sel_dirty_rows(Terminal *term, short old_extent_row,
 		hi = sel.anchor_row;
 
 	if (lo < 0) lo = 0;
-	if (hi >= TERM_ROWS) hi = TERM_ROWS - 1;
+	if (hi >= term->active_rows) hi = term->active_rows - 1;
 
 	for (r = lo; r <= hi; r++)
 		term->dirty[r] = 1;
@@ -812,7 +850,7 @@ term_ui_sel_dirty_all(Terminal *term)
 	sel_normalize(&sr, &sc, &er, &ec);
 
 	if (sr < 0) sr = 0;
-	if (er >= TERM_ROWS) er = TERM_ROWS - 1;
+	if (er >= term->active_rows) er = term->active_rows - 1;
 
 	for (r = sr; r <= er; r++)
 		term->dirty[r] = 1;

@@ -105,6 +105,27 @@ conn_open_dialog(Connection *conn)
 
 	DisposeDialog(dlg);
 
+	return conn_connect(conn, conn->host, conn->port);
+}
+
+Boolean
+conn_connect(Connection *conn, const char *host, short port)
+{
+	OSErr err;
+	unsigned long ip;
+
+	if (conn->state != CONN_STATE_IDLE) {
+		SysBeep(10);
+		return false;
+	}
+
+	/* Only copy if host is a different buffer (avoid UB from overlapping strncpy) */
+	if (host != conn->host) {
+		strncpy(conn->host, host, sizeof(conn->host) - 1);
+		conn->host[sizeof(conn->host) - 1] = '\0';
+	}
+	conn->port = port;
+
 	/* Resolve hostname */
 	conn->state = CONN_STATE_RESOLVING;
 

@@ -54,6 +54,9 @@ OSErr conn_init(void);
 /* Show connect dialog and initiate connection */
 Boolean conn_open_dialog(Connection *conn);
 
+/* Connect directly to host:port without showing a dialog */
+Boolean conn_connect(Connection *conn, const char *host, short port);
+
 /* Poll for incoming data — call from event loop */
 void conn_idle(Connection *conn);
 

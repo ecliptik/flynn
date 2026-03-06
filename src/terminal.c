@@ -42,6 +42,11 @@ static void term_dirty_row(Terminal *term, short row);
 static void term_dirty_range(Terminal *term, short r1, short r2);
 static void term_dirty_all(Terminal *term);
 static short term_clamp(short val, short lo, short hi);
+static long utf8_decode(unsigned char *buf, short len);
+static void term_put_unicode(Terminal *term, long cp);
+static unsigned char boxdraw_to_dec(unsigned short cp);
+static unsigned char unicode_to_macroman(unsigned short cp);
+static unsigned char unicode_symbol_to_macroman(unsigned short cp);
 
 #include <OSUtils.h>
 
@@ -51,9 +56,19 @@ static short term_clamp(short val, short lo, short hi);
 void
 terminal_init(Terminal *term)
 {
+	short saved_cols = term->active_cols;
+	short saved_rows = term->active_rows;
+
 	memset(term, 0, sizeof(Terminal));
+
+	/* Restore active dimensions (default to max if not set) */
+	term->active_cols = (saved_cols > 0 && saved_cols <= TERM_COLS) ?
+	    saved_cols : TERM_COLS;
+	term->active_rows = (saved_rows > 0 && saved_rows <= TERM_ROWS) ?
+	    saved_rows : TERM_ROWS;
+
 	term->scroll_top = 0;
-	term->scroll_bottom = TERM_ROWS - 1;
+	term->scroll_bottom = term->active_rows - 1;
 	term->cur_attr = ATTR_NORMAL;
 	term->parse_state = PARSE_NORMAL;
 	term->cursor_visible = 1;
@@ -73,7 +88,8 @@ terminal_init(Terminal *term)
 	term->alt_active = 0;
 
 	/* Fill screen with spaces */
-	term_clear_region(term, 0, 0, TERM_ROWS - 1, TERM_COLS - 1);
+	term_clear_region(term, 0, 0,
+	    term->active_rows - 1, term->active_cols - 1);
 	term_dirty_all(term);
 }
 
@@ -118,8 +134,8 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				/* Tab: advance to next 8-column tab stop */
 				term->wrap_pending = 0;
 				term->cur_col = (term->cur_col + 8) & ~7;
-				if (term->cur_col >= TERM_COLS)
-					term->cur_col = TERM_COLS - 1;
+				if (term->cur_col >= term->active_cols)
+					term->cur_col = term->active_cols - 1;
 			} else if (ch == 0x07) {
 				/* Bell */
 				SysBeep(5);
@@ -129,6 +145,33 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 			} else if (ch == 0x0F) {
 				/* SI - Shift In: activate G0 */
 				term->gl_charset = 0;
+			} else if (ch >= 0xC0 && term->utf8_expect == 0) {
+				/* Start of multi-byte UTF-8 sequence */
+				if (ch < 0xE0) {
+					term->utf8_expect = 2;
+				} else if (ch < 0xF0) {
+					term->utf8_expect = 3;
+				} else if (ch < 0xF8) {
+					term->utf8_expect = 4;
+				}
+				if (term->utf8_expect) {
+					term->utf8_buf[0] = ch;
+					term->utf8_len = 1;
+				}
+			} else if (ch >= 0x80 && ch < 0xC0 &&
+			    term->utf8_expect > 0) {
+				/* Continuation byte */
+				term->utf8_buf[term->utf8_len++] = ch;
+				if (term->utf8_len == term->utf8_expect) {
+					long cp = utf8_decode(term->utf8_buf,
+					    term->utf8_expect);
+					term_put_unicode(term, cp);
+					term->utf8_expect = 0;
+				}
+			} else if (ch >= 0x80) {
+				/* Stray continuation or invalid: fallback */
+				term->utf8_expect = 0;
+				term_put_char(term, '?');
 			} else if (ch >= 0x20) {
 				/* Printable character */
 				term_put_char(term, ch);
@@ -289,7 +332,7 @@ term_clamp(short val, short lo, short hi)
 static void
 term_dirty_row(Terminal *term, short row)
 {
-	if (row >= 0 && row < TERM_ROWS)
+	if (row >= 0 && row < term->active_rows)
 		term->dirty[row] = 1;
 }
 
@@ -301,8 +344,8 @@ term_dirty_range(Terminal *term, short r1, short r2)
 {
 	short r;
 
-	r1 = term_clamp(r1, 0, TERM_ROWS - 1);
-	r2 = term_clamp(r2, 0, TERM_ROWS - 1);
+	r1 = term_clamp(r1, 0, term->active_rows - 1);
+	r2 = term_clamp(r2, 0, term->active_rows - 1);
 	for (r = r1; r <= r2; r++)
 		term->dirty[r] = 1;
 }
@@ -313,7 +356,7 @@ term_dirty_range(Terminal *term, short r1, short r2)
 static void
 term_dirty_all(Terminal *term)
 {
-	term_dirty_range(term, 0, TERM_ROWS - 1);
+	term_dirty_range(term, 0, term->active_rows - 1);
 }
 
 /*
@@ -325,10 +368,10 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 {
 	short r, c;
 
-	r1 = term_clamp(r1, 0, TERM_ROWS - 1);
-	r2 = term_clamp(r2, 0, TERM_ROWS - 1);
-	c1 = term_clamp(c1, 0, TERM_COLS - 1);
-	c2 = term_clamp(c2, 0, TERM_COLS - 1);
+	r1 = term_clamp(r1, 0, term->active_rows - 1);
+	r2 = term_clamp(r2, 0, term->active_rows - 1);
+	c1 = term_clamp(c1, 0, term->active_cols - 1);
+	c2 = term_clamp(c2, 0, term->active_cols - 1);
 
 	for (r = r1; r <= r2; r++) {
 		for (c = c1; c <= c2; c++) {
@@ -446,7 +489,7 @@ term_put_char(Terminal *term, unsigned char ch)
 		} else {
 			/* No autowrap: overwrite at right margin */
 			term->wrap_pending = 0;
-			term->cur_col = TERM_COLS - 1;
+			term->cur_col = term->active_cols - 1;
 		}
 	}
 
@@ -459,7 +502,7 @@ term_put_char(Terminal *term, unsigned char ch)
 
 	/* Insert mode: shift line right before placing character */
 	if (term->insert_mode) {
-		for (c = TERM_COLS - 1; c > term->cur_col; c--) {
+		for (c = term->active_cols - 1; c > term->cur_col; c--) {
 			term->screen[term->cur_row][c] =
 			    term->screen[term->cur_row][c - 1];
 		}
@@ -469,7 +512,7 @@ term_put_char(Terminal *term, unsigned char ch)
 	term->screen[term->cur_row][term->cur_col].attr = attr;
 	term_dirty_row(term, term->cur_row);
 
-	if (term->cur_col < TERM_COLS - 1) {
+	if (term->cur_col < term->active_cols - 1) {
 		term->cur_col++;
 	} else {
 		/* At right margin: set wrap pending for auto-wrap */
@@ -489,7 +532,7 @@ term_newline(Terminal *term)
 	if (term->cur_row == term->scroll_bottom) {
 		/* At bottom of scroll region: scroll up */
 		term_scroll_up(term, term->scroll_top, term->scroll_bottom, 1);
-	} else if (term->cur_row < TERM_ROWS - 1) {
+	} else if (term->cur_row < term->active_rows - 1) {
 		term->cur_row++;
 	}
 }
@@ -533,8 +576,8 @@ term_process_esc(Terminal *term, unsigned char ch)
 
 	case '8':
 		/* DECRC - restore cursor position, attributes, and charsets */
-		term->cur_row = term_clamp(term->saved_row, 0, TERM_ROWS - 1);
-		term->cur_col = term_clamp(term->saved_col, 0, TERM_COLS - 1);
+		term->cur_row = term_clamp(term->saved_row, 0, term->active_rows - 1);
+		term->cur_col = term_clamp(term->saved_col, 0, term->active_cols - 1);
 		term->cur_attr = term->saved_attr;
 		term->g0_charset = term->saved_g0_charset;
 		term->g1_charset = term->saved_g1_charset;
@@ -564,6 +607,16 @@ term_process_esc(Terminal *term, unsigned char ch)
 		/* Next line: CR + LF */
 		term_carriage_return(term);
 		term_newline(term);
+		break;
+
+	case '=':
+		/* DECKPAM - application keypad mode */
+		term->keypad_mode = 1;
+		break;
+
+	case '>':
+		/* DECKPNM - normal keypad mode */
+		term->keypad_mode = 0;
 		break;
 
 	case 'c':
@@ -714,16 +767,16 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		/* CUD - cursor down */
 		term->wrap_pending = 0;
 		term->cur_row += p1;
-		if (term->cur_row >= TERM_ROWS)
-			term->cur_row = TERM_ROWS - 1;
+		if (term->cur_row >= term->active_rows)
+			term->cur_row = term->active_rows - 1;
 		break;
 
 	case 'C':
 		/* CUF - cursor forward (right) */
 		term->wrap_pending = 0;
 		term->cur_col += p1;
-		if (term->cur_col >= TERM_COLS)
-			term->cur_col = TERM_COLS - 1;
+		if (term->cur_col >= term->active_cols)
+			term->cur_col = term->active_cols - 1;
 		break;
 
 	case 'D':
@@ -742,9 +795,9 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->cur_row = term_clamp(p1 - 1 + term->scroll_top,
 			    term->scroll_top, term->scroll_bottom);
 		} else {
-			term->cur_row = term_clamp(p1 - 1, 0, TERM_ROWS - 1);
+			term->cur_row = term_clamp(p1 - 1, 0, term->active_rows - 1);
 		}
-		term->cur_col = term_clamp(p2 - 1, 0, TERM_COLS - 1);
+		term->cur_col = term_clamp(p2 - 1, 0, term->active_cols - 1);
 		break;
 
 	case 'J':
@@ -754,23 +807,23 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		case 0:
 			/* Cursor to end of screen */
 			term_clear_region(term, term->cur_row, term->cur_col,
-			    term->cur_row, TERM_COLS - 1);
-			if (term->cur_row < TERM_ROWS - 1)
+			    term->cur_row, term->active_cols - 1);
+			if (term->cur_row < term->active_rows - 1)
 				term_clear_region(term, term->cur_row + 1, 0,
-				    TERM_ROWS - 1, TERM_COLS - 1);
+				    term->active_rows - 1, term->active_cols - 1);
 			break;
 		case 1:
 			/* Start of screen to cursor */
 			if (term->cur_row > 0)
 				term_clear_region(term, 0, 0,
-				    term->cur_row - 1, TERM_COLS - 1);
+				    term->cur_row - 1, term->active_cols - 1);
 			term_clear_region(term, term->cur_row, 0,
 			    term->cur_row, term->cur_col);
 			break;
 		case 2:
 			/* Entire screen */
 			term_clear_region(term, 0, 0,
-			    TERM_ROWS - 1, TERM_COLS - 1);
+			    term->active_rows - 1, term->active_cols - 1);
 			break;
 		}
 		break;
@@ -782,7 +835,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		case 0:
 			/* Cursor to end of line */
 			term_clear_region(term, term->cur_row, term->cur_col,
-			    term->cur_row, TERM_COLS - 1);
+			    term->cur_row, term->active_cols - 1);
 			break;
 		case 1:
 			/* Start of line to cursor */
@@ -792,7 +845,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		case 2:
 			/* Entire line */
 			term_clear_region(term, term->cur_row, 0,
-			    term->cur_row, TERM_COLS - 1);
+			    term->cur_row, term->active_cols - 1);
 			break;
 		}
 		break;
@@ -817,8 +870,8 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 
 	case '@':
 		/* ICH - insert characters at cursor, shifting right */
-		p1 = term_clamp(p1, 1, TERM_COLS - term->cur_col);
-		for (c = TERM_COLS - 1; c >= term->cur_col + p1; c--) {
+		p1 = term_clamp(p1, 1, term->active_cols - term->cur_col);
+		for (c = term->active_cols - 1; c >= term->cur_col + p1; c--) {
 			term->screen[term->cur_row][c] =
 			    term->screen[term->cur_row][c - p1];
 		}
@@ -831,12 +884,12 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 
 	case 'P':
 		/* DCH - delete characters at cursor, shifting left */
-		p1 = term_clamp(p1, 1, TERM_COLS - term->cur_col);
-		for (c = term->cur_col; c < TERM_COLS - p1; c++) {
+		p1 = term_clamp(p1, 1, term->active_cols - term->cur_col);
+		for (c = term->cur_col; c < term->active_cols - p1; c++) {
 			term->screen[term->cur_row][c] =
 			    term->screen[term->cur_row][c + p1];
 		}
-		for (c = TERM_COLS - p1; c < TERM_COLS; c++) {
+		for (c = term->active_cols - p1; c < term->active_cols; c++) {
 			term->screen[term->cur_row][c].ch = ' ';
 			term->screen[term->cur_row][c].attr = ATTR_NORMAL;
 		}
@@ -845,7 +898,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 
 	case 'X':
 		/* ECH - erase characters at cursor (don't move cursor) */
-		p1 = term_clamp(p1, 1, TERM_COLS - term->cur_col);
+		p1 = term_clamp(p1, 1, term->active_cols - term->cur_col);
 		for (c = term->cur_col; c < term->cur_col + p1; c++) {
 			term->screen[term->cur_row][c].ch = ' ';
 			term->screen[term->cur_row][c].attr = ATTR_NORMAL;
@@ -858,13 +911,13 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		p1 = (term->num_params >= 1 && term->params[0] > 0) ?
 		    term->params[0] : 1;
 		p2 = (term->num_params >= 2 && term->params[1] > 0) ?
-		    term->params[1] : TERM_ROWS;
-		term->scroll_top = term_clamp(p1 - 1, 0, TERM_ROWS - 1);
-		term->scroll_bottom = term_clamp(p2 - 1, 0, TERM_ROWS - 1);
+		    term->params[1] : term->active_rows;
+		term->scroll_top = term_clamp(p1 - 1, 0, term->active_rows - 1);
+		term->scroll_bottom = term_clamp(p2 - 1, 0, term->active_rows - 1);
 		if (term->scroll_top >= term->scroll_bottom) {
 			/* Invalid: reset to full screen */
 			term->scroll_top = 0;
-			term->scroll_bottom = TERM_ROWS - 1;
+			term->scroll_bottom = term->active_rows - 1;
 		}
 		/* Cursor moves to home after setting scroll region */
 		term->cur_row = term->origin_mode ? term->scroll_top : 0;
@@ -902,22 +955,22 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 	case 'd':
 		/* VPA - line position absolute (row, 1-based) */
 		term->wrap_pending = 0;
-		term->cur_row = term_clamp(p1 - 1, 0, TERM_ROWS - 1);
+		term->cur_row = term_clamp(p1 - 1, 0, term->active_rows - 1);
 		break;
 
 	case 'G':
 	case '`':
 		/* CHA / HPA - cursor character absolute (column, 1-based) */
 		term->wrap_pending = 0;
-		term->cur_col = term_clamp(p1 - 1, 0, TERM_COLS - 1);
+		term->cur_col = term_clamp(p1 - 1, 0, term->active_cols - 1);
 		break;
 
 	case 'E':
 		/* CNL - cursor next line */
 		term->wrap_pending = 0;
 		term->cur_row += p1;
-		if (term->cur_row >= TERM_ROWS)
-			term->cur_row = TERM_ROWS - 1;
+		if (term->cur_row >= term->active_rows)
+			term->cur_row = term->active_rows - 1;
 		term->cur_col = 0;
 		break;
 
@@ -983,6 +1036,13 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 				case 2004:
 					term->bracketed_paste = 1;
 					break;
+				case 12:	/* cursor blink */
+				case 1000:	/* mouse click reporting */
+				case 1002:	/* mouse button-event tracking */
+				case 1003:	/* mouse all-motion tracking */
+				case 1004:	/* focus events */
+				case 1006:	/* SGR mouse mode */
+					break;
 				}
 			}
 		} else if (term->intermediate == 0) {
@@ -1026,10 +1086,10 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 					/* Restore cursor */
 					term->cur_row = term_clamp(
 					    term->saved_row, 0,
-					    TERM_ROWS - 1);
+					    term->active_rows - 1);
 					term->cur_col = term_clamp(
 					    term->saved_col, 0,
-					    TERM_COLS - 1);
+					    term->active_cols - 1);
 					term->cur_attr = term->saved_attr;
 					term->wrap_pending = 0;
 					break;
@@ -1038,15 +1098,22 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 					term_switch_to_main(term);
 					term->cur_row = term_clamp(
 					    term->saved_row, 0,
-					    TERM_ROWS - 1);
+					    term->active_rows - 1);
 					term->cur_col = term_clamp(
 					    term->saved_col, 0,
-					    TERM_COLS - 1);
+					    term->active_cols - 1);
 					term->cur_attr = term->saved_attr;
 					term->wrap_pending = 0;
 					break;
 				case 2004:
 					term->bracketed_paste = 0;
+					break;
+				case 12:	/* cursor blink */
+				case 1000:	/* mouse click reporting */
+				case 1002:	/* mouse button-event tracking */
+				case 1003:	/* mouse all-motion tracking */
+				case 1004:	/* focus events */
+				case 1006:	/* SGR mouse mode */
 					break;
 				}
 			}
@@ -1089,9 +1156,9 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		/* SCORC - restore cursor position (like ESC 8) */
 		if (term->intermediate == 0) {
 			term->cur_row = term_clamp(term->saved_row,
-			    0, TERM_ROWS - 1);
+			    0, term->active_rows - 1);
 			term->cur_col = term_clamp(term->saved_col,
-			    0, TERM_COLS - 1);
+			    0, term->active_cols - 1);
 			term->cur_attr = term->saved_attr;
 			term->wrap_pending = 0;
 		}
@@ -1107,10 +1174,11 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->origin_mode = 0;
 			term->autowrap = 1;
 			term->cursor_key_mode = 0;
+			term->keypad_mode = 0;
 			term->insert_mode = 0;
 			term->cursor_visible = 1;
 			term->scroll_top = 0;
-			term->scroll_bottom = TERM_ROWS - 1;
+			term->scroll_bottom = term->active_rows - 1;
 			term->saved_row = 0;
 			term->saved_col = 0;
 			term->saved_attr = ATTR_NORMAL;
@@ -1320,7 +1388,7 @@ term_switch_to_alt(Terminal *term)
 	term->alt_active = 1;
 
 	/* Clear the screen for alt buffer use */
-	term_clear_region(term, 0, 0, TERM_ROWS - 1, TERM_COLS - 1);
+	term_clear_region(term, 0, 0, term->active_rows - 1, term->active_cols - 1);
 	term->cur_row = 0;
 	term->cur_col = 0;
 	term->wrap_pending = 0;
@@ -1344,4 +1412,232 @@ term_switch_to_main(Terminal *term)
 	term->alt_active = 0;
 	term->wrap_pending = 0;
 	term_dirty_all(term);
+}
+
+/* ----------------------------------------------------------------
+ * UTF-8 decode and Unicode translation
+ * ---------------------------------------------------------------- */
+
+/*
+ * utf8_decode - extract Unicode codepoint from accumulated UTF-8 bytes
+ */
+static long
+utf8_decode(unsigned char *buf, short len)
+{
+	long cp;
+
+	switch (len) {
+	case 2:
+		cp = ((long)(buf[0] & 0x1F) << 6) | (buf[1] & 0x3F);
+		break;
+	case 3:
+		cp = ((long)(buf[0] & 0x0F) << 12) |
+		     ((long)(buf[1] & 0x3F) << 6) | (buf[2] & 0x3F);
+		break;
+	case 4:
+		cp = ((long)(buf[0] & 0x07) << 18) |
+		     ((long)(buf[1] & 0x3F) << 12) |
+		     ((long)(buf[2] & 0x3F) << 6) | (buf[3] & 0x3F);
+		break;
+	default:
+		cp = 0xFFFD;	/* replacement character */
+	}
+	return cp;
+}
+
+/*
+ * boxdraw_to_dec - map Unicode box-drawing codepoint to DEC Special Graphics
+ */
+static unsigned char
+boxdraw_to_dec(unsigned short cp)
+{
+	switch (cp) {
+	/* Light box-drawing */
+	case 0x2500: return 'q';	/* horizontal */
+	case 0x2502: return 'x';	/* vertical */
+	case 0x250C: return 'l';	/* upper-left */
+	case 0x2510: return 'k';	/* upper-right */
+	case 0x2514: return 'm';	/* lower-left */
+	case 0x2518: return 'j';	/* lower-right */
+	case 0x251C: return 't';	/* left tee */
+	case 0x2524: return 'u';	/* right tee */
+	case 0x252C: return 'w';	/* top tee */
+	case 0x2534: return 'v';	/* bottom tee */
+	case 0x253C: return 'n';	/* crossing */
+	/* Heavy variants */
+	case 0x2501: return 'q';
+	case 0x2503: return 'x';
+	case 0x250F: return 'l';
+	case 0x2513: return 'k';
+	case 0x2517: return 'm';
+	case 0x251B: return 'j';
+	case 0x2523: return 't';
+	case 0x252B: return 'u';
+	case 0x2533: return 'w';
+	case 0x253B: return 'v';
+	case 0x254B: return 'n';
+	/* Double-line variants */
+	case 0x2550: return 'q';
+	case 0x2551: return 'x';
+	case 0x2554: return 'l';
+	case 0x2557: return 'k';
+	case 0x255A: return 'm';
+	case 0x255D: return 'j';
+	case 0x2560: return 't';
+	case 0x2563: return 'u';
+	case 0x2566: return 'w';
+	case 0x2569: return 'v';
+	case 0x256C: return 'n';
+	/* Block elements */
+	case 0x2588: return 'a';	/* full block -> checkerboard */
+	case 0x2592: return 'a';	/* medium shade -> checkerboard */
+	case 0x25C6: return '`';	/* diamond */
+	default:     return 0;
+	}
+}
+
+/* Index: codepoint - 0x80. Value: Mac Roman byte, or 0 if unmapped. */
+static const unsigned char latin1_to_macroman[128] = {
+	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,		/* 0x80-0x8F: C1 */
+	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,		/* 0x90-0x9F: C1 */
+	0xCA,0xC1,0xA2,0xA3, 0xB4,0xB4,0x7C,0xA4,	/* 0xA0-0xA7 */
+	0xAC,0xA9,0xBB,0xC7, 0xC2,0,0xA8,0xF8,	/* 0xA8-0xAF */
+	0xA1,0xB1,0,0, 0xAB,0xB5,0xA6,0xE1,		/* 0xB0-0xB7 */
+	0xFC,0,0xBC,0xC8, 0,0,0,0xC0,			/* 0xB8-0xBF */
+	0xCB,0xE7,0xE5,0xCC, 0x80,0x81,0xAE,0x82,	/* 0xC0-0xC7 */
+	0xE9,0x83,0xE6,0xE8, 0xED,0xEA,0xEB,0xEC,	/* 0xC8-0xCF */
+	0,0x84,0xF1,0xEE, 0xEF,0xCD,0x85,0,		/* 0xD0-0xD7 */
+	0xAF,0xF4,0xF2,0xF3, 0x86,0,0,0xA7,		/* 0xD8-0xDF */
+	0x88,0x87,0x89,0x8B, 0x8A,0x8C,0xBE,0x8D,	/* 0xE0-0xE7 */
+	0x8F,0x8E,0x90,0x91, 0x93,0x92,0x94,0x95,	/* 0xE8-0xEF */
+	0,0x96,0x98,0x97, 0x99,0x9B,0x9A,0xD6,		/* 0xF0-0xF7 */
+	0xBF,0x9D,0x9C,0x9E, 0x9F,0,0,0xD8,		/* 0xF8-0xFF */
+};
+
+/*
+ * unicode_to_macroman - translate U+0080-U+00FF to Mac Roman
+ */
+static unsigned char
+unicode_to_macroman(unsigned short cp)
+{
+	if (cp < 0x80 || cp > 0xFF)
+		return 0;
+	return latin1_to_macroman[cp - 0x80];
+}
+
+/*
+ * unicode_symbol_to_macroman - translate common Unicode symbols to Mac Roman
+ */
+static unsigned char
+unicode_symbol_to_macroman(unsigned short cp)
+{
+	switch (cp) {
+	case 0x2013: return 0xD0;	/* en dash */
+	case 0x2014: return 0xD1;	/* em dash */
+	case 0x2018: return 0xD4;	/* left single quote */
+	case 0x2019: return 0xD5;	/* right single quote */
+	case 0x201C: return 0xD2;	/* left double quote */
+	case 0x201D: return 0xD3;	/* right double quote */
+	case 0x2022: return 0xA5;	/* bullet */
+	case 0x2026: return 0xC9;	/* ellipsis */
+	case 0x2122: return 0xAA;	/* trademark */
+	case 0x20AC: return 0xDB;	/* euro sign */
+	case 0x2260: return 0xAD;	/* not equal */
+	case 0x2264: return 0xB2;	/* less or equal */
+	case 0x2265: return 0xB3;	/* greater or equal */
+	case 0x03C0: return 0xB9;	/* pi */
+	case 0x2206: return 0xC6;	/* delta */
+	case 0x221A: return 0xC3;	/* square root */
+	case 0x221E: return 0xB0;	/* infinity */
+	case 0x2248: return 0xC5;	/* almost equal */
+	default:     return 0;
+	}
+}
+
+/*
+ * term_put_unicode - translate a Unicode codepoint and output to terminal
+ */
+static void
+term_put_unicode(Terminal *term, long cp)
+{
+	unsigned char ch;
+
+	/* Emoji modifier/ZWJ absorption */
+	if (term->last_was_emoji) {
+		if (cp == 0x200D ||			/* ZWJ */
+		    (cp >= 0x1F3FB && cp <= 0x1F3FF) ||	/* skin tones */
+		    cp == 0xFE0E || cp == 0xFE0F ||	/* variation sel */
+		    (cp >= 0xE0020 && cp <= 0xE007F) ||	/* tag sequences */
+		    cp == 0x20E3) {			/* enclosing keycap */
+			return;		/* absorb silently */
+		}
+		term->last_was_emoji = 0;
+	}
+
+	/* Latin-1 Supplement: direct Mac Roman mapping */
+	if (cp >= 0x80 && cp <= 0xFF) {
+		ch = unicode_to_macroman((unsigned short)cp);
+		if (ch)
+			term_put_char(term, ch);
+		else
+			term_put_char(term, '?');	/* fallback */
+		return;
+	}
+
+	/* Box-drawing: U+2500-U+257F -> DEC Special Graphics */
+	if (cp >= 0x2500 && cp <= 0x257F) {
+		ch = boxdraw_to_dec((unsigned short)cp);
+		if (ch) {
+			unsigned char save_g0 = term->g0_charset;
+			unsigned char save_gl = term->gl_charset;
+			term->g0_charset = '0';
+			term->gl_charset = 0;
+			term_put_char(term, ch);
+			term->g0_charset = save_g0;
+			term->gl_charset = save_gl;
+		} else {
+			term_put_char(term, '-');
+		}
+		return;
+	}
+
+	/* Block elements outside 2500-257F range */
+	if (cp == 0x2588 || cp == 0x2592 || cp == 0x25C6) {
+		ch = boxdraw_to_dec((unsigned short)cp);
+		if (ch) {
+			unsigned char save_g0 = term->g0_charset;
+			unsigned char save_gl = term->gl_charset;
+			term->g0_charset = '0';
+			term->gl_charset = 0;
+			term_put_char(term, ch);
+			term->g0_charset = save_g0;
+			term->gl_charset = save_gl;
+			return;
+		}
+	}
+
+	/* Common Unicode symbols -> Mac Roman */
+	if ((cp >= 0x2000 && cp <= 0x22FF) || cp == 0x03C0 ||
+	    cp == 0x20AC) {
+		ch = unicode_symbol_to_macroman((unsigned short)cp);
+		if (ch) {
+			term_put_char(term, ch);
+			return;
+		}
+	}
+
+	/* Wide characters (CJK, emoji): two-cell placeholder */
+	if ((cp >= 0x2E80 && cp <= 0x9FFF) ||		/* CJK */
+	    (cp >= 0xF900 && cp <= 0xFAFF) ||		/* CJK compat */
+	    (cp >= 0xFE30 && cp <= 0xFE6F) ||		/* CJK forms */
+	    (cp >= 0x1F000)) {				/* emoji */
+		term_put_char(term, '?');
+		term_put_char(term, '?');
+		if (cp >= 0x1F000)
+			term->last_was_emoji = 1;
+		return;
+	}
+
+	/* Everything else: fallback */
+	term_put_char(term, '?');
 }

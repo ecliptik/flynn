@@ -13,6 +13,7 @@
 #define APPLE_MENU_ID       128
 #define FILE_MENU_ID        129
 #define EDIT_MENU_ID        130
+#define SETTINGS_MENU_ID    131
 
 /* Apple menu items */
 #define APPLE_MENU_ABOUT_ID 1
@@ -21,7 +22,10 @@
 #define FILE_MENU_CONNECT_ID    1
 #define FILE_MENU_DISCONNECT_ID 2
 /* separator = 3 */
-#define FILE_MENU_QUIT_ID       4
+#define FILE_MENU_BOOKMARKS_ID  4
+/* separator = 5 */
+#define FILE_MENU_QUIT_ID       6
+#define FILE_MENU_BM_BASE       7	/* first bookmark menu item */
 
 /* Edit menu items */
 #define EDIT_MENU_UNDO_ID   1
@@ -31,12 +35,37 @@
 #define EDIT_MENU_PASTE_ID  5
 #define EDIT_MENU_CLEAR_ID  6
 
+/* Settings menu items */
+#define SETTINGS_FONT_9_ID  1
+#define SETTINGS_FONT_12_ID 2
+
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130
+#define DLOG_BOOKMARKS_ID   131
+#define DLOG_BM_EDIT_ID     132
 
-/* Terminal window dimensions */
-#define TERM_WIN_WIDTH      500
-#define TERM_WIN_HEIGHT     320
+/* Bookmark manager dialog items */
+#define BM_DONE             1
+#define BM_ADD              2
+#define BM_EDIT             3
+#define BM_DELETE            4
+#define BM_CONNECT          5
+#define BM_LABEL            6
+#define BM_LIST             7	/* UserItem for list area */
+
+/* Bookmark add/edit dialog items */
+#define BME_OK              1
+#define BME_CANCEL          2
+#define BME_NAME_LABEL      3
+#define BME_NAME_FIELD      4
+#define BME_HOST_LABEL      5
+#define BME_HOST_FIELD      6
+#define BME_PORT_LABEL      7
+#define BME_PORT_FIELD      8
+
+/* Max window content area for grid computation */
+#define MAX_WIN_WIDTH       500
+#define MAX_WIN_HEIGHT      320
 
 /* Application creator and type */
 #define APP_CREATOR         'FLYN'

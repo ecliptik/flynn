@@ -62,6 +62,10 @@ typedef struct {
 	short		sb_head;	/* next line to write in ring */
 	short		sb_count;	/* number of valid lines */
 
+	/* Active grid dimensions (may be < max when using larger font) */
+	short		active_cols;
+	short		active_rows;
+
 	/* Cursor */
 	short		cur_row;
 	short		cur_col;
@@ -97,6 +101,7 @@ typedef struct {
 
 	/* DEC modes */
 	unsigned char	cursor_key_mode;	/* DECCKM: 0=normal, 1=application */
+	unsigned char	keypad_mode;		/* DECKPAM: 0=normal, 1=application */
 	unsigned char	autowrap;		/* DECAWM: 1=on (default), 0=off */
 	unsigned char	origin_mode;		/* DECOM: 0=absolute, 1=relative */
 	unsigned char	insert_mode;		/* IRM: 0=replace, 1=insert */
@@ -132,6 +137,12 @@ typedef struct {
 	/* OSC window title */
 	unsigned char	title_changed;
 	char		window_title[64];
+
+	/* UTF-8 decoder state */
+	unsigned char	utf8_buf[4];	/* accumulator for multi-byte sequence */
+	unsigned char	utf8_len;	/* bytes accumulated so far */
+	unsigned char	utf8_expect;	/* total bytes expected (2, 3, or 4) */
+	unsigned char	last_was_emoji;	/* absorb following modifiers */
 } Terminal;
 
 /* Initialize terminal to default state */

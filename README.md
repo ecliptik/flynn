@@ -7,21 +7,27 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 ## Features
 
 - Client-side Telnet protocol with IAC negotiation (BINARY, ECHO, SGA, TTYPE, NAWS)
-- VT100 terminal emulation (cursor movement, screen clearing, text attributes)
+- VT220 terminal emulation with xterm compatibility (TERM=xterm)
+- DEC Special Graphics box-drawing via QuickDraw (tmux, mc, dialog borders)
+- UTF-8 support: accented characters, box-drawing, curly quotes, symbols
+- Alternate screen buffer for full-screen apps (vi, nano, less, tmux)
+- Session bookmarks (up to 8, one-click connect from menu)
+- Font selection (Monaco 9pt or Monaco 12pt, saved in preferences)
 - MacTCP networking for TCP/IP connectivity
-- Designed for interactive terminal use (vi, nano, shell sessions)
-- Scrollback viewing with Cmd+Up/Down keyboard navigation
+- Scrollback viewing with Cmd+Up/Down keyboard navigation (96 lines)
 - Mouse-based text selection (click-drag, double-click word, shift-click extend)
 - Copy/paste via Mac clipboard (Cmd+C copies selection or full screen, Cmd+V to paste)
-- Settings persistence (host/port saved across launches)
+- Settings persistence (host/port, bookmarks, font saved across launches)
 - Option key as Ctrl modifier for M0110 keyboard
 - Cmd+. sends Escape (classic Mac convention), Clear key also sends Escape
-- Proper About dialog with version and credits
+- F1-F12 via Cmd+1..0 for M0110 keyboards, native ADB F-key support
+- Application cursor keys and keypad mode for vi/tmux navigation
+- Bracketed paste mode support
 - Targets Motorola 68000 CPU (Mac Plus compatible)
 
 ## Current Status
 
-Phases 0-7 are complete. Flynn is a fully featured telnet client: connects to real servers, renders VT100 terminal output including full-screen TUI applications (nano, vi), handles interactive shell sessions with mouse text selection, copy/paste and scrollback viewing, saves preferences across launches, and supports the M0110 keyboard's Option key as Ctrl. The application runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1.
+Version 0.9.0 — Phases 0-14 complete. Flynn is a fully featured telnet client with VT220/xterm terminal emulation, UTF-8 support, session bookmarks, and font selection. It connects to modern Linux telnetd servers, renders full-screen TUI applications (nano, vi, tmux, mc), handles interactive shell sessions with mouse text selection, copy/paste and scrollback viewing, and saves all preferences across launches. The application runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1.
 
 ## Keyboard Shortcuts
 
@@ -40,6 +46,9 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | Extend selection | Shift+click | Extends selection to click point |
 | Copy | Cmd+C | Copies selection, or full screen if none |
 | Paste | Cmd+V | Sends clipboard to connection |
+| F1-F10 | Cmd+1..0 | For M0110 keyboards without function keys |
+| Bookmarks | Cmd+B | Open bookmark manager |
+| Connect | Cmd+N | Open connect dialog |
 
 ## Building
 
