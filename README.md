@@ -1,6 +1,6 @@
 # Flynn
 
-A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 with MacTCP 2.1. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
+A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 with MacTCP 2.1. Also tested on System 7.5.5 with Open Transport. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 
 This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
@@ -33,7 +33,7 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 - **M0110 keyboard support** — Option key as Ctrl, Cmd+. as Escape, Cmd+1-0 for F-keys, designed for the original Mac Plus keyboard
 - **Dark mode** — inverted display option for late-night telnet sessions
 - **Settings persistence** — host, port, bookmarks, font, and preferences saved across launches
-- **4MB Mac Plus** — ~98KB on disk, ~60KB RAM footprint (~1.5% of 4MB). Runs on a Macintosh Plus with System 6.0.8 and MacTCP 2.1
+- **4MB Mac Plus** — ~98KB on disk, ~60KB RAM footprint (~1.5% of 4MB). Runs on a Macintosh Plus with System 6.0.8 and MacTCP 2.1. Also compatible with System 7.5.5 and Open Transport
 
 ## Keyboard Shortcuts
 

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2026-03-07
+
+### Fixed
+- TCP connect timeout enabled (commandTimeoutValue = 30 seconds)
+  - Previously commented out, causing ~5 minute UI freeze when
+    networking was unavailable (no command timeout = wait forever)
+
+### Changed
+- Verified compatibility with System 7.5.5 and Open Transport
+- Updated README, About Flynn, and CHANGELOG to document
+  System 7 / Open Transport support
+
 ## [1.0.0] - 2026-03-07
 
 ### Added
@@ -21,7 +33,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - README: Added Claude Code attribution, navigation TOC, and expanded
   Acknowledgments (Retro68, Snow emulator as individual entries)
-- About dialog version updated to 1.0.0
+- About dialog version updated to 1.0.0 (updated to 1.0.1 in next release)
 - Version: 0.11.1 → 1.0.0
 
 ## [0.11.0] - 2026-03-06

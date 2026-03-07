@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.0.0
+                    Version 1.0.1
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -11,10 +11,11 @@ About Flynn
 -----------
 
 Flynn is a Telnet client for the Apple Macintosh Plus
-and later models running System 6.0.8. It connects to
-remote hosts over TCP/IP using MacTCP, providing a
-full-featured terminal for interactive sessions with
-Linux, Unix, and other Telnet-capable servers.
+and later models running System 6.0.8 or later. It
+connects to remote hosts over TCP/IP using MacTCP or
+Open Transport, providing a full-featured terminal for
+interactive sessions with Linux, Unix, and other
+Telnet-capable servers.
 
 Flynn emulates a VT220/xterm terminal with support for
 full-screen applications like vi, nano, tmux, and
@@ -28,9 +29,9 @@ System Requirements
 -------------------
 
   - Macintosh Plus or later (68000 CPU)
-  - System 6.0.8 or later
-  - MacTCP 2.1 (configured with a valid TCP/IP
-    connection)
+  - System 6.0.8 or later (tested through 7.5.5)
+  - MacTCP 2.1 or Open Transport (configured with
+    a valid TCP/IP connection)
   - 4 MB RAM recommended
   - Network connection (Ethernet or compatible)
 
