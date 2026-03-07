@@ -2,10 +2,7 @@
 
 A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 with MacTCP 2.1. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 
-This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-with [Claude Code Teams](https://docs.anthropic.com/en/docs/claude-code/teams) orchestration.
-[Read the development journal](JOURNAL.md) — from first build to full VT220 terminal emulator,
-built entirely through agentic AI development.
+This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code). [Read the development journal](JOURNAL.md).
 
 <p align="center">
 <a href="#features">Features</a> · <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> · <a href="#building">Building</a> · <a href="#testing">Testing</a> · <a href="#acknowledgments">Acknowledgments</a> · <a href="#license">License</a>
