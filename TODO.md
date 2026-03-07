@@ -174,4 +174,8 @@
   - Map CP437 glyphs to bitmap resources or custom font
   - Support ANSI color (with color Mac support) and monochrome fallback
   - For connecting to classic BBS systems (Synchronet, Mystic, etc.)
+- [ ] Multiple simultaneous sessions in separate windows
+  - Each window has its own Connection, TelnetState, Terminal, and TerminalUI
+  - Window switching via standard Mac Window menu
+  - Independent connect/disconnect per session
 - [ ] SSH support
