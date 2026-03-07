@@ -139,8 +139,17 @@
 - [x] Wide character / emoji → 2-cell placeholder
 - [x] Emoji modifier/ZWJ sequence absorption
 
+## Phase 15: Additional Fonts + Window Resizing
+- [x] Additional fonts (Courier 10, Chicago 12, Geneva 9, Geneva 10)
+- [x] Proportional font rendering (per-character MoveTo+DrawChar for Chicago/Geneva)
+- [x] Window resizing with grow box (drag-to-resize, snap to cell boundaries)
+- [x] Terminal buffer increase (132x50 max, up from 80x24)
+- [x] NAWS renegotiation on window resize
+- [x] Username auto-login field in Connect dialog
+- [x] charCode-based arrow key fallback for M0110A keyboards
+- [x] Clear terminal screen on remote disconnect
+- [x] Fix initial window size clamped to 80x24 default
+
 ## Future
 - [ ] Color support (for System 7 / color Macs)
 - [ ] SSH support
-- [ ] Additional fonts (Chicago 12, Geneva 9/10, Courier 10)
-- [ ] Configurable scroll region / window resizing

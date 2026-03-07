@@ -1,5 +1,84 @@
 # Development Log
 
+## 2026-03-06: v0.11.0 — Additional Fonts, Window Resizing, Auto-Login
+
+### Additional Fonts (Courier 10, Chicago 12, Geneva 9, Geneva 10)
+
+Expanded the Preferences > Fonts menu from 2 items (Monaco 9/12) to 6, adding Courier 10 (font_id=22), Chicago 12 (font_id=0), Geneva 9 (font_id=3), and Geneva 10 (font_id=3). All PREFS_* menu constants renumbered. CheckItem logic compares both font_id and font_size for correct checkmark behavior.
+
+### Proportional Font Rendering Fix
+
+Chicago and Geneva are proportional fonts — `DrawText()` advances the pen by each character's actual width rather than the cell width. This caused text to render compressed while the cursor stayed on the wider widMax grid, creating visible misalignment. Fixed by detecting proportional fonts in `term_ui_set_font()` (comparing widMax to character metrics) and switching to per-character `MoveTo()`/`DrawChar()` rendering that forces each character onto its cell grid position. Slightly slower than batched `DrawText()`, but pixel-accurate.
+
+### Window Resizing with Grow Box
+
+Added drag-to-resize for the terminal window:
+- `inGrow` handler in `handle_mouse_down()` calls `GrowWindow()` with min/max size limits
+- `do_window_resize()` computes grid from pixel dimensions, snaps to cell boundaries, clamps cursor, redraws, and sends NAWS if connected
+- Grow icon drawn clipped in `handle_update()` to avoid scroll bar artifacts
+- Refactored `do_font_change()` to delegate to `do_window_resize()` for consistent behavior
+
+Terminal buffer increased from 80x24 to 132x50 max. This adds ~29KB of memory (total ~60KB), still well within the 4MB Mac Plus limit. New constants: `TERM_MAX_COLS=132`, `TERM_MAX_ROWS=50`, `TERM_DEFAULT_COLS=80`, `TERM_DEFAULT_ROWS=24`, `MIN_WIN_COLS=20`, `MIN_WIN_ROWS=5`.
+
+### Username Auto-Login
+
+Added a Username field to the Connect dialog (DLOG 129). When provided, Flynn auto-sends the username after connecting (with a short delay for the login prompt to appear). Username is saved in preferences (v5→v6 migration) and pre-filled on subsequent connections.
+
+### Other Fixes
+
+- charCode-based arrow key fallback for M0110A keyboards (handles keyboard layouts that send arrow charCodes instead of virtual keycodes)
+- Clear terminal screen on remote disconnect — resets terminal state and clears window before showing the connection lost alert
+- Initial window clamped to 80x24 default (was incorrectly using 132x50 max buffer size)
+- Connect dialog labels improved ("Host or IP:", removed redundant info text)
+
+---
+
+## 2026-03-06: v0.10.1 — Custom DNS Resolver, Preferences Reorganization
+
+### Custom DNS Resolver (dns.c)
+
+The dnrp code resource (Apple's DNS resolver loaded via `OpenResolver()`) crashes when DNS lookups fail under Retro68. Root cause: calling convention mismatch between Retro68's flat code model and the dnrp resource's A5-relative pascal callbacks. Rather than debug the code resource loading, replaced it entirely with a custom UDP-based DNS resolver.
+
+`dns_resolve()` sends A-record queries to a configurable DNS server (default 1.1.1.1) over MacTCP UDP, with 15-second timeout and 2 retry attempts. Parses standard DNS response format including CNAME chains. Error-specific alerts: "Host not found" (NXDOMAIN), "DNS lookup timed out", "DNS lookup failed".
+
+### DNS Server Preference
+
+Added DLOG 133 for DNS Server configuration, accessible from Preferences > Networking > DNS Server. User can set any IP address as their DNS server. Validated before saving, persisted in FlynnPrefs.
+
+### Preferences Menu Reorganization
+
+Restructured the Preferences menu with disabled section headers:
+- Fonts: Monaco 9, Monaco 12
+- Terminal Type: xterm, VT220, VT100
+- Networking: DNS Server...
+- Misc: Dark Mode
+
+### Hostname Validation
+
+Added validation in the Connect dialog to reject malformed IPs (e.g., doubled addresses like "192.168.7.230192.168.7.230") and invalid DNS labels. Uses `ip2long()` check for all-numeric hostnames.
+
+---
+
+## 2026-03-06: v0.10.0 — Preferences Menu, Dark Mode, Floppy Image
+
+### Preferences Menu
+
+Renamed and expanded the Font menu (MENU 131) into a Preferences menu with font selection, terminal type selection (xterm/VT220/VT100), and dark mode toggle. Terminal type preference controls TTYPE cycling order — user's preferred type is sent first during negotiation. Prefs version 3→4.
+
+### Dark Mode
+
+Implemented as a global XOR of ATTR_INVERSE. On a monochrome Mac, dark mode renders white text on black background. All rendering paths (normal text, DEC Special Graphics, cursor blink) work correctly in both modes. The key insight: patXor-based cursor rendering is mode-invariant since XOR is self-inverting.
+
+### 800K Floppy Image
+
+build.sh now sets the correct FLYN creator code and includes the Read Me file on the Flynn.dsk floppy image, making it ready for use with FloppyEMU or physical disk drives.
+
+### About Dialog Polish
+
+Added ICON resource (32x32 mono, same bitmap as Finder icon), made dialog taller with consistent margins, and added ecliptik.com URL.
+
+---
+
 ## 2026-03-06: v0.9.1 — Finder Icon, Read Me, Font Menu, BinHex
 
 ### Custom Finder Icon (ICN# 128)

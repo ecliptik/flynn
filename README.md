@@ -12,7 +12,8 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 - UTF-8 support: accented characters, box-drawing, curly quotes, symbols
 - Alternate screen buffer for full-screen apps (vi, nano, less, tmux)
 - Session bookmarks (up to 8, one-click connect from menu)
-- Font selection (Monaco 9pt or Monaco 12pt, saved in preferences)
+- Font selection (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
+- Resizable terminal window with grow box (up to 132x50 cells)
 - MacTCP networking for TCP/IP connectivity
 - Scrollback viewing with Cmd+Up/Down keyboard navigation (96 lines)
 - Mouse-based text selection (click-drag, double-click word, shift-click extend)
@@ -27,7 +28,7 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 
 ## Current Status
 
-Version 0.9.1 — Phases 0-14 complete. Flynn is a fully featured telnet client with VT220/xterm terminal emulation, UTF-8 support, session bookmarks, and font selection. It connects to modern Linux telnetd servers, renders full-screen TUI applications (nano, vi, tmux, mc), handles interactive shell sessions with mouse text selection, copy/paste and scrollback viewing, and saves all preferences across launches. Ships with a custom Finder icon, TeachText Read Me documentation, and BinHex archive for cross-platform distribution. The application runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1.
+Version 0.11.0 — Phases 0-15 complete. Flynn is a fully featured telnet client with VT220/xterm terminal emulation, UTF-8 support, session bookmarks, resizable windows, and 6 font choices. It connects to modern Linux telnetd servers, renders full-screen TUI applications (nano, vi, tmux, mc), handles interactive shell sessions with mouse text selection, copy/paste and scrollback viewing, and saves all preferences across launches. Ships with a custom Finder icon, TeachText Read Me documentation, and BinHex archive for cross-platform distribution. The application runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1.
 
 ## Keyboard Shortcuts
 

@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                   Version 0.10.0
+                   Version 0.11.0
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -51,14 +51,16 @@ Getting Started
    you wish to connect to. The default port is 23
    (standard Telnet).
 
-5. Click Connect. Flynn will resolve the hostname
+5. Optionally enter a username. If provided, Flynn
+   will automatically send it after connecting.
+
+6. Click Connect. Flynn will resolve the hostname
    and establish a TCP connection.
 
-6. You should see a login prompt from the remote
-   host. Type your username and password to begin
-   your session.
+7. You should see a login prompt from the remote
+   host. Type your password to begin your session.
 
-7. To disconnect, choose "Disconnect" from the
+8. To disconnect, choose "Disconnect" from the
    Session menu, or simply close the window.
 
 
@@ -77,8 +79,13 @@ Features
   - 96-line scrollback buffer
   - Mouse text selection with copy and paste
   - Session bookmarks for one-click connections
-  - Preferences menu: font size, terminal type,
-    dark mode
+  - Resizable window (drag the grow box to resize)
+  - Six font choices: Monaco 9, Monaco 12, Courier
+    10, Chicago 12, Geneva 9, Geneva 10
+  - Terminal type selection: xterm, VT220, VT100
+  - Dark mode (white text on black background)
+  - Custom DNS server configuration
+  - Username auto-login
   - Application cursor keys and keypad mode
   - Bracketed paste mode
   - All preferences saved across launches
@@ -149,7 +156,31 @@ mappings for all of these:
   Arrow Keys:  Arrow keys send standard VT100
   cursor sequences. When an application enables
   cursor key mode (vi, tmux), Flynn automatically
-  switches to application cursor sequences.
+  switches to application cursor sequences. On
+  M0110A keyboards, arrow keys also work via
+  charCode fallback for compatibility.
+
+
+Window Resizing
+---------------
+
+Flynn's terminal window can be resized by dragging
+the grow box in the lower-right corner. The window
+snaps to cell boundaries so text always aligns
+properly.
+
+  - Default size: 80 columns x 24 rows
+  - Maximum size: 132 columns x 50 rows
+  - Minimum size: 20 columns x 5 rows
+
+When connected, resizing the window automatically
+notifies the server of the new terminal dimensions
+(via NAWS), so programs like vi and tmux will
+adjust their layout accordingly.
+
+The window size adapts to the selected font. Larger
+fonts produce fewer columns and rows; smaller fonts
+produce more.
 
 
 Session Bookmarks
@@ -182,17 +213,26 @@ called "Flynn Prefs" in the System Folder.
 Preferences
 -----------
 
-The Preferences menu contains settings for font size,
-terminal type, and display mode.
+The Preferences menu contains settings for fonts,
+terminal type, networking, and display mode.
 
-  Font Size
-  ~~~~~~~~~
-  Monaco 9pt   80 columns x 24 rows (default)
-  Monaco 12pt  Larger text, fewer columns/rows
+  Fonts
+  ~~~~~
+  Monaco 9pt    80 columns x 24 rows (default)
+  Monaco 12pt   Larger text, fewer columns/rows
+  Courier 10pt  Classic fixed-width alternative
+  Chicago 12pt  The classic Mac system font
+  Geneva 9pt    Compact proportional font
+  Geneva 10pt   Slightly larger proportional font
 
   The terminal grid is automatically recomputed when
-  you change font size, and the server is notified of
+  you change font, and the server is notified of
   the new window size if connected.
+
+  Note: Proportional fonts (Chicago, Geneva) use
+  per-character positioning to maintain alignment
+  with the cell grid. Fixed-width fonts (Monaco,
+  Courier) may render slightly faster.
 
   Terminal Type
   ~~~~~~~~~~~~~
@@ -200,6 +240,11 @@ terminal type, and display mode.
   xterm (default), VT220, or VT100. This controls
   which escape sequences the server sends. Changes
   take effect on the next connection.
+
+  Networking
+  ~~~~~~~~~~
+  DNS Server: Configure a custom DNS server IP
+  address. Default is 1.1.1.1 (Cloudflare DNS).
 
   Dark Mode
   ~~~~~~~~~
@@ -224,9 +269,11 @@ Troubleshooting
   service is running on the server (port 23).
 
   DNS resolution fails
-  Check that a DNS server is configured in MacTCP.
-  You can also try connecting by IP address instead
-  of hostname.
+  Flynn uses its own DNS resolver (default server:
+  1.1.1.1). You can change the DNS server in
+  Preferences > Networking > DNS Server. You can
+  also try connecting by IP address instead of
+  hostname.
 
   No response after connecting
   Some servers require you to press Return after
@@ -245,6 +292,11 @@ Troubleshooting
   see question marks instead, the remote program
   may be sending characters that Flynn does not
   yet map.
+
+  Window too small or too large
+  Drag the grow box in the lower-right corner to
+  resize the terminal window. The grid snaps to
+  cell boundaries automatically.
 
 
 Credits

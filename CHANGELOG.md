@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-03-06
+
+### Added
+- Additional font options: Courier 10, Chicago 12, Geneva 9, Geneva 10
+  - Preferences > Fonts menu expanded from 2 to 6 items
+  - CheckItem logic compares both font_id and font_size
+- Window resizing with grow box
+  - Drag-to-resize terminal window, snaps to cell boundaries
+  - Terminal buffer increased to 132x50 max (from 80x24)
+  - Min window size: 20x5 cells
+  - Grow icon drawn clipped (avoids scroll bar lines)
+  - NAWS renegotiation sent on resize while connected
+- Proportional font rendering
+  - Detects proportional fonts (Chicago, Geneva) in `term_ui_set_font()`
+  - Uses per-character MoveTo+DrawChar to keep text aligned with cell grid
+- Username auto-login field in Connect dialog
+  - Sends username automatically on connect (with short delay)
+  - Username saved in preferences (v5→v6 migration) and pre-filled
+- charCode-based arrow key fallback for M0110A keyboards
+- Clear terminal screen on remote disconnect
+  - Resets terminal and clears window before showing alert
+
+### Fixed
+- Cursor misalignment with proportional fonts (Chicago, Geneva)
+  - DrawText advanced pen by actual glyph width, not cell width
+- Initial window too large on launch (clamped to 80x24 default, not 132x50 max)
+- Connect dialog labels improved ("Host or IP:", info text removed)
+
+### Changed
+- Version: 0.10.1 → 0.11.0
+- FlynnPrefs bumped to v6 (adds username field)
+- TERM_MAX_COLS/TERM_MAX_ROWS: 132x50, TERM_DEFAULT_COLS/TERM_DEFAULT_ROWS: 80x24
+- Memory impact: buffer increase adds ~29KB (total ~60KB, within 4MB limit)
+
 ## [0.10.1] - 2026-03-06
 
 ### Added

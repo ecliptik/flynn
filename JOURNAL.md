@@ -4,6 +4,50 @@ A living document recording the development of Flynn, a Telnet client for classi
 
 ---
 
+## 2026-03-06 — v0.11.0: Fonts, Resizable Windows, and Polish
+
+### Expanding Beyond Monaco
+
+Flynn started with two font choices: Monaco 9pt (the workhorse, giving 80x24) and Monaco 12pt (larger, fewer cells). This release adds four more: Courier 10, Chicago 12, Geneva 9, and Geneva 10. The interesting challenge was that Chicago and Geneva are proportional fonts — characters have different widths.
+
+The initial implementation used `DrawText()` for batched rendering, which works beautifully for monospace fonts. But with proportional fonts, `DrawText()` advances the pen by each glyph's actual width, while the cursor stays on the fixed-width cell grid. The result: text progressively drifts left of where the cursor thinks it is.
+
+The fix detects proportional fonts at `term_ui_set_font()` time (comparing `widMax` to individual character metrics) and switches to per-character `MoveTo()`/`DrawChar()` rendering. Each character is explicitly positioned at its cell's x-coordinate, keeping text aligned with the grid regardless of glyph width. It's slower than batched `DrawText()`, but on a terminal that refreshes at most a few dozen rows per frame, the difference is imperceptible.
+
+### Draggable Window Resizing
+
+The terminal window now has a grow box in the lower-right corner. Drag to resize, and Flynn snaps to the nearest cell boundary, recomputes the grid dimensions, and — if connected — sends a NAWS update so the remote server knows the new terminal size. This means you can resize during a tmux or vi session and have everything reflow correctly.
+
+To support this, the terminal buffer was increased from the fixed 80x24 to a maximum of 132x50. The default is still 80x24, but you can expand all the way to 132 columns — the classic DEC VT100 wide mode column count. This adds about 29KB of memory, bringing the total to ~60KB, still just 1.5% of the Mac Plus's 4MB.
+
+The grow box is drawn clipped to avoid the characteristic scroll bar lines that appear when you use `DrawGrowIcon()` without clipping — a classic Mac UI detail.
+
+### Username Auto-Login
+
+A small but useful convenience: the Connect dialog now has a Username field. If you fill it in, Flynn automatically sends the username after connecting (with a short delay for the login prompt to appear). Combined with saved bookmarks, this means you can get from launch to a shell prompt in two clicks.
+
+### The M0110A Arrow Key Fix
+
+Discovered that M0110A keyboards (the Mac Plus keyboard with numeric keypad) send arrow key events with charCode values rather than virtual keycodes in some configurations. Added a charCode fallback path: if the virtual keycode doesn't match known arrow keys, check the charCode (0x1C-0x1F) before falling through to normal character handling.
+
+### Current State
+
+Version 0.11.0 — 15 phases complete. Flynn has grown from an 8.5KB skeleton to a ~90KB full-featured terminal client with 6 font choices, resizable windows up to 132x50, session bookmarks, dark mode, custom DNS resolver, username auto-login, UTF-8 support, and comprehensive VT220/xterm terminal emulation. All running on a 1986 Macintosh Plus with 4MB of RAM.
+
+---
+
+## 2026-03-06 — v0.10.0/v0.10.1: Preferences, Dark Mode, DNS
+
+### Preferences Menu and Dark Mode
+
+Expanded the simple Font menu into a full Preferences menu with font selection, terminal type (xterm/VT220/VT100), and a dark mode toggle. Dark mode on a monochrome Mac is elegantly simple: globally XOR the ATTR_INVERSE flag. White text on black. The cursor blink (patXor) is self-inverting, so it works identically in both modes.
+
+### Custom DNS Resolver
+
+The dnrp code resource — Apple's DNS resolver loaded as a CODE resource via `OpenResolver()` — crashes under Retro68 when lookups fail. The root cause is a calling convention mismatch: dnrp uses A5-relative pascal callbacks that don't work with Retro68's flat code model. Rather than debug legacy code resource loading, replaced it entirely with `dns.c` — a clean UDP-based DNS resolver that sends A-record queries to a configurable server (default 1.1.1.1).
+
+---
+
 ## 2026-03-06 — v0.9.1: The Finishing Touches
 
 ### What Changed

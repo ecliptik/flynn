@@ -151,6 +151,40 @@ See `docs/PLAN-UTF8.md` for complete design.
   - `?` as replacement character (was Mac Roman sigma, fixed)
   - Files: terminal.c
 
+## Phase 15: Additional Fonts + Window Resizing (~250 lines, +29KB memory)
+
+Expands font options and adds drag-to-resize window support.
+
+- [x] Additional font options (Courier 10, Chicago 12, Geneva 9, Geneva 10)
+  - Preferences > Fonts menu expanded from 2 to 6 items
+  - CheckItem compares both font_id and font_size
+  - Files: main.c, main.h, telnet.r
+- [x] Proportional font rendering
+  - Detect proportional fonts in term_ui_set_font()
+  - Per-character MoveTo+DrawChar for Chicago/Geneva alignment
+  - Files: terminal_ui.c
+- [x] Window resizing with grow box
+  - inGrow handler in handle_mouse_down() with GrowWindow()
+  - do_window_resize() computes grid, snaps to cell boundaries, clamps cursor
+  - Grow icon drawn clipped in handle_update()
+  - Files: main.c, main.h
+- [x] Terminal buffer increase (132x50 max)
+  - TERM_MAX_COLS=132, TERM_MAX_ROWS=50
+  - TERM_DEFAULT_COLS=80, TERM_DEFAULT_ROWS=24
+  - MIN_WIN_COLS=20, MIN_WIN_ROWS=5
+  - Files: terminal.h, terminal.c
+- [x] NAWS renegotiation on resize
+  - Sends updated window size when resizing while connected
+  - Files: main.c
+- [x] Username auto-login in Connect dialog
+  - Auto-sends username on connect with delay
+  - Saved in prefs v6
+  - Files: connection.c, connection.h, settings.c, settings.h, telnet.r
+- [x] charCode-based arrow key fallback for M0110A keyboards
+  - Files: main.c
+- [x] Clear terminal screen on remote disconnect
+  - Files: main.c
+
 ## Summary
 
 | Phase | Feature | New Code | Memory | Dependencies | Status |
@@ -161,7 +195,8 @@ See `docs/PLAN-UTF8.md` for complete design.
 | 12 | Font Selection | ~200 lines | +20 bytes | None (parallel) | **Done** |
 | 13 | xterm Compat | ~100 lines | +0 bytes | Phase 10 | **Done** |
 | 14 | UTF-8 Support | ~250 lines | +~1KB code | Phase 10 | **Done** |
+| 15 | Fonts + Resizing | ~250 lines | +29KB | Phase 12 | **Done** |
 
-All phases 9-14 are complete as of v0.9.0. Phases 11 and 12 were developed
-in parallel. Phase 13 completed remaining items (keypad mode, TTYPE cycling,
-mouse consume). Phase 14 adds full UTF-8 decode-and-translate.
+All phases 9-15 are complete as of v0.11.0. Phase 15 expanded font options
+to 6 choices, added drag-to-resize windows (up to 132x50), proportional font
+rendering, username auto-login, and several bug fixes.
