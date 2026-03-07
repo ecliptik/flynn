@@ -5,7 +5,7 @@ A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 w
 This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 <p align="center">
-<a href="#features">Features</a> · <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> · <a href="#building">Building</a> · <a href="#testing">Testing</a> · <a href="#acknowledgments">Acknowledgments</a> · <a href="#license">License</a>
+<a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> · <a href="#building">Building</a> · <a href="#testing">Testing</a> · <a href="#acknowledgments">Acknowledgments</a> · <a href="#license">License</a>
 </p>
 
 | | |
@@ -16,6 +16,15 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 | **Connect Dialog** — saved host, port, and username auto-login | **Claude Code via Flynn** — the AI that built Flynn, running inside it |
 
 ---
+
+## Download
+
+Pre-built binaries are available on the [Releases](https://github.com/ecliptik/flynn/releases) page:
+
+- **Flynn-x.y.z.dsk** — 800K floppy disk image. Mount in an emulator or write to a real floppy.
+- **Flynn-x.y.z.hqx** — BinHex archive. Download via web/BBS and decode with BinHex 4.0 or StuffIt on your Mac.
+
+No build toolchain required — just download and run.
 
 ## Features
 

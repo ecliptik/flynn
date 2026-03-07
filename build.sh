@@ -18,6 +18,13 @@ cd "$BUILD_DIR"
 cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
 make "$@"
 
+# Read version from CMakeLists.txt
+VERSION=$(grep -oP 'project\(Flynn VERSION \K[0-9]+\.[0-9]+\.[0-9]+' "$SCRIPT_DIR/CMakeLists.txt")
+if [ -z "$VERSION" ]; then
+    echo "Warning: Could not read version from CMakeLists.txt, using 'unknown'"
+    VERSION="unknown"
+fi
+
 # Generate BinHex (.hqx) archive if macutils is available
 if command -v binhex >/dev/null 2>&1; then
     binhex "$BUILD_DIR/Flynn.bin" > "$BUILD_DIR/Flynn.hqx"
@@ -26,16 +33,11 @@ else
     echo "Note: Install macutils for BinHex output: sudo apt install macutils"
 fi
 
-echo ""
-echo "Build complete. Output:"
-ls -la "$BUILD_DIR"/Flynn.* 2>/dev/null || echo "  (no output files found)"
-
 # Convert About Flynn line endings to Mac CR format
 ABOUT_SRC="$SCRIPT_DIR/docs/About Flynn"
 ABOUT_OUT="$BUILD_DIR/About Flynn"
 if [ -f "$ABOUT_SRC" ]; then
     tr '\n' '\r' < "$ABOUT_SRC" > "$ABOUT_OUT"
-    echo "  About Flynn: $ABOUT_OUT"
 fi
 
 # Post-process 800K floppy image: set creator code and add About Flynn
@@ -47,8 +49,17 @@ if [ -f "$BUILD_DIR/Flynn.dsk" ]; then
         hattrib -t ttro -c ttxt ":About Flynn"
     fi
     humount
-    echo "  800K floppy: Flynn.dsk (creator code set, About Flynn included)"
 fi
+
+# Create versioned copies
+cp "$BUILD_DIR/Flynn.bin" "$BUILD_DIR/Flynn-${VERSION}.bin"
+cp "$BUILD_DIR/Flynn.dsk" "$BUILD_DIR/Flynn-${VERSION}.dsk"
+[ -f "$BUILD_DIR/Flynn.hqx" ] && cp "$BUILD_DIR/Flynn.hqx" "$BUILD_DIR/Flynn-${VERSION}.hqx"
+
+echo ""
+echo "Build complete (v${VERSION}):"
+ls -la "$BUILD_DIR"/Flynn-${VERSION}.* 2>/dev/null
+[ -f "$ABOUT_OUT" ] && echo "  About Flynn included in disk image"
 
 echo ""
 echo "To deploy to HFS image:"
