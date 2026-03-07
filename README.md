@@ -7,16 +7,14 @@ with [Claude Code Teams](https://docs.anthropic.com/en/docs/claude-code/teams) o
 [Read the development journal](JOURNAL.md) — from first build to full VT220 terminal emulator,
 built entirely through agentic AI development.
 
+[Features](#features) | [Keyboard Shortcuts](#keyboard-shortcuts) | [Building](#building) | [Testing](#testing) | [Acknowledgments](#acknowledgments) | [License](#license)
+
 | | |
 |:---:|:---:|
-| ![Flynn connected to a Linux server showing neofetch system info with Raspberry Pi ASCII art](docs/screenshots/flynn-neofetch-crt.png) | ![Flynn running tmux with three split panes showing cal, ls, and uname output with box-drawing characters](docs/screenshots/flynn-tmux-crt.png) |
-| **Telnet Session** — Connected to a Linux server with neofetch displaying system info and Raspberry Pi ASCII art. Shows OSC window title, auto-login, and VT220 terminal emulation. | **tmux Split Panes** — Three-pane tmux layout with box-drawing line characters rendered via QuickDraw. Calendar, file listing, and kernel info running simultaneously. |
-| ![Flynn connect dialog showing host, port, and username fields with saved settings](docs/screenshots/flynn-connect-crt.png) | ![Claude Code running inside Flynn on a Macintosh Plus, describing the Flynn project](docs/screenshots/flynn-claudecode-crt.png) |
-| **Connect Dialog** — Native Mac dialog with host, port, and username fields. Settings persist across launches for quick reconnection. | **Claude Code via Flynn** — Claude Code running over telnet on a Mac Plus — the AI that built Flynn, running inside its own creation. |
-
----
-
-[Features](#features) | [Keyboard Shortcuts](#keyboard-shortcuts) | [Building](#building) | [Testing](#testing) | [Acknowledgments](#acknowledgments) | [License](#license)
+| ![Flynn telnet session with neofetch](docs/screenshots/flynn-neofetch-crt.png) | ![Flynn running tmux with three split panes](docs/screenshots/flynn-tmux-crt.png) |
+| **Telnet Session** — neofetch over telnet with VT220 emulation | **tmux Split Panes** — box-drawing characters rendered via QuickDraw |
+| ![Flynn connect dialog](docs/screenshots/flynn-connect-crt.png) | ![Claude Code running inside Flynn](docs/screenshots/flynn-claudecode-crt.png) |
+| **Connect Dialog** — saved host, port, and username auto-login | **Claude Code via Flynn** — the AI that built Flynn, running inside it |
 
 ---
 
