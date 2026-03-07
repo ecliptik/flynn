@@ -7,7 +7,9 @@ with [Claude Code Teams](https://docs.anthropic.com/en/docs/claude-code/teams) o
 [Read the development journal](JOURNAL.md) — from first build to full VT220 terminal emulator,
 built entirely through agentic AI development.
 
-[Features](#features) | [Keyboard Shortcuts](#keyboard-shortcuts) | [Building](#building) | [Testing](#testing) | [Acknowledgments](#acknowledgments) | [License](#license)
+<p align="center">
+<a href="#features">Features</a> · <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> · <a href="#building">Building</a> · <a href="#testing">Testing</a> · <a href="#acknowledgments">Acknowledgments</a> · <a href="#license">License</a>
+</p>
 
 | | |
 |:---:|:---:|
