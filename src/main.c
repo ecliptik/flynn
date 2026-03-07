@@ -36,6 +36,30 @@ static Terminal terminal;
 static FlynnPrefs prefs;
 static RgnHandle grow_clip_rgn = 0L;
 
+/* Keystroke send buffer — batches multiple keystrokes into one TCP send */
+static char key_send_buf[256];
+static short key_send_len = 0;
+
+static void
+buffer_key_send(const char *data, short len)
+{
+	short i;
+
+	for (i = 0; i < len && key_send_len < (short)sizeof(key_send_buf); i++)
+		key_send_buf[key_send_len++] = data[i];
+}
+
+static void
+flush_key_send(void)
+{
+	if (key_send_len > 0 && conn.state == CONN_STATE_CONNECTED) {
+		conn_send(&conn, key_send_buf, key_send_len);
+		key_send_len = 0;
+	} else {
+		key_send_len = 0;
+	}
+}
+
 /* Forward declarations */
 static void init_toolbox(void);
 static void init_menus(void);
@@ -362,7 +386,7 @@ main_event_loop(void)
 						terminal.title_changed = 0;
 					}
 
-					GetPort(&save);
+						GetPort(&save);
 					SetPort(term_window);
 					term_ui_draw(term_window,
 					    &terminal);
@@ -377,7 +401,17 @@ main_event_loop(void)
 			break;
 		case keyDown:
 		case autoKey:
+			/* Drain all pending key events into buffer,
+			 * then flush once (one TCP send for N keys) */
 			handle_key_down(&event);
+			{
+				EventRecord pending;
+
+				while (GetNextEvent(keyDownMask |
+				    autoKeyMask, &pending))
+					handle_key_down(&pending);
+			}
+			flush_key_send();
 			break;
 		case mouseDown:
 			handle_mouse_down(&event);
@@ -452,7 +486,7 @@ handle_key_down(EventRecord *event)
 		/* Cmd+. sends Escape (classic Mac convention) */
 		if (key == '.' && conn.state == CONN_STATE_CONNECTED) {
 			char esc = 0x1B;
-			conn_send(&conn, &esc, 1);
+			buffer_key_send(&esc, 1);
 			return;
 		}
 
@@ -460,16 +494,16 @@ handle_key_down(EventRecord *event)
 		if (conn.state == CONN_STATE_CONNECTED &&
 		    key >= '0' && key <= '9') {
 			switch (key) {
-			case '1': conn_send(&conn, "\033OP", 3); return;
-			case '2': conn_send(&conn, "\033OQ", 3); return;
-			case '3': conn_send(&conn, "\033OR", 3); return;
-			case '4': conn_send(&conn, "\033OS", 3); return;
-			case '5': conn_send(&conn, "\033[15~", 5); return;
-			case '6': conn_send(&conn, "\033[17~", 5); return;
-			case '7': conn_send(&conn, "\033[18~", 5); return;
-			case '8': conn_send(&conn, "\033[19~", 5); return;
-			case '9': conn_send(&conn, "\033[20~", 5); return;
-			case '0': conn_send(&conn, "\033[21~", 5); return;
+			case '1': buffer_key_send("\033OP", 3); return;
+			case '2': buffer_key_send("\033OQ", 3); return;
+			case '3': buffer_key_send("\033OR", 3); return;
+			case '4': buffer_key_send("\033OS", 3); return;
+			case '5': buffer_key_send("\033[15~", 5); return;
+			case '6': buffer_key_send("\033[17~", 5); return;
+			case '7': buffer_key_send("\033[18~", 5); return;
+			case '8': buffer_key_send("\033[19~", 5); return;
+			case '9': buffer_key_send("\033[20~", 5); return;
+			case '0': buffer_key_send("\033[21~", 5); return;
 			}
 		}
 
@@ -495,21 +529,21 @@ handle_key_down(EventRecord *event)
 	/* Application keypad mode (DECKPAM): numpad sends SS3 sequences */
 	if (terminal.keypad_mode) {
 		switch (vkey) {
-		case 0x52: conn_send(&conn, "\033Op", 3); return;  /* KP 0 */
-		case 0x53: conn_send(&conn, "\033Oq", 3); return;  /* KP 1 */
-		case 0x54: conn_send(&conn, "\033Or", 3); return;  /* KP 2 */
-		case 0x55: conn_send(&conn, "\033Os", 3); return;  /* KP 3 */
-		case 0x56: conn_send(&conn, "\033Ot", 3); return;  /* KP 4 */
-		case 0x57: conn_send(&conn, "\033Ou", 3); return;  /* KP 5 */
-		case 0x58: conn_send(&conn, "\033Ov", 3); return;  /* KP 6 */
-		case 0x59: conn_send(&conn, "\033Ow", 3); return;  /* KP 7 */
-		case 0x5B: conn_send(&conn, "\033Ox", 3); return;  /* KP 8 */
-		case 0x5C: conn_send(&conn, "\033Oy", 3); return;  /* KP 9 */
-		case 0x41: conn_send(&conn, "\033On", 3); return;  /* KP . */
-		case 0x4C: conn_send(&conn, "\033OM", 3); return;  /* KP Enter */
-		case 0x45: conn_send(&conn, "\033Ok", 3); return;  /* KP + */
-		case 0x4E: conn_send(&conn, "\033Om", 3); return;  /* KP - */
-		case 0x43: conn_send(&conn, "\033Oj", 3); return;  /* KP * */
+		case 0x52: buffer_key_send("\033Op", 3); return;  /* KP 0 */
+		case 0x53: buffer_key_send("\033Oq", 3); return;  /* KP 1 */
+		case 0x54: buffer_key_send("\033Or", 3); return;  /* KP 2 */
+		case 0x55: buffer_key_send("\033Os", 3); return;  /* KP 3 */
+		case 0x56: buffer_key_send("\033Ot", 3); return;  /* KP 4 */
+		case 0x57: buffer_key_send("\033Ou", 3); return;  /* KP 5 */
+		case 0x58: buffer_key_send("\033Ov", 3); return;  /* KP 6 */
+		case 0x59: buffer_key_send("\033Ow", 3); return;  /* KP 7 */
+		case 0x5B: buffer_key_send("\033Ox", 3); return;  /* KP 8 */
+		case 0x5C: buffer_key_send("\033Oy", 3); return;  /* KP 9 */
+		case 0x41: buffer_key_send("\033On", 3); return;  /* KP . */
+		case 0x4C: buffer_key_send("\033OM", 3); return;  /* KP Enter */
+		case 0x45: buffer_key_send("\033Ok", 3); return;  /* KP + */
+		case 0x4E: buffer_key_send("\033Om", 3); return;  /* KP - */
+		case 0x43: buffer_key_send("\033Oj", 3); return;  /* KP * */
 		}
 	}
 
@@ -517,100 +551,100 @@ handle_key_down(EventRecord *event)
 	switch (vkey) {
 	case 0x7E:	/* Up arrow */
 		if (terminal.cursor_key_mode)
-			conn_send(&conn, "\033OA", 3);
+			buffer_key_send("\033OA", 3);
 		else
-			conn_send(&conn, "\033[A", 3);
+			buffer_key_send("\033[A", 3);
 		return;
 	case 0x7D:	/* Down arrow */
 		if (terminal.cursor_key_mode)
-			conn_send(&conn, "\033OB", 3);
+			buffer_key_send("\033OB", 3);
 		else
-			conn_send(&conn, "\033[B", 3);
+			buffer_key_send("\033[B", 3);
 		return;
 	case 0x7C:	/* Right arrow */
 		if (terminal.cursor_key_mode)
-			conn_send(&conn, "\033OC", 3);
+			buffer_key_send("\033OC", 3);
 		else
-			conn_send(&conn, "\033[C", 3);
+			buffer_key_send("\033[C", 3);
 		return;
 	case 0x7B:	/* Left arrow */
 		if (terminal.cursor_key_mode)
-			conn_send(&conn, "\033OD", 3);
+			buffer_key_send("\033OD", 3);
 		else
-			conn_send(&conn, "\033[D", 3);
+			buffer_key_send("\033[D", 3);
 		return;
 	case 0x73:	/* Home */
-		conn_send(&conn, "\033[H", 3);
+		buffer_key_send("\033[H", 3);
 		return;
 	case 0x77:	/* End */
-		conn_send(&conn, "\033[F", 3);
+		buffer_key_send("\033[F", 3);
 		return;
 	case 0x74:	/* Page Up */
-		conn_send(&conn, "\033[5~", 4);
+		buffer_key_send("\033[5~", 4);
 		return;
 	case 0x79:	/* Page Down */
-		conn_send(&conn, "\033[6~", 4);
+		buffer_key_send("\033[6~", 4);
 		return;
 	case 0x75:	/* Forward Delete */
-		conn_send(&conn, "\033[3~", 4);
+		buffer_key_send("\033[3~", 4);
 		return;
 	case 0x33:	/* Delete/Backspace → DEL */
 		key = 0x7F;
-		conn_send(&conn, &key, 1);
+		buffer_key_send(&key, 1);
 		return;
 	case 0x35:	/* Escape */
 		key = 0x1B;
-		conn_send(&conn, &key, 1);
+		buffer_key_send(&key, 1);
 		return;
 	case 0x24:	/* Return */
 	case 0x4C:	/* Keypad Enter */
 		key = 0x0D;
-		conn_send(&conn, &key, 1);
+		buffer_key_send(&key, 1);
 		return;
 	case 0x30:	/* Tab */
 		key = 0x09;
-		conn_send(&conn, &key, 1);
+		buffer_key_send(&key, 1);
 		return;
 	case 0x47:	/* Clear/NumLock → Escape (M0110A keypad) */
 		key = 0x1B;
-		conn_send(&conn, &key, 1);
+		buffer_key_send(&key, 1);
 		return;
 	/* Function keys F1-F12 (ADB extended keyboards) */
 	case 0x7A:	/* F1 */
-		conn_send(&conn, "\033OP", 3);
+		buffer_key_send("\033OP", 3);
 		return;
 	case 0x78:	/* F2 */
-		conn_send(&conn, "\033OQ", 3);
+		buffer_key_send("\033OQ", 3);
 		return;
 	case 0x63:	/* F3 */
-		conn_send(&conn, "\033OR", 3);
+		buffer_key_send("\033OR", 3);
 		return;
 	case 0x76:	/* F4 */
-		conn_send(&conn, "\033OS", 3);
+		buffer_key_send("\033OS", 3);
 		return;
 	case 0x60:	/* F5 */
-		conn_send(&conn, "\033[15~", 5);
+		buffer_key_send("\033[15~", 5);
 		return;
 	case 0x61:	/* F6 */
-		conn_send(&conn, "\033[17~", 5);
+		buffer_key_send("\033[17~", 5);
 		return;
 	case 0x62:	/* F7 */
-		conn_send(&conn, "\033[18~", 5);
+		buffer_key_send("\033[18~", 5);
 		return;
 	case 0x64:	/* F8 */
-		conn_send(&conn, "\033[19~", 5);
+		buffer_key_send("\033[19~", 5);
 		return;
 	case 0x65:	/* F9 */
-		conn_send(&conn, "\033[20~", 5);
+		buffer_key_send("\033[20~", 5);
 		return;
 	case 0x6D:	/* F10 */
-		conn_send(&conn, "\033[21~", 5);
+		buffer_key_send("\033[21~", 5);
 		return;
 	case 0x67:	/* F11 */
-		conn_send(&conn, "\033[23~", 5);
+		buffer_key_send("\033[23~", 5);
 		return;
 	case 0x6F:	/* F12 */
-		conn_send(&conn, "\033[24~", 5);
+		buffer_key_send("\033[24~", 5);
 		return;
 	}
 
@@ -634,13 +668,13 @@ handle_key_down(EventRecord *event)
 			case 0x1F: seq = "\033[B"; break;
 			}
 		}
-		conn_send(&conn, (char *)seq, 3);
+		buffer_key_send((char *)seq, 3);
 		return;
 	}
 
 	/* ESC character from any source (keyboard adapters, Clear key) */
 	if (key == 0x1B) {
-		conn_send(&conn, &key, 1);
+		buffer_key_send(&key, 1);
 		return;
 	}
 
@@ -659,7 +693,7 @@ handle_key_down(EventRecord *event)
 
 		if (vkey < 48 && vkey_to_base[vkey]) {
 			key = vkey_to_base[vkey] & 0x1F;
-			conn_send(&conn, &key, 1);
+			buffer_key_send(&key, 1);
 			return;
 		}
 	}
@@ -667,12 +701,12 @@ handle_key_down(EventRecord *event)
 	/* Ctrl+key with physical Control key (extended keyboards) */
 	if (event->modifiers & ControlKey) {
 		key = key & 0x1F;
-		conn_send(&conn, &key, 1);
+		buffer_key_send(&key, 1);
 		return;
 	}
 
 	/* Regular printable character */
-	conn_send(&conn, &key, 1);
+	buffer_key_send(&key, 1);
 }
 
 static void
