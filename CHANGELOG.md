@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.1] - 2026-03-06
+
+### Added
+- Custom DNS resolver using MacTCP UDP (`dns.c`/`dns.h`)
+  - Bypasses broken `dnrp` code resource (crashes on failed lookups due to
+    Retro68 calling convention mismatch)
+  - Sends A-record queries to configurable DNS server (default: 1.1.1.1)
+  - 15-second timeout per attempt, 2 retry attempts
+  - Parses DNS responses including CNAME chains
+  - Error-specific alerts: "Host not found", "DNS lookup timed out",
+    "DNS lookup failed"
+- DNS Server preference dialog (DLOG 133)
+  - Accessible from Preferences > Networking > DNS Server...
+  - User can set any IP address as their DNS server
+  - Validates IP format before saving
+  - Persisted in FlynnPrefs (dns_server field)
+- Hostname validation in Connect dialog
+  - Rejects malformed IPs (e.g., doubled addresses like "1.2.3.41.2.3.4")
+  - Validates DNS label length and character rules
+- `_UDPRcv()` and `_UDPBfrReturn()` wrappers in tcp.c
+
+### Changed
+- Version: 0.10.0 → 0.10.1
+- Preferences menu reorganized into labeled sections:
+  Fonts, Terminal Type, Networking, Misc (disabled section headers)
+- FlynnPrefs bumped to v5 (adds dns_server[16] field)
+- Connection struct gains dns_server field for per-connection DNS config
+- tcp.h converted from CR to LF line endings
+
 ## [0.10.0] - 2026-03-06
 
 ### Added
