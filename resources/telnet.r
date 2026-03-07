@@ -142,7 +142,7 @@ resource 'DITL' (130, "About Flynn") {
 
 		/* Version */
 		{33, 55, 49, 280},
-		StaticText { disabled, "Version 0.10.1" };
+		StaticText { disabled, "Version 0.11.1" };
 
 		/* Description */
 		{62, 30, 78, 270},

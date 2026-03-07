@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.1] - 2026-03-06
+
+### Changed
+- README: Added Claude Code attribution, navigation TOC, and expanded
+  Acknowledgments (Retro68, Snow emulator as individual entries)
+- About dialog version updated to 0.11.1
+- Version: 0.11.0 → 0.11.1
+
 ## [0.11.0] - 2026-03-06
 
 ### Added
