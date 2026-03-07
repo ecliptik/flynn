@@ -370,10 +370,11 @@ handle_key_down(EventRecord *event)
 
 	if (event->modifiers & cmdKey) {
 		/* Cmd+Up/Down for scrollback navigation */
-		if (vkey == 0x7E || vkey == 0x7D) {
+		if (vkey == 0x7E || vkey == 0x7D ||
+		    key == 0x1E || key == 0x1F) {
 			GrafPtr save;
 
-			if (vkey == 0x7E) {
+			if (vkey == 0x7E || key == 0x1E) {
 				if (event->modifiers & shiftKey)
 					terminal_scroll_back(&terminal,
 					    terminal.active_rows);
@@ -571,6 +572,30 @@ handle_key_down(EventRecord *event)
 		return;
 	case 0x6F:	/* F12 */
 		conn_send(&conn, "\033[24~", 5);
+		return;
+	}
+
+	/* Arrow keys by charCode — catches M0110A and keyboards where
+	 * vkey codes differ from ADB 0x7B-0x7E */
+	if (key >= 0x1C && key <= 0x1F) {
+		const char *seq;
+
+		if (terminal.cursor_key_mode) {
+			switch (key) {
+			case 0x1C: seq = "\033OD"; break; /* Left */
+			case 0x1D: seq = "\033OC"; break; /* Right */
+			case 0x1E: seq = "\033OA"; break; /* Up */
+			case 0x1F: seq = "\033OB"; break; /* Down */
+			}
+		} else {
+			switch (key) {
+			case 0x1C: seq = "\033[D"; break;
+			case 0x1D: seq = "\033[C"; break;
+			case 0x1E: seq = "\033[A"; break;
+			case 0x1F: seq = "\033[B"; break;
+			}
+		}
+		conn_send(&conn, (char *)seq, 3);
 		return;
 	}
 
