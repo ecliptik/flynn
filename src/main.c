@@ -254,7 +254,29 @@ main_event_loop(void)
 			/* Detect connection lost */
 			if (prev_state == CONN_STATE_CONNECTED &&
 			    conn.state == CONN_STATE_IDLE) {
+				GrafPtr save;
+				short i;
+
+				terminal_reset(&terminal);
+				telnet_init(&telnet);
+				telnet.preferred_ttype =
+				    prefs.terminal_type;
 				SetWTitle(term_window, "\pFlynn");
+
+				GetPort(&save);
+				SetPort(term_window);
+				if (prefs.dark_mode)
+					PaintRect(
+					    &term_window->portRect);
+				else
+					EraseRect(
+					    &term_window->portRect);
+				for (i = 0; i < terminal.active_rows;
+				    i++)
+					terminal.dirty[i] = 1;
+				term_ui_draw(term_window, &terminal);
+				SetPort(save);
+
 				update_menus();
 				ParamText("\pConnection closed by remote host",
 				    "\p", "\p", "\p");
