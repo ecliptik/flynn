@@ -84,6 +84,10 @@
 #define MAX_WIN_WIDTH       500
 #define MAX_WIN_HEIGHT      320
 
+/* Minimum window size in grid cells */
+#define MIN_WIN_COLS        20
+#define MIN_WIN_ROWS         5
+
 /* Application creator and type */
 #define APP_CREATOR         'FLYN'
 #define APP_TYPE            'APPL'
