@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-03-06
+
+### Added
+- Preferences menu (replacing Font menu, MENU 131)
+  - Terminal type selection: xterm, VT220, VT100 with checkmark
+  - Dark mode toggle for white-on-black rendering
+  - Font selection (Monaco 9/12) retained from Font menu
+- Dark/light mode rendering
+  - XOR-based inverse on monochrome display (black bg, white text)
+  - DEC Special Graphics line-drawing works in both modes
+  - Cursor blink (patXor) works identically in both modes
+- ICON resource in About dialog (32x32 mono, same as Finder icon)
+- Preferred terminal type in TTYPE negotiation
+  - User-selected type sent first, then cycles through remaining types
+- Preferences v3→v4 migration (terminal_type, dark_mode fields)
+
+### Changed
+- Version: 0.9.1 → 0.10.0
+- Font menu renamed to Preferences menu with expanded items
+- About dialog layout: taller (215px), consistent margins, icon added
+- 800K floppy image (Flynn.dsk) now includes Read Me and correct FLYN creator code
+- FlynnPrefs struct gains terminal_type and dark_mode fields
+- TelnetState gains preferred_ttype field
+- Build size: ~90KB (estimated)
+
 ## [0.9.1] - 2026-03-06
 
 ### Added

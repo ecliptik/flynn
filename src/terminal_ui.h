@@ -89,4 +89,7 @@ void  term_ui_sel_dirty_rows(Terminal *term, short old_extent_row,
 	    short new_extent_row);
 void  term_ui_sel_dirty_all(Terminal *term);
 
+/* Dark mode */
+void term_ui_set_dark_mode(short enabled);
+
 #endif /* TERMINAL_UI_H */

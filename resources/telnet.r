@@ -41,11 +41,23 @@ resource 'MENU' (130, "Edit") {
 	}
 };
 
-resource 'MENU' (131, "Font") {
-	131, textMenuProc, allEnabled, enabled, "Font",
+resource 'MENU' (131, "Preferences") {
+	131, textMenuProc, allEnabled, enabled, "Preferences",
 	{
-		"Monaco 9", noIcon, noKey, check, plain;
-		"Monaco 12", noIcon, noKey, noMark, plain
+		"Fonts", noIcon, noKey, noMark, plain;
+		"  Monaco 9", noIcon, noKey, noMark, plain;
+		"  Monaco 12", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Terminal Type", noIcon, noKey, noMark, plain;
+		"  xterm", noIcon, noKey, noMark, plain;
+		"  VT220", noIcon, noKey, noMark, plain;
+		"  VT100", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Networking", noIcon, noKey, noMark, plain;
+		"  DNS Server\311", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Misc", noIcon, noKey, noMark, plain;
+		"  Dark Mode", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -93,7 +105,7 @@ resource 'DITL' (129, "Connect") {
 
 /* About dialog */
 resource 'DLOG' (130, "About Flynn") {
-	{80, 100, 280, 400},
+	{80, 100, 295, 400},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -106,31 +118,35 @@ resource 'DLOG' (130, "About Flynn") {
 resource 'DITL' (130, "About Flynn") {
 	{
 		/* OK button */
-		{165, 115, 185, 185},
+		{175, 115, 195, 185},
 		Button { enabled, "OK" };
 
+		/* Icon */
+		{10, 15, 42, 47},
+		Icon { disabled, 128 };
+
 		/* App name */
-		{15, 60, 35, 240},
+		{10, 55, 30, 280},
 		StaticText { disabled, "Flynn" };
 
 		/* Version */
-		{40, 60, 56, 240},
-		StaticText { disabled, "Version 0.9.1" };
+		{33, 55, 49, 280},
+		StaticText { disabled, "Version 0.10.1" };
 
 		/* Description */
-		{65, 20, 81, 280},
+		{62, 30, 78, 270},
 		StaticText { disabled, "A Telnet client for classic Macintosh" };
 
 		/* Copyright */
-		{90, 40, 106, 260},
+		{84, 30, 100, 270},
 		StaticText { disabled, "\0xA9 2026 Micheal Waltz" };
 
 		/* Credits */
-		{115, 30, 131, 270},
+		{106, 30, 122, 270},
 		StaticText { disabled, "Built with Claude Code + Retro68" };
 
 		/* Website */
-		{138, 30, 154, 270},
+		{128, 30, 144, 270},
 		StaticText { disabled, "https://www.ecliptik.com" };
 	}
 };
@@ -253,9 +269,44 @@ resource 'DITL' (132, "Edit Bookmark") {
 	}
 };
 
-/* Application icon - Macintosh Plus with >_ prompt */
-data 'ICN#' (128) {
-	/* Icon bitmap (32x32) - Mac Plus, white screen, black >_ */
+/* DNS Server dialog */
+resource 'DLOG' (133, "DNS Server") {
+	{80, 100, 200, 400},
+	dBoxProc,
+	visible,
+	noGoAway,
+	0x0,
+	133,
+	"DNS Server",
+	noAutoCenter
+};
+
+resource 'DITL' (133, "DNS Server") {
+	{
+		/* OK button */
+		{85, 210, 105, 280},
+		Button { enabled, "OK" };
+
+		/* Cancel button */
+		{85, 120, 105, 190},
+		Button { enabled, "Cancel" };
+
+		/* Label */
+		{15, 15, 31, 110},
+		StaticText { disabled, "DNS Server:" };
+
+		/* IP address field */
+		{15, 115, 31, 280},
+		EditText { enabled, "1.1.1.1" };
+
+		/* Info text */
+		{50, 15, 66, 280},
+		StaticText { disabled, "Enter IP address (default: 1.1.1.1)" };
+	}
+};
+
+/* Application icon - 32x32 bitmap for About dialog */
+data 'ICON' (128) {
 	$"00000000 03FFFF00"
 	$"07FFFF80 0FFFFFC0"
 	$"0E0001C0 0C0000C0"
@@ -265,12 +316,33 @@ data 'ICN#' (128) {
 	$"0C0000C0 0C0F80C0"
 	$"0C0000C0 0E0001C0"
 	$"0FFFFFC0 0C0000C0"
-	$"0C0000C0 0C7FF0C0"
-	$"0C7FF0C0 0C0000C0"
+	$"0C0000C0 0C0000C0"
+	$"0C007EC0 0C0000C0"
 	$"0C0000C0 0FFFFFC0"
 	$"07FFFF80 03FFFF00"
-	$"00000000 01C01C00"
-	$"01C01C00 00000000"
+	$"00000000 00000000"
+	$"00000000 00000000"
+	$"00000000 00000000"
+};
+
+/* Application icon - Macintosh Plus with >_ prompt */
+data 'ICN#' (128) {
+	/* Icon bitmap (32x32) - Mac Plus, no feet, small floppy right */
+	$"00000000 03FFFF00"
+	$"07FFFF80 0FFFFFC0"
+	$"0E0001C0 0C0000C0"
+	$"0C0000C0 0C8000C0"
+	$"0CC000C0 0C6000C0"
+	$"0CC000C0 0C8000C0"
+	$"0C0000C0 0C0F80C0"
+	$"0C0000C0 0E0001C0"
+	$"0FFFFFC0 0C0000C0"
+	$"0C0000C0 0C0000C0"
+	$"0C007EC0 0C0000C0"
+	$"0C0000C0 0FFFFFC0"
+	$"07FFFF80 03FFFF00"
+	$"00000000 00000000"
+	$"00000000 00000000"
 	$"00000000 00000000"
 	/* Mask bitmap (32x32) */
 	$"00000000 03FFFF00"
@@ -286,8 +358,8 @@ data 'ICN#' (128) {
 	$"0FFFFFC0 0FFFFFC0"
 	$"0FFFFFC0 0FFFFFC0"
 	$"07FFFF80 03FFFF00"
-	$"00000000 01C01C00"
-	$"01C01C00 00000000"
+	$"00000000 00000000"
+	$"00000000 00000000"
 	$"00000000 00000000"
 };
 

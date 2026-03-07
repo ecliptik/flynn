@@ -18,6 +18,9 @@ prefs_defaults(FlynnPrefs *prefs)
 	prefs->port = 23;
 	prefs->font_id = 4;	/* Monaco */
 	prefs->font_size = 9;
+	prefs->terminal_type = 0;	/* xterm */
+	prefs->dark_mode = 0;		/* light */
+	strcpy(prefs->dns_server, "1.1.1.1");
 }
 
 void
@@ -62,6 +65,24 @@ prefs_load(FlynnPrefs *prefs)
 		/* v2→v3 migration: add font fields */
 		prefs->font_id = 4;
 		prefs->font_size = 9;
+		prefs->version = PREFS_VERSION;
+		prefs_save(prefs);
+		return;
+	}
+
+	if (prefs->version == 3) {
+		/* v3→v4 migration: add terminal_type and dark_mode */
+		prefs->terminal_type = 0;
+		prefs->dark_mode = 0;
+		strcpy(prefs->dns_server, "1.1.1.1");
+		prefs->version = PREFS_VERSION;
+		prefs_save(prefs);
+		return;
+	}
+
+	if (prefs->version == 4) {
+		/* v4→v5 migration: add dns_server */
+		strcpy(prefs->dns_server, "1.1.1.1");
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

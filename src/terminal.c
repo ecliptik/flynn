@@ -145,6 +145,51 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 			} else if (ch == 0x0F) {
 				/* SI - Shift In: activate G0 */
 				term->gl_charset = 0;
+			} else if (ch >= 0x80 && ch < 0xC0 &&
+			    term->utf8_expect > 0) {
+				/* UTF-8 continuation byte (priority over C1) */
+				term->utf8_buf[term->utf8_len++] = ch;
+				if (term->utf8_len == term->utf8_expect) {
+					long cp = utf8_decode(term->utf8_buf,
+					    term->utf8_expect);
+					term_put_unicode(term, cp);
+					term->utf8_expect = 0;
+				}
+			} else if (ch == 0x84) {
+				/* IND (8-bit C1) - same as ESC D */
+				term_newline(term);
+			} else if (ch == 0x85) {
+				/* NEL (8-bit C1) - same as ESC E */
+				term_carriage_return(term);
+				term_newline(term);
+			} else if (ch == 0x8D) {
+				/* RI (8-bit C1) - same as ESC M */
+				if (term->cur_row == term->scroll_top)
+					term_scroll_down(term,
+					    term->scroll_top,
+					    term->scroll_bottom, 1);
+				else if (term->cur_row > 0)
+					term->cur_row--;
+				term_dirty_row(term, term->cur_row);
+			} else if (ch == 0x90) {
+				/* DCS (8-bit C1) - same as ESC P */
+				term->parse_state = PARSE_DCS;
+			} else if (ch == 0x9B) {
+				/* CSI (8-bit C1) - same as ESC [ */
+				term->parse_state = PARSE_CSI;
+				term->num_params = 0;
+				term->intermediate = 0;
+				memset(term->params, 0,
+				    sizeof(term->params));
+			} else if (ch == 0x9D) {
+				/* OSC (8-bit C1) - same as ESC ] */
+				term->parse_state = PARSE_OSC;
+				term->osc_len = 0;
+				term->osc_param = 0;
+			} else if (ch == 0x9C) {
+				/* ST (8-bit C1) - string terminator */
+			} else if (ch >= 0x80 && ch <= 0x9F) {
+				/* Other C1 codes: ignore */
 			} else if (ch >= 0xC0 && term->utf8_expect == 0) {
 				/* Start of multi-byte UTF-8 sequence */
 				if (ch < 0xE0) {
@@ -158,18 +203,9 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					term->utf8_buf[0] = ch;
 					term->utf8_len = 1;
 				}
-			} else if (ch >= 0x80 && ch < 0xC0 &&
-			    term->utf8_expect > 0) {
-				/* Continuation byte */
-				term->utf8_buf[term->utf8_len++] = ch;
-				if (term->utf8_len == term->utf8_expect) {
-					long cp = utf8_decode(term->utf8_buf,
-					    term->utf8_expect);
-					term_put_unicode(term, cp);
-					term->utf8_expect = 0;
-				}
-			} else if (ch >= 0x80) {
-				/* Stray continuation or invalid: fallback */
+			} else if (ch >= 0xA0) {
+				/* Stray byte 0xA0-0xBF or 0xC0+ without
+				 * UTF-8 start: display as Mac Roman */
 				term->utf8_expect = 0;
 				term_put_char(term, '?');
 			} else if (ch >= 0x20) {
@@ -197,8 +233,8 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 			/* Consume DCS payload until ST (ESC \) */
 			if (ch == 0x1B)
 				term->parse_state = PARSE_OSC_ESC;
-			/* BEL also terminates DCS (like xterm) */
-			else if (ch == 0x07)
+			/* BEL or 8-bit ST terminates DCS */
+			else if (ch == 0x07 || ch == 0x9C)
 				term->parse_state = PARSE_NORMAL;
 			break;
 		}
@@ -1299,8 +1335,8 @@ term_process_osc(Terminal *term, unsigned char ch)
 	}
 
 	/* PARSE_OSC state */
-	if (ch == 0x07) {
-		/* BEL terminates OSC */
+	if (ch == 0x07 || ch == 0x9C) {
+		/* BEL or 8-bit ST terminates OSC */
 		term_finish_osc(term);
 		term->parse_state = PARSE_NORMAL;
 		return;

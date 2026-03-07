@@ -27,7 +27,7 @@
 #include "settings.h"
 
 /* Globals */
-static MenuHandle apple_menu, file_menu, edit_menu, font_menu;
+static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu;
 static WindowPtr term_window;
 static Boolean running = true;
 static Connection conn;
@@ -40,7 +40,7 @@ static void init_toolbox(void);
 static void init_menus(void);
 static void init_window(void);
 static void update_menus(void);
-static void update_font_menu(void);
+static void update_prefs_menu(void);
 static void rebuild_bookmark_menu(void);
 static void main_event_loop(void);
 static Boolean handle_menu(long menu_id);
@@ -56,6 +56,7 @@ static void do_bookmarks(void);
 static void do_font_change(short font_id, short font_size);
 static void do_copy(void);
 static void do_paste(void);
+static void do_dns_server_dialog(void);
 static short pixel_to_row(short v);
 static short pixel_to_col(short h);
 static void handle_content_click(EventRecord *event);
@@ -72,6 +73,9 @@ main(void)
 	telnet_init(&telnet);
 	terminal_init(&terminal);
 	prefs_load(&prefs);
+	telnet.preferred_ttype = prefs.terminal_type;
+	term_ui_set_dark_mode(prefs.dark_mode);
+	conn.dns_server = ip2long(prefs.dns_server);
 
 	init_window();
 
@@ -96,7 +100,7 @@ main(void)
 
 	rebuild_bookmark_menu();
 	update_menus();
-	update_font_menu();
+	update_prefs_menu();
 
 	main_event_loop();
 	return 0;
@@ -136,7 +140,15 @@ init_menus(void)
 
 	file_menu = GetMenuHandle(FILE_MENU_ID);
 	edit_menu = GetMenuHandle(EDIT_MENU_ID);
-	font_menu = GetMenuHandle(FONT_MENU_ID);
+	prefs_menu = GetMenuHandle(PREFS_MENU_ID);
+
+	/* Disable section header items */
+	if (prefs_menu) {
+		DisableItem(prefs_menu, PREFS_FONTS_HDR);
+		DisableItem(prefs_menu, PREFS_TTYPE_HDR);
+		DisableItem(prefs_menu, PREFS_NET_HDR);
+		DisableItem(prefs_menu, PREFS_MISC_HDR);
+	}
 
 	DrawMenuBar();
 }
@@ -648,7 +660,10 @@ handle_update(EventRecord *event)
 	SetPort(win);
 	BeginUpdate(win);
 
-	EraseRect(&win->portRect);
+	if (prefs.dark_mode)
+		PaintRect(&win->portRect);
+	else
+		EraseRect(&win->portRect);
 
 	if (conn.state == CONN_STATE_CONNECTED) {
 		char title[80];
@@ -671,6 +686,14 @@ handle_update(EventRecord *event)
 		term_ui_draw(term_window, &terminal);
 	} else {
 		SetWTitle(term_window, "\pFlynn");
+		/* In dark mode, still need to invert rows */
+		if (prefs.dark_mode) {
+			short i;
+
+			for (i = 0; i < terminal.active_rows; i++)
+				terminal.dirty[i] = 1;
+			term_ui_draw(term_window, &terminal);
+		}
 	}
 
 	EndUpdate(win);
@@ -746,13 +769,49 @@ handle_menu(long menu_id)
 			}
 		}
 		break;
-	case FONT_MENU_ID:
+	case PREFS_MENU_ID:
 		switch (item) {
-		case FONT_MENU_9_ID:
+		case PREFS_FONT9_ID:
 			do_font_change(4, 9);
 			break;
-		case FONT_MENU_12_ID:
+		case PREFS_FONT12_ID:
 			do_font_change(4, 12);
+			break;
+		case PREFS_XTERM_ID:
+		case PREFS_VT220_ID:
+		case PREFS_VT100_ID:
+			prefs.terminal_type = item - PREFS_XTERM_ID;
+			telnet.preferred_ttype = prefs.terminal_type;
+			prefs_save(&prefs);
+			update_prefs_menu();
+			if (conn.state == CONN_STATE_CONNECTED) {
+				ParamText(
+				    "\pTerminal type change takes "
+				    "effect on next connection.",
+				    "\p", "\p", "\p");
+				Alert(128, 0L);
+			}
+			break;
+		case PREFS_DARK_ID:
+			prefs.dark_mode = !prefs.dark_mode;
+			term_ui_set_dark_mode(prefs.dark_mode);
+			prefs_save(&prefs);
+			update_prefs_menu();
+			{
+				GrafPtr save;
+				short i;
+
+				GetPort(&save);
+				SetPort(term_window);
+				for (i = 0; i < terminal.active_rows;
+				    i++)
+					terminal.dirty[i] = 1;
+				InvalRect(&term_window->portRect);
+				SetPort(save);
+			}
+			break;
+		case PREFS_DNS_ID:
+			do_dns_server_dialog();
 			break;
 		}
 		break;
@@ -790,6 +849,7 @@ do_connect(void)
 
 	if (conn_open_dialog(&conn)) {
 		telnet_init(&telnet);
+		telnet.preferred_ttype = prefs.terminal_type;
 		terminal_reset(&terminal);
 
 		/* Save last-used host/port */
@@ -813,6 +873,7 @@ do_connect_bookmark(short index)
 	bm = &prefs.bookmarks[index];
 	if (conn_connect(&conn, bm->host, bm->port)) {
 		telnet_init(&telnet);
+		telnet.preferred_ttype = prefs.terminal_type;
 		terminal_reset(&terminal);
 
 		strcpy(prefs.host, conn.host);
@@ -1101,6 +1162,7 @@ do_disconnect(void)
 	conn_close(&conn);
 	terminal_reset(&terminal);
 	telnet_init(&telnet);
+	telnet.preferred_ttype = prefs.terminal_type;
 	SetWTitle(term_window, "\pFlynn");
 
 	{
@@ -1109,7 +1171,10 @@ do_disconnect(void)
 
 		GetPort(&save);
 		SetPort(term_window);
-		EraseRect(&term_window->portRect);
+		if (prefs.dark_mode)
+			PaintRect(&term_window->portRect);
+		else
+			EraseRect(&term_window->portRect);
 		for (i = 0; i < terminal.active_rows; i++)
 			terminal.dirty[i] = 1;
 		term_ui_draw(term_window, &terminal);
@@ -1156,7 +1221,10 @@ do_font_change(short font_id, short font_size)
 	/* Clear and redraw */
 	GetPort(&save);
 	SetPort(term_window);
-	EraseRect(&term_window->portRect);
+	if (prefs.dark_mode)
+		PaintRect(&term_window->portRect);
+	else
+		EraseRect(&term_window->portRect);
 	for (i = 0; i < new_rows; i++)
 		terminal.dirty[i] = 1;
 	term_ui_draw(term_window, &terminal);
@@ -1180,18 +1248,92 @@ do_font_change(short font_id, short font_size)
 	prefs.font_size = font_size;
 	prefs_save(&prefs);
 
-	update_font_menu();
+	update_prefs_menu();
 }
 
 static void
-update_font_menu(void)
+update_prefs_menu(void)
 {
-	if (!font_menu)
+	if (!prefs_menu)
 		return;
-	CheckItem(font_menu, FONT_MENU_9_ID,
+	CheckItem(prefs_menu, PREFS_FONT9_ID,
 	    prefs.font_size == 9);
-	CheckItem(font_menu, FONT_MENU_12_ID,
+	CheckItem(prefs_menu, PREFS_FONT12_ID,
 	    prefs.font_size == 12);
+	CheckItem(prefs_menu, PREFS_XTERM_ID,
+	    prefs.terminal_type == 0);
+	CheckItem(prefs_menu, PREFS_VT220_ID,
+	    prefs.terminal_type == 1);
+	CheckItem(prefs_menu, PREFS_VT100_ID,
+	    prefs.terminal_type == 2);
+	CheckItem(prefs_menu, PREFS_DARK_ID,
+	    prefs.dark_mode != 0);
+}
+
+static void
+do_dns_server_dialog(void)
+{
+	DialogPtr dlg;
+	short item_hit;
+	Handle item_h;
+	short item_type;
+	Rect item_rect;
+	Str255 ip_str;
+	char ip_cstr[16];
+	short i, len;
+	unsigned long ip;
+
+	dlg = GetNewDialog(DLOG_DNS_ID, 0L, (WindowPtr)-1L);
+	if (!dlg) {
+		SysBeep(10);
+		return;
+	}
+
+	/* Pre-fill with current DNS server */
+	GetDialogItem(dlg, 4, &item_type, &item_h, &item_rect);
+	len = strlen(prefs.dns_server);
+	ip_str[0] = len;
+	for (i = 0; i < len; i++)
+		ip_str[i + 1] = prefs.dns_server[i];
+	SetDialogItemText(item_h, ip_str);
+
+	ShowWindow(dlg);
+
+	for (;;) {
+		ModalDialog(0L, &item_hit);
+
+		if (item_hit == 2) {  /* Cancel */
+			DisposeDialog(dlg);
+			return;
+		}
+		if (item_hit == 1)  /* OK */
+			break;
+	}
+
+	/* Extract and validate IP */
+	GetDialogItem(dlg, 4, &item_type, &item_h, &item_rect);
+	GetDialogItemText(item_h, ip_str);
+	DisposeDialog(dlg);
+
+	len = ip_str[0];
+	if (len == 0 || len > 15)
+		return;
+	for (i = 0; i < len; i++)
+		ip_cstr[i] = ip_str[i + 1];
+	ip_cstr[len] = '\0';
+
+	ip = ip2long(ip_cstr);
+	if (ip == 0) {
+		ParamText("\pInvalid DNS server IP address",
+		    "\p", "\p", "\p");
+		Alert(128, 0L);
+		return;
+	}
+
+	strncpy(prefs.dns_server, ip_cstr, sizeof(prefs.dns_server) - 1);
+	prefs.dns_server[sizeof(prefs.dns_server) - 1] = '\0';
+	conn.dns_server = ip;
+	prefs_save(&prefs);
 }
 
 static void

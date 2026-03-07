@@ -44,6 +44,7 @@ short			g_cell_height = CELL_HEIGHT;
 static short		g_cell_baseline = CELL_HEIGHT - 2;
 static short		g_font_id = 4;
 static short		g_font_size = 9;
+static short		g_dark_mode = 0;
 
 /* Row pixel helpers */
 static short row_top(short row)    { return TOP_MARGIN + row * g_cell_height; }
@@ -115,6 +116,15 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 }
 
 /*
+ * term_ui_set_dark_mode - enable/disable dark mode rendering
+ */
+void
+term_ui_set_dark_mode(short enabled)
+{
+	g_dark_mode = enabled;
+}
+
+/*
  * term_ui_draw - render terminal contents, only dirty rows
  *
  * Called from BeginUpdate/EndUpdate in the update handler.
@@ -141,6 +151,10 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		EraseRect(&r);
 
 		draw_row(term, row);
+
+		/* Dark mode: invert the rendered row (XOR all pixels) */
+		if (g_dark_mode)
+			InvertRect(&r);
 	}
 
 	terminal_clear_dirty(term);
@@ -429,7 +443,7 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 			char c = ch;
 			short bl = y + g_cell_baseline;
 
-			if (attr & ATTR_INVERSE)
+				if (attr & ATTR_INVERSE)
 				TextMode(srcBic);
 			MoveTo(x, bl);
 			DrawText(&c, 0, 1);

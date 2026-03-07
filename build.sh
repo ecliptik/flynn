@@ -38,6 +38,18 @@ if [ -f "$README_SRC" ]; then
     echo "  Read Me: $README_OUT"
 fi
 
+# Post-process 800K floppy image: set creator code and add Read Me
+if [ -f "$BUILD_DIR/Flynn.dsk" ]; then
+    hmount "$BUILD_DIR/Flynn.dsk"
+    hattrib -t APPL -c FLYN :Flynn
+    if [ -f "$README_OUT" ]; then
+        hcopy -r "$README_OUT" ":Flynn Read Me"
+        hattrib -t TEXT -c ttxt ":Flynn Read Me"
+    fi
+    humount
+    echo "  800K floppy: Flynn.dsk (creator code set, Read Me included)"
+fi
+
 echo ""
 echo "To deploy to HFS image:"
 echo "  hmount diskimages/snow-sys608.img"

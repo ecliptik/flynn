@@ -54,6 +54,7 @@ typedef struct {
 	short		cols;			/* terminal columns */
 	short		rows;			/* terminal rows */
 	short		ttype_count;		/* TTYPE responses sent */
+	short		preferred_ttype;	/* user's preferred TTYPE index */
 } TelnetState;
 
 /* Initialize telnet state, zeroing everything */

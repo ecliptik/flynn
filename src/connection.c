@@ -17,6 +17,7 @@
 
 #include "MacTCP.h"
 #include "tcp.h"
+#include "dns.h"
 #include "connection.h"
 
 OSErr
@@ -108,6 +109,54 @@ conn_open_dialog(Connection *conn)
 	return conn_connect(conn, conn->host, conn->port);
 }
 
+static Boolean
+conn_validate_host(const char *host)
+{
+	short len, i, label_len;
+	char c;
+	Boolean has_alpha = false;
+
+	len = strlen(host);
+
+	/* Empty or too long (DNS max 253) */
+	if (len == 0 || len > 253)
+		return false;
+
+	/* Validate each character and label length */
+	label_len = 0;
+	for (i = 0; i < len; i++) {
+		c = host[i];
+		if (c == '.') {
+			if (label_len == 0)
+				return false;  /* empty label (.foo, foo..bar) */
+			label_len = 0;
+		} else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+			has_alpha = true;
+			label_len++;
+			if (label_len > 63)
+				return false;  /* label too long */
+		} else if ((c >= '0' && c <= '9') || c == '-') {
+			label_len++;
+			if (label_len > 63)
+				return false;  /* label too long */
+		} else {
+			return false;  /* invalid character */
+		}
+	}
+
+	/* Must have at least one character in last label */
+	if (label_len == 0)
+		return false;
+
+	/* If no letters (looks like an IP), validate as dotted quad */
+	if (!has_alpha) {
+		if (ip2long((char *)host) == 0)
+			return false;
+	}
+
+	return true;
+}
+
 Boolean
 conn_connect(Connection *conn, const char *host, short port)
 {
@@ -126,6 +175,13 @@ conn_connect(Connection *conn, const char *host, short port)
 	}
 	conn->port = port;
 
+	/* Validate hostname before attempting resolution */
+	if (!conn_validate_host(conn->host)) {
+		ParamText("\pInvalid hostname or IP address", "\p", "\p", "\p");
+		Alert(128, 0L);
+		return false;
+	}
+
 	/* Resolve hostname */
 	conn->state = CONN_STATE_RESOLVING;
 
@@ -134,11 +190,27 @@ conn_connect(Connection *conn, const char *host, short port)
 	if (ip != 0) {
 		conn->remote_ip = ip;
 	} else {
-		/* DNS lookup */
-		err = DNSResolveName(conn->host, &conn->remote_ip, 0L);
-		if (err != noErr) {
+		/* DNS lookup via UDP */
+		short dns_err = dns_resolve(conn->host, &ip,
+		    conn->dns_server);
+		switch (dns_err) {
+		case DNS_OK:
+			conn->remote_ip = ip;
+			break;
+		case DNS_ERR_NXDOMAIN:
 			conn->state = CONN_STATE_IDLE;
-			ParamText("\pCould not resolve hostname", "\p", "\p", "\p");
+			ParamText("\pHost not found", "\p", "\p", "\p");
+			Alert(128, 0L);
+			return false;
+		case DNS_ERR_TIMEOUT:
+			conn->state = CONN_STATE_IDLE;
+			ParamText("\pDNS lookup timed out",
+			    "\p", "\p", "\p");
+			Alert(128, 0L);
+			return false;
+		default:
+			conn->state = CONN_STATE_IDLE;
+			ParamText("\pDNS lookup failed", "\p", "\p", "\p");
 			Alert(128, 0L);
 			return false;
 		}

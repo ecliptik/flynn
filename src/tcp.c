@@ -487,6 +487,42 @@ _UDPSend(UDPiopb *pb, StreamPtr stream, wdsEntry *wdsPtr, ip_addr remoteIP,
 }
 
 OSErr
+_UDPRcv(UDPiopb *pb, StreamPtr stream, unsigned short timeout,
+  Ptr userData, UDPIOCompletionProc ioCompletion, Boolean async)
+{
+	memset(pb, 0, sizeof(*pb));
+
+	pb->csCode = UDPRead;
+	pb->ioCompletion = ioCompletion;
+	pb->ioCRefNum = gIPPDriverRefNum;
+	pb->udpStream = stream;
+	pb->ioResult = 1;
+
+	pb->csParam.receive.timeOut = timeout;
+	pb->csParam.receive.userDataPtr = userData;
+
+	return PBControl((ParmBlkPtr)pb, async);
+}
+
+OSErr
+_UDPBfrReturn(UDPiopb *pb, StreamPtr stream, Ptr rcvBuff,
+  Ptr userData, UDPIOCompletionProc ioCompletion, Boolean async)
+{
+	memset(pb, 0, sizeof(*pb));
+
+	pb->csCode = UDPBfrReturn;
+	pb->ioCompletion = ioCompletion;
+	pb->ioCRefNum = gIPPDriverRefNum;
+	pb->udpStream = stream;
+	pb->ioResult = 1;
+
+	pb->csParam.receive.rcvBuff = rcvBuff;
+	pb->csParam.receive.userDataPtr = userData;
+
+	return PBControl((ParmBlkPtr)pb, async);
+}
+
+OSErr
 _UDPRelease(UDPiopb *pb, StreamPtr stream, Ptr userData,
   UDPIOCompletionProc ioCompletion, Boolean async)
 {

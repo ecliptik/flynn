@@ -13,7 +13,7 @@
 #define APPLE_MENU_ID       128
 #define FILE_MENU_ID        129
 #define EDIT_MENU_ID        130
-#define FONT_MENU_ID        131
+#define PREFS_MENU_ID       131
 
 /* Apple menu items */
 #define APPLE_MENU_ABOUT_ID 1
@@ -35,14 +35,27 @@
 #define EDIT_MENU_PASTE_ID  5
 #define EDIT_MENU_CLEAR_ID  6
 
-/* Font menu items */
-#define FONT_MENU_9_ID      1
-#define FONT_MENU_12_ID     2
+/* Preferences menu items — organized by section */
+#define PREFS_FONTS_HDR      1   /* disabled section header */
+#define PREFS_FONT9_ID       2
+#define PREFS_FONT12_ID      3
+/* separator = 4 */
+#define PREFS_TTYPE_HDR      5   /* disabled section header */
+#define PREFS_XTERM_ID       6
+#define PREFS_VT220_ID       7
+#define PREFS_VT100_ID       8
+/* separator = 9 */
+#define PREFS_NET_HDR       10   /* disabled section header */
+#define PREFS_DNS_ID        11
+/* separator = 12 */
+#define PREFS_MISC_HDR      13   /* disabled section header */
+#define PREFS_DARK_ID       14
 
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130
 #define DLOG_BOOKMARKS_ID   131
 #define DLOG_BM_EDIT_ID     132
+#define DLOG_DNS_ID         133
 
 /* Bookmark manager dialog items */
 #define BM_DONE             1

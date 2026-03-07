@@ -46,6 +46,7 @@ typedef struct {
 	short       read_len;
 	char        host[256];
 	short       port;
+	ip_addr     dns_server;	/* DNS server to use for lookups */
 } Connection;
 
 /* Initialize connection subsystem (call once at startup) */

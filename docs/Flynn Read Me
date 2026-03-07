@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 0.9.1
+                   Version 0.10.0
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -77,10 +77,11 @@ Features
   - 96-line scrollback buffer
   - Mouse text selection with copy and paste
   - Session bookmarks for one-click connections
-  - Font selection (Monaco 9pt or Monaco 12pt)
+  - Preferences menu: font size, terminal type,
+    dark mode
   - Application cursor keys and keypad mode
   - Bracketed paste mode
-  - Settings saved across launches
+  - All preferences saved across launches
 
 
 Keyboard Shortcuts
@@ -178,21 +179,35 @@ Bookmarks and all preferences are saved to a file
 called "Flynn Prefs" in the System Folder.
 
 
-Font Selection
---------------
+Preferences
+-----------
 
-Flynn supports two font sizes:
+The Preferences menu contains settings for font size,
+terminal type, and display mode.
 
+  Font Size
+  ~~~~~~~~~
   Monaco 9pt   80 columns x 24 rows (default)
   Monaco 12pt  Larger text, fewer columns/rows
 
-To change the font, choose "Monaco 9" or
-"Monaco 12" from the Font menu. The terminal
-grid is automatically recomputed, and if you are
-connected, the server is notified of the new
-window size.
+  The terminal grid is automatically recomputed when
+  you change font size, and the server is notified of
+  the new window size if connected.
 
-Your font preference is saved across launches.
+  Terminal Type
+  ~~~~~~~~~~~~~
+  Choose the terminal type reported to the server:
+  xterm (default), VT220, or VT100. This controls
+  which escape sequences the server sends. Changes
+  take effect on the next connection.
+
+  Dark Mode
+  ~~~~~~~~~
+  Toggle between light mode (black text on white) and
+  dark mode (white text on black). Box-drawing
+  characters and cursor blink work in both modes.
+
+All preferences are saved across launches.
 
 
 Troubleshooting

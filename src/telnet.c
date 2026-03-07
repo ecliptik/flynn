@@ -293,14 +293,19 @@ handle_sb(TelnetState *ts, unsigned char *send, short *sendlen)
 		if (ts->sb_buf[1] == SB_SEND) {
 			const char *ttype;
 
-			/* Cycle: XTERM → VT220 → VT100 */
-			if (ts->ttype_count == 0)
-				ttype = "xterm";
-			else if (ts->ttype_count == 1)
-				ttype = "VT220";
-			else
-				ttype = "VT100";
-			ts->ttype_count++;
+			{
+				static const char *ttype_names[] = {
+					"xterm", "VT220", "VT100"
+				};
+				short idx;
+
+				idx = ts->preferred_ttype +
+				    ts->ttype_count;
+				if (idx > 2)
+					idx = 2;
+				ttype = ttype_names[idx];
+				ts->ttype_count++;
+			}
 
 			buf[0] = IAC;
 			buf[1] = SB;
