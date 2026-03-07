@@ -30,24 +30,24 @@ echo ""
 echo "Build complete. Output:"
 ls -la "$BUILD_DIR"/Flynn.* 2>/dev/null || echo "  (no output files found)"
 
-# Convert Read Me line endings to Mac CR format
-README_SRC="$SCRIPT_DIR/docs/Flynn Read Me"
-README_OUT="$BUILD_DIR/Flynn Read Me"
-if [ -f "$README_SRC" ]; then
-    tr '\n' '\r' < "$README_SRC" > "$README_OUT"
-    echo "  Read Me: $README_OUT"
+# Convert About Flynn line endings to Mac CR format
+ABOUT_SRC="$SCRIPT_DIR/docs/About Flynn"
+ABOUT_OUT="$BUILD_DIR/About Flynn"
+if [ -f "$ABOUT_SRC" ]; then
+    tr '\n' '\r' < "$ABOUT_SRC" > "$ABOUT_OUT"
+    echo "  About Flynn: $ABOUT_OUT"
 fi
 
-# Post-process 800K floppy image: set creator code and add Read Me
+# Post-process 800K floppy image: set creator code and add About Flynn
 if [ -f "$BUILD_DIR/Flynn.dsk" ]; then
     hmount "$BUILD_DIR/Flynn.dsk"
     hattrib -t APPL -c FLYN :Flynn
-    if [ -f "$README_OUT" ]; then
-        hcopy -r "$README_OUT" ":Flynn Read Me"
-        hattrib -t TEXT -c ttxt ":Flynn Read Me"
+    if [ -f "$ABOUT_OUT" ]; then
+        hcopy -r "$ABOUT_OUT" ":About Flynn"
+        hattrib -t ttro -c ttxt ":About Flynn"
     fi
     humount
-    echo "  800K floppy: Flynn.dsk (creator code set, Read Me included)"
+    echo "  800K floppy: Flynn.dsk (creator code set, About Flynn included)"
 fi
 
 echo ""
@@ -56,6 +56,6 @@ echo "  hmount diskimages/snow-sys608.img"
 echo "  hmkdir :Flynn"
 echo "  hcopy -m build/Flynn.bin ':Flynn:Flynn'"
 echo "  hattrib -t APPL -c FLYN ':Flynn:Flynn'"
-echo "  hcopy -r 'build/Flynn Read Me' ':Flynn:Flynn Read Me'"
-echo "  hattrib -t TEXT -c ttxt ':Flynn:Flynn Read Me'"
+echo "  hcopy -r 'build/About Flynn' ':Flynn:About Flynn'"
+echo "  hattrib -t ttro -c ttxt ':Flynn:About Flynn'"
 echo "  humount"
