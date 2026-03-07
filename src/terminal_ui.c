@@ -45,6 +45,7 @@ static short		g_cell_baseline = CELL_HEIGHT - 2;
 static short		g_font_id = 4;
 static short		g_font_size = 9;
 static short		g_dark_mode = 0;
+static short		g_font_proportional = 0;
 
 /* Row pixel helpers */
 static short row_top(short row)    { return TOP_MARGIN + row * g_cell_height; }
@@ -108,6 +109,10 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 	g_cell_baseline = fi.ascent + fi.leading;
 	g_font_id = font_id;
 	g_font_size = font_size;
+
+	/* Detect proportional fonts: if 'i' is narrower than widMax,
+	 * the font is proportional and needs per-character drawing */
+	g_font_proportional = (CharWidth('i') != fi.widMax);
 
 	TextFace(0);
 	TextMode(srcOr);
@@ -261,13 +266,31 @@ draw_row(Terminal *term, short row)
 
 			/* Draw text in white (srcBic: clears bits where text is) */
 			TextMode(srcBic);
-			MoveTo(col_left(run_start), baseline);
-			DrawText(buf, 0, run_len);
+			if (g_font_proportional) {
+				short i;
+				for (i = 0; i < run_len; i++) {
+					MoveTo(col_left(run_start + i),
+					    baseline);
+					DrawChar(buf[i]);
+				}
+			} else {
+				MoveTo(col_left(run_start), baseline);
+				DrawText(buf, 0, run_len);
+			}
 			TextMode(srcOr);
 		} else {
 			/* Normal or bold/underline text */
-			MoveTo(col_left(run_start), baseline);
-			DrawText(buf, 0, run_len);
+			if (g_font_proportional) {
+				short i;
+				for (i = 0; i < run_len; i++) {
+					MoveTo(col_left(run_start + i),
+					    baseline);
+					DrawChar(buf[i]);
+				}
+			} else {
+				MoveTo(col_left(run_start), baseline);
+				DrawText(buf, 0, run_len);
+			}
 		}
 	}
 
