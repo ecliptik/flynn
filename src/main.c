@@ -54,6 +54,7 @@ static void do_connect_bookmark(short index);
 static void do_disconnect(void);
 static void do_bookmarks(void);
 static void do_font_change(short font_id, short font_size);
+static void do_window_resize(short width, short height);
 static void do_copy(void);
 static void do_paste(void);
 static void do_dns_server_dialog(void);
@@ -640,6 +641,23 @@ handle_mouse_down(EventRecord *event)
 			running = false;
 		}
 		break;
+	case inGrow: {
+		long new_size;
+		Rect limit_rect;
+		short min_w, min_h, max_w, max_h;
+
+		min_w = LEFT_MARGIN * 2 + MIN_WIN_COLS * g_cell_width;
+		min_h = TOP_MARGIN * 2 + MIN_WIN_ROWS * g_cell_height;
+		max_w = qd.screenBits.bounds.right - 10;
+		max_h = qd.screenBits.bounds.bottom - 10;
+
+		SetRect(&limit_rect, min_w, min_h, max_w, max_h);
+		new_size = GrowWindow(win, event->where, &limit_rect);
+		if (new_size != 0)
+			do_window_resize(LoWord(new_size),
+			    HiWord(new_size));
+		break;
+	}
 	case inContent:
 		if (win != FrontWindow())
 			SelectWindow(win);
@@ -694,6 +712,23 @@ handle_update(EventRecord *event)
 				terminal.dirty[i] = 1;
 			term_ui_draw(term_window, &terminal);
 		}
+	}
+
+	/* Draw grow icon (clipped to avoid scroll bar track lines) */
+	{
+		Rect clip_r;
+		RgnHandle old_clip = NewRgn();
+
+		GetClip(old_clip);
+		SetRect(&clip_r,
+		    win->portRect.right - 15,
+		    win->portRect.bottom - 15,
+		    win->portRect.right,
+		    win->portRect.bottom);
+		ClipRect(&clip_r);
+		DrawGrowIcon(win);
+		SetClip(old_clip);
+		DisposeRgn(old_clip);
 	}
 
 	EndUpdate(win);
@@ -1187,22 +1222,51 @@ do_disconnect(void)
 static void
 do_font_change(short font_id, short font_size)
 {
-	short new_cols, new_rows;
-	GrafPtr save;
-	short i;
+	short win_w, win_h;
 
 	if (font_id == prefs.font_id && font_size == prefs.font_size)
 		return;
 
 	term_ui_set_font(term_window, font_id, font_size);
 
-	/* Compute new grid */
-	new_cols = (MAX_WIN_WIDTH - LEFT_MARGIN * 2) / g_cell_width;
-	new_rows = (MAX_WIN_HEIGHT - TOP_MARGIN * 2) / g_cell_height;
+	/* Compute window size for default grid */
+	win_w = LEFT_MARGIN * 2 + TERM_DEFAULT_COLS * g_cell_width;
+	win_h = TOP_MARGIN * 2 + TERM_DEFAULT_ROWS * g_cell_height;
+	if (win_w > MAX_WIN_WIDTH)
+		win_w = MAX_WIN_WIDTH;
+	if (win_h > MAX_WIN_HEIGHT)
+		win_h = MAX_WIN_HEIGHT;
+
+	do_window_resize(win_w, win_h);
+
+	/* Save preference */
+	prefs.font_id = font_id;
+	prefs.font_size = font_size;
+	prefs_save(&prefs);
+
+	update_prefs_menu();
+}
+
+static void
+do_window_resize(short width, short height)
+{
+	short new_cols, new_rows;
+	GrafPtr save;
+	short i;
+
+	/* Compute grid from pixel dimensions */
+	new_cols = (width - LEFT_MARGIN * 2) / g_cell_width;
+	new_rows = (height - TOP_MARGIN * 2) / g_cell_height;
+
+	/* Clamp to buffer limits */
 	if (new_cols > TERM_COLS)
 		new_cols = TERM_COLS;
+	if (new_cols < MIN_WIN_COLS)
+		new_cols = MIN_WIN_COLS;
 	if (new_rows > TERM_ROWS)
 		new_rows = TERM_ROWS;
+	if (new_rows < MIN_WIN_ROWS)
+		new_rows = MIN_WIN_ROWS;
 
 	terminal.active_cols = new_cols;
 	terminal.active_rows = new_rows;
@@ -1213,7 +1277,7 @@ do_font_change(short font_id, short font_size)
 	if (terminal.cur_row >= new_rows)
 		terminal.cur_row = new_rows - 1;
 
-	/* Resize window */
+	/* Snap window to grid boundaries */
 	SizeWindow(term_window,
 	    LEFT_MARGIN * 2 + new_cols * g_cell_width,
 	    TOP_MARGIN * 2 + new_rows * g_cell_height, true);
@@ -1242,13 +1306,6 @@ do_font_change(short font_id, short font_size)
 		if (naws_len > 0)
 			conn_send(&conn, (char *)naws_buf, naws_len);
 	}
-
-	/* Save preference */
-	prefs.font_id = font_id;
-	prefs.font_size = font_size;
-	prefs_save(&prefs);
-
-	update_prefs_menu();
 }
 
 static void

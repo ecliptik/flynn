@@ -61,11 +61,11 @@ terminal_init(Terminal *term)
 
 	memset(term, 0, sizeof(Terminal));
 
-	/* Restore active dimensions (default to max if not set) */
+	/* Restore active dimensions (default if not set) */
 	term->active_cols = (saved_cols > 0 && saved_cols <= TERM_COLS) ?
-	    saved_cols : TERM_COLS;
+	    saved_cols : TERM_DEFAULT_COLS;
 	term->active_rows = (saved_rows > 0 && saved_rows <= TERM_ROWS) ?
-	    saved_rows : TERM_ROWS;
+	    saved_rows : TERM_DEFAULT_ROWS;
 
 	term->scroll_top = 0;
 	term->scroll_bottom = term->active_rows - 1;

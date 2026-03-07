@@ -19,12 +19,16 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
-/* Screen dimensions */
-#define TERM_COLS		80
-#define TERM_ROWS		24
+/* Maximum screen dimensions (buffer size) */
+#define TERM_COLS		132
+#define TERM_ROWS		50
 
-/* Scrollback: 4 pages worth of lines */
-#define TERM_SCROLLBACK_LINES	(TERM_ROWS * 4)
+/* Default active dimensions */
+#define TERM_DEFAULT_COLS	80
+#define TERM_DEFAULT_ROWS	24
+
+/* Scrollback: 4 pages of default rows */
+#define TERM_SCROLLBACK_LINES	(TERM_DEFAULT_ROWS * 4)
 
 /* Maximum CSI parameters per sequence */
 #define TERM_MAX_PARAMS		8
