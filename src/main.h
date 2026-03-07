@@ -37,19 +37,23 @@
 
 /* Preferences menu items — organized by section */
 #define PREFS_FONTS_HDR      1   /* disabled section header */
-#define PREFS_FONT9_ID       2
-#define PREFS_FONT12_ID      3
-/* separator = 4 */
-#define PREFS_TTYPE_HDR      5   /* disabled section header */
-#define PREFS_XTERM_ID       6
-#define PREFS_VT220_ID       7
-#define PREFS_VT100_ID       8
-/* separator = 9 */
-#define PREFS_NET_HDR       10   /* disabled section header */
-#define PREFS_DNS_ID        11
-/* separator = 12 */
-#define PREFS_MISC_HDR      13   /* disabled section header */
-#define PREFS_DARK_ID       14
+#define PREFS_FONT9_ID       2   /* Monaco 9 */
+#define PREFS_FONT12_ID      3   /* Monaco 12 */
+#define PREFS_FONT_C10       4   /* Courier 10 */
+#define PREFS_FONT_CH12      5   /* Chicago 12 */
+#define PREFS_FONT_G9        6   /* Geneva 9 */
+#define PREFS_FONT_G10       7   /* Geneva 10 */
+/* separator = 8 */
+#define PREFS_TTYPE_HDR      9   /* disabled section header */
+#define PREFS_XTERM_ID      10
+#define PREFS_VT220_ID      11
+#define PREFS_VT100_ID      12
+/* separator = 13 */
+#define PREFS_NET_HDR       14   /* disabled section header */
+#define PREFS_DNS_ID        15
+/* separator = 16 */
+#define PREFS_MISC_HDR      17   /* disabled section header */
+#define PREFS_DARK_ID       18
 
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130

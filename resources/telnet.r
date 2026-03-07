@@ -47,6 +47,10 @@ resource 'MENU' (131, "Preferences") {
 		"Fonts", noIcon, noKey, noMark, plain;
 		"  Monaco 9", noIcon, noKey, noMark, plain;
 		"  Monaco 12", noIcon, noKey, noMark, plain;
+		"  Courier 10", noIcon, noKey, noMark, plain;
+		"  Chicago 12", noIcon, noKey, noMark, plain;
+		"  Geneva 9", noIcon, noKey, noMark, plain;
+		"  Geneva 10", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Terminal Type", noIcon, noKey, noMark, plain;
 		"  xterm", noIcon, noKey, noMark, plain;

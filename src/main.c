@@ -777,6 +777,18 @@ handle_menu(long menu_id)
 		case PREFS_FONT12_ID:
 			do_font_change(4, 12);
 			break;
+		case PREFS_FONT_C10:
+			do_font_change(22, 10);
+			break;
+		case PREFS_FONT_CH12:
+			do_font_change(0, 12);
+			break;
+		case PREFS_FONT_G9:
+			do_font_change(3, 9);
+			break;
+		case PREFS_FONT_G10:
+			do_font_change(3, 10);
+			break;
 		case PREFS_XTERM_ID:
 		case PREFS_VT220_ID:
 		case PREFS_VT100_ID:
@@ -1257,9 +1269,17 @@ update_prefs_menu(void)
 	if (!prefs_menu)
 		return;
 	CheckItem(prefs_menu, PREFS_FONT9_ID,
-	    prefs.font_size == 9);
+	    prefs.font_id == 4 && prefs.font_size == 9);
 	CheckItem(prefs_menu, PREFS_FONT12_ID,
-	    prefs.font_size == 12);
+	    prefs.font_id == 4 && prefs.font_size == 12);
+	CheckItem(prefs_menu, PREFS_FONT_C10,
+	    prefs.font_id == 22 && prefs.font_size == 10);
+	CheckItem(prefs_menu, PREFS_FONT_CH12,
+	    prefs.font_id == 0 && prefs.font_size == 12);
+	CheckItem(prefs_menu, PREFS_FONT_G9,
+	    prefs.font_id == 3 && prefs.font_size == 9);
+	CheckItem(prefs_menu, PREFS_FONT_G10,
+	    prefs.font_id == 3 && prefs.font_size == 10);
 	CheckItem(prefs_menu, PREFS_XTERM_ID,
 	    prefs.terminal_type == 0);
 	CheckItem(prefs_menu, PREFS_VT220_ID,
