@@ -5,7 +5,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	5
+#define PREFS_VERSION	6
 #define MAX_BOOKMARKS	8
 
 typedef struct {
@@ -25,6 +25,7 @@ typedef struct {
 	short		terminal_type;	/* 0=xterm, 1=VT220, 2=VT100 */
 	unsigned char	dark_mode;	/* 0=light, 1=dark */
 	char		dns_server[16];	/* IP address, default "1.1.1.1" */
+	char		username[64];	/* auto-login username, empty = disabled */
 } FlynnPrefs;
 
 /* Load preferences from "Flynn Prefs" file. Returns defaults if not found. */

@@ -83,6 +83,15 @@ prefs_load(FlynnPrefs *prefs)
 	if (prefs->version == 4) {
 		/* v4→v5 migration: add dns_server */
 		strcpy(prefs->dns_server, "1.1.1.1");
+		prefs->username[0] = '\0';
+		prefs->version = PREFS_VERSION;
+		prefs_save(prefs);
+		return;
+	}
+
+	if (prefs->version == 5) {
+		/* v5→v6 migration: add username */
+		prefs->username[0] = '\0';
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

@@ -67,7 +67,7 @@ resource 'MENU' (131, "Preferences") {
 
 /* Connection dialog */
 resource 'DLOG' (129, "Connect") {
-	{60, 80, 210, 420},
+	{60, 80, 220, 420},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -80,18 +80,18 @@ resource 'DLOG' (129, "Connect") {
 resource 'DITL' (129, "Connect") {
 	{
 		/* OK button */
-		{115, 250, 135, 320},
+		{125, 250, 145, 320},
 		Button { enabled, "Connect" };
 
 		/* Cancel button */
-		{115, 165, 135, 235},
+		{125, 165, 145, 235},
 		Button { enabled, "Cancel" };
 
 		/* Host label + field */
-		{15, 15, 31, 60},
-		StaticText { disabled, "Host:" };
+		{15, 15, 31, 75},
+		StaticText { disabled, "Host or IP:" };
 
-		{15, 65, 31, 325},
+		{15, 80, 31, 325},
 		EditText { enabled, "" };
 
 		/* Port label + field */
@@ -101,9 +101,16 @@ resource 'DITL' (129, "Connect") {
 		{45, 65, 61, 135},
 		EditText { enabled, "23" };
 
-		/* Info text */
-		{80, 15, 96, 325},
-		StaticText { disabled, "Enter hostname or IP address" };
+		/* Info text (unused, kept for DITL item ordering) */
+		{0, 0, 0, 0},
+		StaticText { disabled, "" };
+
+		/* Username label + field */
+		{75, 15, 91, 85},
+		StaticText { disabled, "Username:" };
+
+		{75, 90, 91, 235},
+		EditText { enabled, "" };
 	}
 };
 

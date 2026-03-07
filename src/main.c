@@ -86,10 +86,10 @@ main(void)
 	    g_cell_width;
 	terminal.active_rows = (MAX_WIN_HEIGHT - TOP_MARGIN * 2) /
 	    g_cell_height;
-	if (terminal.active_cols > TERM_COLS)
-		terminal.active_cols = TERM_COLS;
-	if (terminal.active_rows > TERM_ROWS)
-		terminal.active_rows = TERM_ROWS;
+	if (terminal.active_cols > TERM_DEFAULT_COLS)
+		terminal.active_cols = TERM_DEFAULT_COLS;
+	if (terminal.active_rows > TERM_DEFAULT_ROWS)
+		terminal.active_rows = TERM_DEFAULT_ROWS;
 	terminal.scroll_bottom = terminal.active_rows - 1;
 	telnet.cols = terminal.active_cols;
 	telnet.rows = terminal.active_rows;
@@ -918,16 +918,26 @@ do_connect(void)
 		strcpy(conn.host, prefs.host);
 		conn.port = prefs.port;
 	}
+	if (!conn.username[0] && prefs.username[0])
+		strcpy(conn.username, prefs.username);
 
 	if (conn_open_dialog(&conn)) {
 		telnet_init(&telnet);
 		telnet.preferred_ttype = prefs.terminal_type;
 		terminal_reset(&terminal);
 
-		/* Save last-used host/port */
+		/* Save last-used host/port/username */
 		strcpy(prefs.host, conn.host);
 		prefs.port = conn.port;
+		strcpy(prefs.username, conn.username);
 		prefs_save(&prefs);
+
+		/* Auto-send username after connect */
+		if (conn.username[0]) {
+			conn_send(&conn, conn.username,
+			    strlen(conn.username));
+			conn_send(&conn, "\r", 1);
+		}
 	}
 	update_menus();
 }

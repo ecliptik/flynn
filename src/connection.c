@@ -34,7 +34,7 @@ conn_open_dialog(Connection *conn)
 	Handle item_h;
 	short item_type;
 	Rect item_rect;
-	Str255 host_str, port_str;
+	Str255 host_str, port_str, user_str;
 	long port_num;
 	OSErr err;
 	unsigned long ip;
@@ -65,6 +65,14 @@ conn_open_dialog(Connection *conn)
 		sprintf((char *)&port_str[1], "%d", conn->port);
 		port_str[0] = strlen((char *)&port_str[1]);
 		SetDialogItemText(item_h, port_str);
+	}
+	if (conn->username[0]) {
+		GetDialogItem(dlg, DLOG_USER_FIELD, &item_type,
+		    &item_h, &item_rect);
+		user_str[0] = strlen(conn->username);
+		for (i = 0; i < user_str[0]; i++)
+			user_str[i + 1] = conn->username[i];
+		SetDialogItemText(item_h, user_str);
 	}
 
 	ShowWindow(dlg);
@@ -102,6 +110,18 @@ conn_open_dialog(Connection *conn)
 		conn->port = (short)port_num;
 	} else {
 		conn->port = DEFAULT_PORT;
+	}
+
+	/* Extract username (optional) */
+	GetDialogItem(dlg, DLOG_USER_FIELD, &item_type, &item_h,
+	    &item_rect);
+	GetDialogItemText(item_h, user_str);
+	if (user_str[0] > 0 && user_str[0] < 63) {
+		for (i = 0; i < user_str[0]; i++)
+			conn->username[i] = user_str[i + 1];
+		conn->username[i] = '\0';
+	} else {
+		conn->username[0] = '\0';
 	}
 
 	DisposeDialog(dlg);

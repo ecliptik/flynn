@@ -29,6 +29,9 @@
 #define DLOG_HOST_FIELD  4
 #define DLOG_PORT_LABEL  5
 #define DLOG_PORT_FIELD  6
+#define DLOG_INFO_TEXT   7
+#define DLOG_USER_LABEL  8
+#define DLOG_USER_FIELD  9
 
 /* Default port */
 #define DEFAULT_PORT     23
@@ -46,6 +49,7 @@ typedef struct {
 	short       read_len;
 	char        host[256];
 	short       port;
+	char        username[64];
 	ip_addr     dns_server;	/* DNS server to use for lookups */
 } Connection;
 
