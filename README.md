@@ -21,8 +21,8 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 
 Pre-built binaries are available on the [Releases](https://github.com/ecliptik/flynn/releases) page:
 
-- **Flynn-x.y.z.dsk** — 800K floppy disk image. Mount in an emulator or write to a real floppy.
-- **Flynn-x.y.z.hqx** — BinHex archive. Download via web/BBS and decode with BinHex 4.0 or StuffIt on your Mac.
+- **Flynn-x.y.z.dsk** — 800K floppy disk image with Flynn app and Read Me. Mount in an emulator or write to a real floppy.
+- **Flynn-x.y.z.hqx** — BinHex archive of the Flynn application only. Download via web/BBS and decode with BinHex 4.0 or StuffIt on your Mac.
 
 No build toolchain required — just download and run.
 

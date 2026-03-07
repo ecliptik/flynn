@@ -25,6 +25,9 @@ if [ -z "$VERSION" ]; then
     VERSION="unknown"
 fi
 
+# Fix creator code in MacBinary header (Retro68 sets '????' instead of 'FLYN')
+printf 'FLYN' | dd of="$BUILD_DIR/Flynn.bin" bs=1 seek=69 count=4 conv=notrunc 2>/dev/null
+
 # Generate BinHex (.hqx) archive if macutils is available
 if command -v binhex >/dev/null 2>&1; then
     binhex "$BUILD_DIR/Flynn.bin" > "$BUILD_DIR/Flynn.hqx"
