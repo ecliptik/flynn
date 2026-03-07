@@ -7,51 +7,34 @@ with [Claude Code Teams](https://docs.anthropic.com/en/docs/claude-code/teams) o
 [Read the development journal](JOURNAL.md) — from first build to full VT220 terminal emulator,
 built entirely through agentic AI development.
 
-![Flynn connected to a Linux server via telnet, showing neofetch output on a Macintosh Plus running System 6.0.8](docs/screenshots/flynn-telnet-session.png)
+| | |
+|:---:|:---:|
+| ![Flynn connected to a Linux server showing neofetch system info with Raspberry Pi ASCII art](docs/screenshots/flynn-neofetch-crt.png) | ![Flynn running tmux with three split panes showing cal, ls, and uname output with box-drawing characters](docs/screenshots/flynn-tmux-crt.png) |
+| **Telnet Session** — Connected to a Linux server with neofetch displaying system info and Raspberry Pi ASCII art. Shows OSC window title, auto-login, and VT220 terminal emulation. | **tmux Split Panes** — Three-pane tmux layout with box-drawing line characters rendered via QuickDraw. Calendar, file listing, and kernel info running simultaneously. |
+| ![Flynn connect dialog showing host, port, and username fields with saved settings](docs/screenshots/flynn-connect-crt.png) | ![Claude Code running inside Flynn on a Macintosh Plus, describing the Flynn project](docs/screenshots/flynn-claudecode-crt.png) |
+| **Connect Dialog** — Native Mac dialog with host, port, and username fields. Settings persist across launches for quick reconnection. | **Claude Code via Flynn** — Claude Code running over telnet on a Mac Plus — the AI that built Flynn, running inside its own creation. |
 
 ---
 
-[Features](#features) | [Current Status](#current-status) | [Keyboard Shortcuts](#keyboard-shortcuts) | [Building](#building) | [Testing](#testing) | [Acknowledgments](#acknowledgments) | [License](#license)
+[Features](#features) | [Keyboard Shortcuts](#keyboard-shortcuts) | [Building](#building) | [Testing](#testing) | [Acknowledgments](#acknowledgments) | [License](#license)
 
 ---
 
 ## Features
 
-- Client-side Telnet protocol with IAC negotiation (BINARY, ECHO, SGA, TTYPE, NAWS)
-- VT220 terminal emulation with xterm compatibility (TERM=xterm)
-- DEC Special Graphics box-drawing via QuickDraw (tmux, mc, dialog borders)
-- UTF-8 support: accented characters, box-drawing, curly quotes, symbols
-- Alternate screen buffer for full-screen apps (vi, nano, less, tmux)
-- Session bookmarks (up to 8, one-click connect from menu)
-- Font selection (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
-- Resizable terminal window with grow box (up to 132x50 cells)
-- MacTCP networking for TCP/IP connectivity
-- Scrollback viewing with Cmd+Up/Down keyboard navigation (96 lines)
-- Mouse-based text selection (click-drag, double-click word, shift-click extend)
-- Copy/paste via Mac clipboard (Cmd+C copies selection or full screen, Cmd+V to paste)
-- Settings persistence (host/port, bookmarks, font saved across launches)
-- Option key as Ctrl modifier for M0110 keyboard
-- Cmd+. sends Escape (classic Mac convention), Clear key also sends Escape
-- F1-F12 via Cmd+1..0 for M0110 keyboards, native ADB F-key support
-- Application cursor keys and keypad mode for vi/tmux navigation
-- Bracketed paste mode support
-- Targets Motorola 68000 CPU (Mac Plus compatible)
-
-## Current Status
-
-**Version 0.11.1** — fully featured and stable.
-
-Flynn connects to modern Linux telnetd servers and runs full-screen TUI
-applications (nano, vi, tmux, mc) with VT220/xterm terminal emulation.
-It handles interactive shell sessions with mouse text selection, copy/paste,
-scrollback viewing, and saves all preferences across launches.
-
-- 6 font choices with resizable windows (up to 132x50)
-- UTF-8 decode-and-translate for accented characters, box-drawing, and symbols
-- Session bookmarks, username auto-login, custom DNS resolver
-- Dark mode, configurable terminal type (xterm/VT220/VT100)
-- Custom Finder icon, TeachText Read Me, BinHex archive for distribution
-- Runs on a Macintosh Plus with 4MB RAM under System 6.0.8 with MacTCP 2.1
+- **VT100/VT220/xterm terminal emulation** — runs vi, nano, tmux, mc, and other full-screen TUI apps over telnet
+- **Box-drawing characters** — DEC Special Graphics rendered natively via QuickDraw for clean tmux panes, mc panels, and dialog borders
+- **UTF-8 support** — accented characters, curly quotes, and symbols decoded and mapped to Mac Roman
+- **Resizable window** — drag the grow box from 80x24 up to 132x50 cells, with NAWS negotiation
+- **6 fonts** — Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10, including proportional font rendering
+- **Session bookmarks** — save up to 8 hosts with one-click connect from the Session menu
+- **Username auto-login** — sends your username at the login prompt automatically
+- **Mouse text selection** — click-drag, double-click to select words, shift-click to extend, Cmd+C/V for copy/paste
+- **Scrollback** — 96 lines of history, navigate with Cmd+Up/Down
+- **M0110 keyboard support** — Option key as Ctrl, Cmd+. as Escape, Cmd+1-0 for F-keys, designed for the original Mac Plus keyboard
+- **Dark mode** — inverted display option for late-night telnet sessions
+- **Settings persistence** — host, port, bookmarks, font, and preferences saved across launches
+- **4MB Mac Plus** — ~98KB on disk, ~60KB RAM footprint (~1.5% of 4MB). Runs on a Macintosh Plus with System 6.0.8 and MacTCP 2.1
 
 ## Keyboard Shortcuts
 
