@@ -204,10 +204,7 @@ _TCPActiveOpen(TCPiopb *pb, StreamPtr stream, ip_addr remoteIP,
 	pb->csParam.open.ulpTimeoutValue = 10;
 	pb->csParam.open.ulpTimeoutAction = 1;
 	pb->csParam.open.validityFlags = 0xC0;
-#if 0
-	/* not available with this csCode */
 	pb->csParam.open.commandTimeoutValue = 30;
-#endif
 	pb->csParam.open.remoteHost = remoteIP;	
 	pb->csParam.open.remotePort	= remotePort;	
 	pb->csParam.open.localHost = 0;	
