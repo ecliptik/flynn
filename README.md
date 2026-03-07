@@ -2,7 +2,18 @@
 
 A Telnet client for classic Macintosh (68000/Mac Plus), targeting System 6.0.8 with MacTCP 2.1. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 
+This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+with [Claude Code Teams](https://docs.anthropic.com/en/docs/claude-code/teams) orchestration.
+[Read the development journal](JOURNAL.md) — from first build to full VT220 terminal emulator,
+built entirely through agentic AI development.
+
 ![Flynn connected to a Linux server via telnet, showing neofetch output on a Macintosh Plus running System 6.0.8](docs/screenshots/flynn-telnet-session.png)
+
+---
+
+[Features](#features) | [Current Status](#current-status) | [Keyboard Shortcuts](#keyboard-shortcuts) | [Building](#building) | [Testing](#testing) | [Acknowledgments](#acknowledgments) | [License](#license)
+
+---
 
 ## Features
 
@@ -74,12 +85,11 @@ Uses [Snow](https://snowemu.com/) emulator (v1.3.1) with a Mac Plus ROM and Syst
 
 ## Acknowledgments
 
-This project incorporates code from two open-source classic Macintosh applications by joshua stein (jcs@jcs.org), both released under the ISC license:
-
-- **[wallops](https://github.com/jcs/wallops)** - IRC client for classic Macintosh. MacTCP wrapper (`tcp.c`/`tcp.h`), DNS resolution (`dnr.c`/`dnr.h`), utility functions (`util.c`/`util.h`), and `MacTCP.h` are used directly from this project.
-- **[subtext](https://github.com/jcs/subtext)** - BBS server for classic Macintosh. The Telnet IAC protocol implementation (`telnet.c`/`telnet.h`) served as the reference for this project's client-side telnet engine.
-
-See the individual source files for copyright notices and license terms.
+- **[Claude Code](https://claude.ai/code)** — AI-assisted development by [Anthropic](https://www.anthropic.com/). Flynn was built entirely through agentic AI pair programming.
+- **[Retro68](https://github.com/autc04/Retro68)** by Wolfgang Thaller — the 68k Macintosh cross-compilation toolchain that makes building classic Mac applications on modern Linux possible.
+- **[Snow](https://snowemu.com/)** — a Rust-based classic Macintosh emulator with low-level hardware emulation, DaynaPORT SCSI/Link networking, and BlueSCSI Toolbox support. Used for all development testing.
+- **[wallops](https://github.com/jcs/wallops)** by joshua stein — IRC client for classic Macintosh. MacTCP wrapper (`tcp.c`/`tcp.h`), DNS resolution (`dnr.c`/`dnr.h`), utility functions (`util.c`/`util.h`), and `MacTCP.h` are used directly from this project. ISC license.
+- **[subtext](https://github.com/jcs/subtext)** by joshua stein — BBS server for classic Macintosh. The Telnet IAC protocol implementation (`telnet.c`/`telnet.h`) served as the reference for Flynn's client-side telnet engine. ISC license.
 
 ## License
 
