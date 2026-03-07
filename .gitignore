@@ -25,3 +25,7 @@ tools/blank_100MB_HFS.dsk
 /screenshots/
 test_phase5.py
 test_launch.py
+tests/__pycache__/
+
+# Release artifacts
+Flynn_*
