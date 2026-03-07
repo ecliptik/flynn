@@ -2,13 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.11.1] - 2026-03-06
+## [1.0.0] - 2026-03-07
+
+### Added
+- Control menu with 6 items for sending control sequences without a
+  physical Ctrl key:
+  - Send Ctrl-C, Send Ctrl-D, Send Ctrl-Z, Send Escape, Send Ctrl-L,
+    Send Break (Telnet IAC BRK)
+  - Menu items enabled only when connected
+  - MENU resource 132 added, MBAR updated to include it
+- Keystroke buffering to prevent character loss during fast typing
+  - Drains all pending key events from the Mac event queue before sending
+  - Batches multiple keystrokes into a single TCP send (reduces per-key
+    blocking from synchronous _TCPSend)
+  - Single keystrokes still send immediately for interactive feel
+  - key_send_buf[256] with buffer_key_send() and flush_key_send()
 
 ### Changed
 - README: Added Claude Code attribution, navigation TOC, and expanded
   Acknowledgments (Retro68, Snow emulator as individual entries)
-- About dialog version updated to 0.11.1
-- Version: 0.11.0 → 0.11.1
+- About dialog version updated to 1.0.0
+- Version: 0.11.1 → 1.0.0
 
 ## [0.11.0] - 2026-03-06
 

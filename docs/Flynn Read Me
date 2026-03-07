@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                   Version 0.11.1
+                    Version 1.0.0
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -86,6 +86,9 @@ Features
   - Dark mode (white text on black background)
   - Custom DNS server configuration
   - Username auto-login
+  - Control menu for sending Ctrl-C, Ctrl-D, Ctrl-Z,
+    Escape, Ctrl-L, and Break without a Ctrl key
+  - Keystroke buffering for reliable fast typing
   - Application cursor keys and keypad mode
   - Bracketed paste mode
   - All preferences saved across launches

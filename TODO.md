@@ -150,6 +150,14 @@
 - [x] Clear terminal screen on remote disconnect
 - [x] Fix initial window size clamped to 80x24 default
 
+## Phase 16: Control Menu + Keystroke Buffering (v1.0.0)
+- [x] Control menu (MENU 132) with 6 items: Ctrl-C, Ctrl-D, Ctrl-Z, Escape, Ctrl-L, Break
+- [x] Menu items enabled/disabled based on connection state
+- [x] Telnet IAC BRK (0xFF 0xF3) for Send Break
+- [x] Keystroke buffering (key_send_buf[256], buffer_key_send, flush_key_send)
+- [x] Event queue draining (GetNextEvent loop in keyDown handler)
+- [x] Single keystrokes send immediately, bursts batch into one TCP send
+
 ## Future
 - [ ] Color support (for System 7 / color Macs)
 - [ ] SSH support

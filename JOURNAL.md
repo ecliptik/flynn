@@ -4,6 +4,26 @@ A living document recording the development of Flynn, a Telnet client for classi
 
 ---
 
+## 2026-03-07 — v1.0.0: Control Menu, Keystroke Buffering, and 1.0
+
+### The Control Menu
+
+On a real Macintosh Plus with its M0110 keyboard, there's no physical Ctrl key. Flynn already maps Option+letter to Ctrl+letter, but testing on a Linux laptop through the Snow emulator revealed that neither Ctrl nor Command keys reliably pass through. The solution: a dedicated Control menu with the six most useful control sequences — Ctrl-C (interrupt), Ctrl-D (EOF), Ctrl-Z (suspend), Escape, Ctrl-L (clear screen), and Break (Telnet IAC BRK). Menu items are only enabled when connected.
+
+### Keystroke Buffering
+
+Fast typing — whether human or automated — was losing characters. The root cause was three compounding bottlenecks: synchronous `_TCPSend()` blocking for 2-10ms per keystroke, only one event processed per main loop iteration (with 50-200ms of null event processing for drawing between iterations), and the System 6 event queue overflowing at ~20 events.
+
+The fix drains all pending key events from the Mac event queue into a 256-byte buffer, then flushes them in a single TCP send. This eliminates per-keystroke TCP blocking while keeping single keystrokes interactive — when you type one character, it sends immediately because there's only one event to drain.
+
+The first implementation buffered until the null event handler, which was reliable but felt laggy — characters didn't appear relative to when they were typed. The final approach flushes immediately after draining all pending key events in the keyDown handler, giving the best of both worlds: no character loss and responsive echo.
+
+### Version 1.0.0
+
+After 16 phases of development — from an 8.5KB skeleton to a ~98KB full-featured terminal client — Flynn reaches 1.0. It connects to modern Linux servers over Telnet, emulates a VT220/xterm terminal well enough to run vi, nano, tmux, and Midnight Commander, handles UTF-8, renders box-drawing characters via QuickDraw, supports 6 fonts, resizable windows up to 132x50, session bookmarks, dark mode, custom DNS, username auto-login, keystroke buffering, and a Control menu — all running on a 1986 Macintosh Plus with 4MB of RAM.
+
+---
+
 ## 2026-03-06 — v0.11.0: Fonts, Resizable Windows, and Polish
 
 ### Expanding Beyond Monaco

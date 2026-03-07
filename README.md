@@ -28,6 +28,8 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 - **Username auto-login** — sends your username at the login prompt automatically
 - **Mouse text selection** — click-drag, double-click to select words, shift-click to extend, Cmd+C/V for copy/paste
 - **Scrollback** — 96 lines of history, navigate with Cmd+Up/Down
+- **Control menu** — send Ctrl-C, Ctrl-D, Ctrl-Z, Escape, Ctrl-L, and Break without a physical Ctrl key
+- **Keystroke buffering** — batches fast typing into single TCP sends, no character loss
 - **M0110 keyboard support** — Option key as Ctrl, Cmd+. as Escape, Cmd+1-0 for F-keys, designed for the original Mac Plus keyboard
 - **Dark mode** — inverted display option for late-night telnet sessions
 - **Settings persistence** — host, port, bookmarks, font, and preferences saved across launches

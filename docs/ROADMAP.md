@@ -185,6 +185,24 @@ Expands font options and adds drag-to-resize window support.
 - [x] Clear terminal screen on remote disconnect
   - Files: main.c
 
+## Phase 16: Control Menu + Keystroke Buffering (~100 lines)
+
+Adds a dedicated menu for sending control sequences and fixes character loss
+during fast typing.
+
+- [x] Control menu (MENU 132, "Control")
+  - 6 items: Send Ctrl-C, Ctrl-D, Ctrl-Z, Escape, Ctrl-L, Send Break
+  - Break sends Telnet IAC BRK (0xFF 0xF3)
+  - Items enabled only when connected (update_menus)
+  - Files: main.c, main.h, telnet.r
+- [x] Keystroke buffering
+  - key_send_buf[256] with buffer_key_send() and flush_key_send()
+  - All conn_send() calls in handle_key_down() replaced with buffer_key_send()
+  - Event queue draining: GetNextEvent loop collects all pending keyDown events
+  - Single flush after draining — one TCP send for N keystrokes
+  - Eliminates per-keystroke _TCPSend blocking (~2-10ms each)
+  - Files: main.c
+
 ## Summary
 
 | Phase | Feature | New Code | Memory | Dependencies | Status |
@@ -196,7 +214,8 @@ Expands font options and adds drag-to-resize window support.
 | 13 | xterm Compat | ~100 lines | +0 bytes | Phase 10 | **Done** |
 | 14 | UTF-8 Support | ~250 lines | +~1KB code | Phase 10 | **Done** |
 | 15 | Fonts + Resizing | ~250 lines | +29KB | Phase 12 | **Done** |
+| 16 | Control + Buffering | ~100 lines | +256 bytes | None | **Done** |
 
-All phases 9-15 are complete as of v0.11.0. Phase 15 expanded font options
-to 6 choices, added drag-to-resize windows (up to 132x50), proportional font
-rendering, username auto-login, and several bug fixes.
+All phases 9-16 are complete as of v1.0.0. Phase 16 added a Control menu
+for sending control sequences and keystroke buffering to eliminate character
+loss during fast typing.
