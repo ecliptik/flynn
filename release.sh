@@ -39,6 +39,16 @@ release_forgejo() {
         return 0
     fi
 
+    # Check if release already exists
+    local existing
+    existing=$(curl -s -o /dev/null -w "%{http_code}" \
+        "$FORGEJO_URL/api/v1/repos/$FORGEJO_REPO/releases/tags/$tag" \
+        -H "Authorization: token $FORGEJO_TOKEN")
+    if [ "$existing" = "200" ]; then
+        echo "  Forgejo release for $tag already exists, skipping"
+        return 0
+    fi
+
     echo "Creating Forgejo release for $tag..."
     local response
     response=$(curl -s -X POST "$FORGEJO_URL/api/v1/repos/$FORGEJO_REPO/releases" \
@@ -94,6 +104,12 @@ release_github() {
         return 0
     fi
 
+    # Check if release already exists
+    if gh release view "$tag" --repo "$GITHUB_REPO" >/dev/null 2>&1; then
+        echo "  GitHub release for $tag already exists, skipping"
+        return 0
+    fi
+
     echo "Creating GitHub release for $tag..."
 
     # Ensure tags are pushed to GitHub
@@ -126,8 +142,8 @@ do_release() {
     local body
     body=$(extract_changelog "$ver")
     if [ -z "$body" ]; then
-        echo "Error: No changelog entry found for version $ver"
-        return 1
+        echo "Warning: No changelog entry found for version $ver, using tag message"
+        body="Release Flynn $tag"
     fi
 
     # Verify tag exists
@@ -164,14 +180,27 @@ forgejo_release_exists() {
     [ "$status" = "200" ]
 }
 
+# Check for existing releases on GitHub
+github_release_exists() {
+    local tag="$1"
+    if ! command -v gh >/dev/null 2>&1; then
+        return 1
+    fi
+    gh release view "$tag" --repo "$GITHUB_REPO" >/dev/null 2>&1
+}
+
 # Main
 if [ "$1" = "--hierarchical" ]; then
-    # Release all tags that don't have Forgejo releases yet
+    # Release all tags that don't have releases yet
     echo "Checking for unreleased tags..."
     for tag in $(git tag -l 'v*' --sort=version:refname); do
-        if forgejo_release_exists "$tag"; then
-            echo "  $tag: already released, skipping"
+        local_forgejo=$(forgejo_release_exists "$tag" && echo "yes" || echo "no")
+        local_github=$(github_release_exists "$tag" && echo "yes" || echo "no")
+        if [ "$local_forgejo" = "yes" ] && [ "$local_github" = "yes" ]; then
+            echo "  $tag: already released on both platforms, skipping"
         else
+            [ "$local_forgejo" = "yes" ] && echo "  $tag: already on Forgejo, checking GitHub..."
+            [ "$local_github" = "yes" ] && echo "  $tag: already on GitHub, checking Forgejo..."
             do_release "$tag"
         fi
     done
