@@ -7,7 +7,7 @@
 #include "Processes.r"
 
 resource 'MBAR' (128) {
-	{ 128, 129, 130, 131 }
+	{ 128, 129, 130, 131, 132 }
 };
 
 resource 'MENU' (128, "Apple") {
@@ -62,6 +62,18 @@ resource 'MENU' (131, "Preferences") {
 		"-", noIcon, noKey, noMark, plain;
 		"Misc", noIcon, noKey, noMark, plain;
 		"  Dark Mode", noIcon, noKey, noMark, plain
+	}
+};
+
+resource 'MENU' (132, "Control") {
+	132, textMenuProc, allEnabled, enabled, "Control",
+	{
+		"Send Ctrl-C", noIcon, noKey, noMark, plain;
+		"Send Ctrl-D", noIcon, noKey, noMark, plain;
+		"Send Ctrl-Z", noIcon, noKey, noMark, plain;
+		"Send Escape", noIcon, noKey, noMark, plain;
+		"Send Ctrl-L", noIcon, noKey, noMark, plain;
+		"Send Break", noIcon, noKey, noMark, plain
 	}
 };
 

@@ -27,7 +27,7 @@
 #include "settings.h"
 
 /* Globals */
-static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu;
+static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
 static WindowPtr term_window;
 static Boolean running = true;
 static Connection conn;
@@ -146,6 +146,7 @@ init_menus(void)
 	file_menu = GetMenuHandle(FILE_MENU_ID);
 	edit_menu = GetMenuHandle(EDIT_MENU_ID);
 	prefs_menu = GetMenuHandle(PREFS_MENU_ID);
+	ctrl_menu = GetMenuHandle(CTRL_MENU_ID);
 
 	/* Disable section header items */
 	if (prefs_menu) {
@@ -198,6 +199,18 @@ update_menus(void)
 	} else {
 		DisableItem(edit_menu, EDIT_MENU_COPY_ID);
 		DisableItem(edit_menu, EDIT_MENU_PASTE_ID);
+	}
+
+	/* Control menu: enable only when connected */
+	if (ctrl_menu) {
+		short ci;
+
+		for (ci = CTRL_MENU_CTRLC; ci <= CTRL_MENU_BREAK; ci++) {
+			if (connected)
+				EnableItem(ctrl_menu, ci);
+			else
+				DisableItem(ctrl_menu, ci);
+		}
 	}
 
 	/* Bookmark menu items: enable only when disconnected */
@@ -852,6 +865,42 @@ handle_menu(long menu_id)
 			case EDIT_MENU_PASTE_ID:
 				do_paste();
 				break;
+			}
+		}
+		break;
+	case CTRL_MENU_ID:
+		if (conn.state == CONN_STATE_CONNECTED) {
+			char ctrl_byte;
+
+			switch (item) {
+			case CTRL_MENU_CTRLC:
+				ctrl_byte = 0x03;
+				conn_send(&conn, &ctrl_byte, 1);
+				break;
+			case CTRL_MENU_CTRLD:
+				ctrl_byte = 0x04;
+				conn_send(&conn, &ctrl_byte, 1);
+				break;
+			case CTRL_MENU_CTRLZ:
+				ctrl_byte = 0x1A;
+				conn_send(&conn, &ctrl_byte, 1);
+				break;
+			case CTRL_MENU_ESC:
+				ctrl_byte = 0x1B;
+				conn_send(&conn, &ctrl_byte, 1);
+				break;
+			case CTRL_MENU_CTRLL:
+				ctrl_byte = 0x0C;
+				conn_send(&conn, &ctrl_byte, 1);
+				break;
+			case CTRL_MENU_BREAK: {
+				char brk_seq[2];
+
+				brk_seq[0] = (char)0xFF;  /* IAC */
+				brk_seq[1] = (char)0xF3;  /* BRK */
+				conn_send(&conn, brk_seq, 2);
+				break;
+			}
 			}
 		}
 		break;

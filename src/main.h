@@ -14,6 +14,7 @@
 #define FILE_MENU_ID        129
 #define EDIT_MENU_ID        130
 #define PREFS_MENU_ID       131
+#define CTRL_MENU_ID        132
 
 /* Apple menu items */
 #define APPLE_MENU_ABOUT_ID 1
@@ -54,6 +55,14 @@
 /* separator = 16 */
 #define PREFS_MISC_HDR      17   /* disabled section header */
 #define PREFS_DARK_ID       18
+
+/* Control menu items */
+#define CTRL_MENU_CTRLC     1
+#define CTRL_MENU_CTRLD     2
+#define CTRL_MENU_CTRLZ     3
+#define CTRL_MENU_ESC       4
+#define CTRL_MENU_CTRLL     5
+#define CTRL_MENU_BREAK     6
 
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130
