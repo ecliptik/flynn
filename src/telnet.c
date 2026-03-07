@@ -33,6 +33,9 @@
 #include <string.h>
 #include "telnet.h"
 
+/* Maximum send buffer size (must match caller's buffer) */
+#define TELNET_SEND_MAX		4096
+
 /* Telnet protocol bytes */
 #define SE		240	/* end of sub-negotiation */
 #define NOP		241	/* no operation */
@@ -95,8 +98,11 @@ send_bytes(unsigned char *send, short *sendlen, const unsigned char *data,
 {
 	short i;
 
-	for (i = 0; i < len; i++)
+	for (i = 0; i < len; i++) {
+		if (*sendlen >= TELNET_SEND_MAX)
+			return;
 		send[(*sendlen)++] = data[i];
+	}
 }
 
 /*
@@ -304,7 +310,8 @@ handle_sb(TelnetState *ts, unsigned char *send, short *sendlen)
 				if (idx > 2)
 					idx = 2;
 				ttype = ttype_names[idx];
-				ts->ttype_count++;
+				if (ts->ttype_count < 10)
+					ts->ttype_count++;
 			}
 
 			buf[0] = IAC;

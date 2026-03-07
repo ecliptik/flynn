@@ -59,7 +59,27 @@ terminal_init(Terminal *term)
 	short saved_cols = term->active_cols;
 	short saved_rows = term->active_rows;
 
-	memset(term, 0, sizeof(Terminal));
+	/* Zero parser state and cursor fields (small, ~200 bytes) */
+	term->cur_row = 0;
+	term->cur_col = 0;
+	term->cur_attr = ATTR_NORMAL;
+	term->parse_state = PARSE_NORMAL;
+	term->num_params = 0;
+	term->intermediate = 0;
+	memset(term->params, 0, sizeof(term->params));
+	term->cursor_visible = 1;
+	term->sb_head = 0;
+	term->sb_count = 0;
+	term->scroll_offset = 0;
+	term->response_len = 0;
+	term->osc_len = 0;
+	term->osc_param = 0;
+	term->title_changed = 0;
+	term->window_title[0] = '\0';
+	term->utf8_len = 0;
+	term->utf8_expect = 0;
+	term->last_was_emoji = 0;
+	term->wrap_pending = 0;
 
 	/* Restore active dimensions (default if not set) */
 	term->active_cols = (saved_cols > 0 && saved_cols <= TERM_COLS) ?
@@ -69,9 +89,6 @@ terminal_init(Terminal *term)
 
 	term->scroll_top = 0;
 	term->scroll_bottom = term->active_rows - 1;
-	term->cur_attr = ATTR_NORMAL;
-	term->parse_state = PARSE_NORMAL;
-	term->cursor_visible = 1;
 
 	/* Character sets */
 	term->g0_charset = 'B';
@@ -81,13 +98,31 @@ terminal_init(Terminal *term)
 	/* DEC modes */
 	term->autowrap = 1;
 	term->cursor_key_mode = 0;
+	term->keypad_mode = 0;
 	term->origin_mode = 0;
 	term->insert_mode = 0;
+	term->bracketed_paste = 0;
 
 	/* Alternate screen */
 	term->alt_active = 0;
+	term->alt_cur_row = 0;
+	term->alt_cur_col = 0;
+	term->alt_cur_attr = ATTR_NORMAL;
 
-	/* Fill screen with spaces */
+	/* Saved cursor */
+	term->saved_row = 0;
+	term->saved_col = 0;
+	term->saved_attr = ATTR_NORMAL;
+	term->saved_g0_charset = 'B';
+	term->saved_g1_charset = 'B';
+	term->saved_gl_charset = 0;
+	term->saved_origin_mode = 0;
+	term->saved_autowrap = 1;
+
+	/* Clear dirty flags then mark active rows dirty */
+	memset(term->dirty, 0, sizeof(term->dirty));
+
+	/* Clear only the active screen area (not full 132x50 buffer) */
 	term_clear_region(term, 0, 0,
 	    term->active_rows - 1, term->active_cols - 1);
 	term_dirty_all(term);
@@ -725,8 +760,10 @@ term_process_csi(Terminal *term, unsigned char ch)
 		} else if (term->parse_state == PARSE_CSI_PARAM) {
 			if (term->num_params > 0) {
 				short idx = term->num_params - 1;
-				term->params[idx] = term->params[idx] * 10 +
-				    (ch - '0');
+				if (term->params[idx] < 3000)
+					term->params[idx] =
+					    term->params[idx] * 10 +
+					    (ch - '0');
 			}
 		}
 		/* Digits after intermediate are invalid; ignore */

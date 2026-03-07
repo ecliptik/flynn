@@ -96,7 +96,7 @@ conn_open_dialog(Connection *conn)
 		DisposeDialog(dlg);
 		return false;
 	}
-	for (i = 0; i < host_str[0] && i < 255; i++)
+	for (i = 0; i < host_str[0] && i < (short)(sizeof(conn->host) - 1); i++)
 		conn->host[i] = host_str[i + 1];
 	conn->host[i] = '\0';
 
@@ -116,7 +116,7 @@ conn_open_dialog(Connection *conn)
 	GetDialogItem(dlg, DLOG_USER_FIELD, &item_type, &item_h,
 	    &item_rect);
 	GetDialogItemText(item_h, user_str);
-	if (user_str[0] > 0 && user_str[0] < 63) {
+	if (user_str[0] > 0 && user_str[0] < (short)(sizeof(conn->username) - 1)) {
 		for (i = 0; i < user_str[0]; i++)
 			conn->username[i] = user_str[i + 1];
 		conn->username[i] = '\0';
@@ -378,7 +378,12 @@ conn_status_str(Connection *conn, char *buf, short buflen)
 		break;
 	case CONN_STATE_CONNECTED:
 		long2ip(conn->remote_ip, ip_str);
-		sprintf(buf, "Connected to %s", ip_str);
+		/* ip_str max 15 chars + "Connected to " = 28, safe for any reasonable buflen */
+		if (buflen >= 29) {
+			sprintf(buf, "Connected to %s", ip_str);
+		} else {
+			strncpy(buf, "Connected", buflen - 1);
+		}
 		break;
 	case CONN_STATE_CLOSING:
 		strncpy(buf, "Closing...", buflen - 1);

@@ -20,7 +20,8 @@ prefs_defaults(FlynnPrefs *prefs)
 	prefs->font_size = 9;
 	prefs->terminal_type = 0;	/* xterm */
 	prefs->dark_mode = 0;		/* light */
-	strcpy(prefs->dns_server, "1.1.1.1");
+	strncpy(prefs->dns_server, "1.1.1.1", sizeof(prefs->dns_server) - 1);
+	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 }
 
 void
@@ -50,6 +51,18 @@ prefs_load(FlynnPrefs *prefs)
 		return;
 	}
 
+	/* Force null termination on all string fields (defense against corrupted file) */
+	prefs->host[sizeof(prefs->host) - 1] = '\0';
+	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
+	prefs->username[sizeof(prefs->username) - 1] = '\0';
+	{
+		short i;
+		for (i = 0; i < MAX_BOOKMARKS; i++) {
+			prefs->bookmarks[i].name[sizeof(prefs->bookmarks[i].name) - 1] = '\0';
+			prefs->bookmarks[i].host[sizeof(prefs->bookmarks[i].host) - 1] = '\0';
+		}
+	}
+
 	if (prefs->version == 1) {
 		/* v1→v2 migration: host/port already read, zero bookmark fields */
 		prefs->bookmark_count = 0;
@@ -74,7 +87,9 @@ prefs_load(FlynnPrefs *prefs)
 		/* v3→v4 migration: add terminal_type and dark_mode */
 		prefs->terminal_type = 0;
 		prefs->dark_mode = 0;
-		strcpy(prefs->dns_server, "1.1.1.1");
+		strncpy(prefs->dns_server, "1.1.1.1",
+		    sizeof(prefs->dns_server) - 1);
+		prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;
@@ -82,7 +97,9 @@ prefs_load(FlynnPrefs *prefs)
 
 	if (prefs->version == 4) {
 		/* v4→v5 migration: add dns_server */
-		strcpy(prefs->dns_server, "1.1.1.1");
+		strncpy(prefs->dns_server, "1.1.1.1",
+		    sizeof(prefs->dns_server) - 1);
+		prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 		prefs->username[0] = '\0';
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);

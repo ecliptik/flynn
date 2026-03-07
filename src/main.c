@@ -34,6 +34,7 @@ static Connection conn;
 static TelnetState telnet;
 static Terminal terminal;
 static FlynnPrefs prefs;
+static RgnHandle grow_clip_rgn = 0L;
 
 /* Forward declarations */
 static void init_toolbox(void);
@@ -69,19 +70,18 @@ main(void)
 	init_toolbox();
 	init_menus();
 
-	memset(&conn, 0, sizeof(conn));
-	conn_init();
+	/* Load prefs and fast init before showing window */
+	prefs_load(&prefs);
+	term_ui_set_dark_mode(prefs.dark_mode);
 	telnet_init(&telnet);
 	terminal_init(&terminal);
-	prefs_load(&prefs);
 	telnet.preferred_ttype = prefs.terminal_type;
-	term_ui_set_dark_mode(prefs.dark_mode);
-	conn.dns_server = ip2long(prefs.dns_server);
 
+	/* Show window with correct grid from the start */
 	init_window();
-
-	/* Apply saved font and compute grid */
 	term_ui_set_font(term_window, prefs.font_id, prefs.font_size);
+
+	/* Compute grid and size window to fit */
 	terminal.active_cols = (MAX_WIN_WIDTH - LEFT_MARGIN * 2) /
 	    g_cell_width;
 	terminal.active_rows = (MAX_WIN_HEIGHT - TOP_MARGIN * 2) /
@@ -94,7 +94,6 @@ main(void)
 	telnet.cols = terminal.active_cols;
 	telnet.rows = terminal.active_rows;
 
-	/* Size window to fit the grid */
 	SizeWindow(term_window,
 	    LEFT_MARGIN * 2 + terminal.active_cols * g_cell_width,
 	    TOP_MARGIN * 2 + terminal.active_rows * g_cell_height, true);
@@ -102,6 +101,11 @@ main(void)
 	rebuild_bookmark_menu();
 	update_menus();
 	update_prefs_menu();
+
+	/* Slow MacTCP init — window is already visible */
+	memset(&conn, 0, sizeof(conn));
+	conn_init();
+	conn.dns_server = ip2long(prefs.dns_server);
 
 	main_event_loop();
 	return 0;
@@ -285,7 +289,7 @@ main_event_loop(void)
 
 			if (conn.read_len > 0) {
 				unsigned char out_buf[TCP_READ_BUFSIZ];
-				unsigned char send_buf[256];
+				unsigned char send_buf[TCP_READ_BUFSIZ];
 				short out_len = 0, send_len = 0;
 
 				telnet_process(&telnet,
@@ -731,7 +735,7 @@ handle_update(EventRecord *event)
 		EraseRect(&win->portRect);
 
 	if (conn.state == CONN_STATE_CONNECTED) {
-		char title[80];
+		char title[270];
 		Str255 ptitle;
 		short i, len;
 
@@ -764,9 +768,10 @@ handle_update(EventRecord *event)
 	/* Draw grow icon (clipped to avoid scroll bar track lines) */
 	{
 		Rect clip_r;
-		RgnHandle old_clip = NewRgn();
 
-		GetClip(old_clip);
+		if (!grow_clip_rgn)
+			grow_clip_rgn = NewRgn();
+		GetClip(grow_clip_rgn);
 		SetRect(&clip_r,
 		    win->portRect.right - 15,
 		    win->portRect.bottom - 15,
@@ -774,8 +779,7 @@ handle_update(EventRecord *event)
 		    win->portRect.bottom);
 		ClipRect(&clip_r);
 		DrawGrowIcon(win);
-		SetClip(old_clip);
-		DisposeRgn(old_clip);
+		SetClip(grow_clip_rgn);
 	}
 
 	EndUpdate(win);
@@ -997,7 +1001,7 @@ bm_list_draw(WindowPtr win, short item)
 {
 	short i, y;
 	Rect r;
-	char line[64];
+	char line[180];
 	short len, tmpType;
 	Handle tmpH;
 	FlynnPrefs *p = bm_prefs_ptr;
@@ -1473,9 +1477,15 @@ do_dns_server_dialog(void)
 static void
 do_copy(void)
 {
-	char buf[TERM_ROWS * (TERM_COLS + 1)];
+	long buf_size;
+	char *buf;
 	short row, col, len, last_nonspace;
 	TermCell *cell;
+
+	buf_size = (long)terminal.active_rows * (terminal.active_cols + 1);
+	buf = (char *)NewPtr(buf_size);
+	if (!buf)
+		return;
 
 	if (term_ui_sel_active()) {
 		short sr, sc, er, ec;
@@ -1530,6 +1540,7 @@ do_copy(void)
 
 	ZeroScrap();
 	PutScrap(len, 'TEXT', buf);
+	DisposePtr((Ptr)buf);
 }
 
 static void
