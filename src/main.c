@@ -133,6 +133,7 @@ ttype_to_str(short ttype, char *buf)
 	case 0:  strcpy(buf, "xterm"); break;
 	case 1:  strcpy(buf, "VT220"); break;
 	case 2:  strcpy(buf, "VT100"); break;
+	case 3:  strcpy(buf, "xterm-256color"); break;
 	default: strcpy(buf, "Default"); break;
 	}
 }
@@ -1250,6 +1251,7 @@ handle_menu(long menu_id)
 		case PREFS_XTERM_ID:
 		case PREFS_VT220_ID:
 		case PREFS_VT100_ID:
+		case PREFS_XTERM256_ID:
 			if (active_session)
 				active_session->telnet.preferred_ttype =
 				    item - PREFS_XTERM_ID;
@@ -1474,6 +1476,7 @@ do_connect(void)
 		term_ui_set_font(s->window, s->font_id, s->font_size);
 		session_save_font(s);
 		term_ui_init(s->window, &s->terminal);
+		term_ui_save_state(&s->ui);
 		s->conn.dns_server = ip2long(prefs.dns_server);
 		if (prefs.dark_mode)
 			PaintRect(&s->window->portRect);
@@ -1496,6 +1499,7 @@ do_connect(void)
 		term_ui_set_font(s->window, s->font_id, s->font_size);
 		session_save_font(s);
 		term_ui_init(s->window, &s->terminal);
+		term_ui_save_state(&s->ui);
 		s->conn.dns_server = ip2long(prefs.dns_server);
 		if (prefs.dark_mode)
 			PaintRect(&s->window->portRect);
@@ -1793,6 +1797,7 @@ do_connect_bookmark(short index)
 		term_ui_set_font(s->window, s->font_id, s->font_size);
 		session_save_font(s);
 		term_ui_init(s->window, &s->terminal);
+		term_ui_save_state(&s->ui);
 		s->conn.dns_server = ip2long(prefs.dns_server);
 		if (prefs.dark_mode)
 			PaintRect(&s->window->portRect);
@@ -1815,6 +1820,7 @@ do_connect_bookmark(short index)
 		term_ui_set_font(s->window, s->font_id, s->font_size);
 		session_save_font(s);
 		term_ui_init(s->window, &s->terminal);
+		term_ui_save_state(&s->ui);
 		s->conn.dns_server = ip2long(prefs.dns_server);
 		if (prefs.dark_mode)
 			PaintRect(&s->window->portRect);
@@ -2029,7 +2035,7 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 		if (item_hit == BME_OK)
 			break;
 
-		/* Cycle terminal type: Default->xterm->VT220->VT100->Default */
+		/* Cycle terminal type: Default->xterm->VT220->VT100->xterm-256color->Default */
 		if (item_hit == BME_TTYPE_BTN) {
 			if (cur_ttype == -1)
 				cur_ttype = 0;
@@ -2037,6 +2043,8 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 				cur_ttype = 1;
 			else if (cur_ttype == 1)
 				cur_ttype = 2;
+			else if (cur_ttype == 2)
+				cur_ttype = 3;
 			else
 				cur_ttype = -1;
 			ttype_to_str(cur_ttype, btn_text);
@@ -2444,6 +2452,8 @@ update_prefs_menu(void)
 	    ttype == 1);
 	CheckItem(prefs_menu, PREFS_VT100_ID,
 	    ttype == 2);
+	CheckItem(prefs_menu, PREFS_XTERM256_ID,
+	    ttype == 3);
 	CheckItem(prefs_menu, PREFS_DARK_ID,
 	    prefs.dark_mode != 0);
 }

@@ -14,7 +14,7 @@ typedef struct {
 	char		host[128];
 	unsigned short	port;
 	char		username[64];
-	short		terminal_type;	/* 0=xterm, 1=VT220, 2=VT100; -1=use global */
+	short		terminal_type;	/* 0=xterm, 1=VT220, 2=VT100, 3=xterm-256color; -1=use global */
 	short		font_id;	/* 0=use global default */
 	short		font_size;	/* 0=use global default */
 } Bookmark;
@@ -27,7 +27,7 @@ typedef struct {
 	Bookmark	bookmarks[MAX_BOOKMARKS];
 	short		font_id;
 	short		font_size;
-	short		terminal_type;	/* 0=xterm, 1=VT220, 2=VT100 */
+	short		terminal_type;	/* 0=xterm, 1=VT220, 2=VT100, 3=xterm-256color */
 	unsigned char	dark_mode;	/* 0=light, 1=dark */
 	char		dns_server[16];	/* IP address, default "1.1.1.1" */
 	char		username[64];	/* auto-login username, empty = disabled */

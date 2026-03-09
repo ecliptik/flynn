@@ -301,16 +301,25 @@ handle_sb(TelnetState *ts, unsigned char *send, short *sendlen)
 			const char *ttype;
 
 			{
-				static const char *ttype_names[] = {
-					"xterm", "VT220", "VT100"
+				static const char *ttype_cycle[] = {
+					"xterm-256color", "xterm",
+					"VT220", "VT100"
 				};
-				short idx;
+				/* Map pref value to cycle start:
+				 * 0=xterm->1, 1=VT220->2,
+				 * 2=VT100->3, 3=xterm-256color->0 */
+				static const short ttype_start[] = {
+					1, 2, 3, 0
+				};
+				short idx, start;
 
-				idx = ts->preferred_ttype +
-				    ts->ttype_count;
-				if (idx > 2)
-					idx = 2;
-				ttype = ttype_names[idx];
+				start = (ts->preferred_ttype >= 0 &&
+				    ts->preferred_ttype <= 3) ?
+				    ttype_start[ts->preferred_ttype] : 1;
+				idx = start + ts->ttype_count;
+				if (idx > 3)
+					idx = 3;
+				ttype = ttype_cycle[idx];
 				if (ts->ttype_count < 10)
 					ts->ttype_count++;
 			}

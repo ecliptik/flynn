@@ -57,6 +57,7 @@ resource 'MENU' (131, "Preferences") {
 		"  xterm", noIcon, noKey, noMark, plain;
 		"  VT220", noIcon, noKey, noMark, plain;
 		"  VT100", noIcon, noKey, noMark, plain;
+		"  xterm-256color", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Networking", noIcon, noKey, noMark, plain;
 		"  DNS Server\311", noIcon, noKey, noMark, plain;

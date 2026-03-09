@@ -195,9 +195,23 @@ draw_row(Terminal *term, short row)
 	short last_face = -1;
 	short row_y;
 	short sel_start_col, sel_end_col;
+	short cell_w, eff_cols;
+	unsigned char lattr;
 
 	baseline = row_top(row) + g_cell_baseline;
 	row_y = row_top(row);
+
+	/* Double-width/height: halve columns, double cell width */
+	lattr = term->line_attr[row];
+	if (lattr == LINE_ATTR_DBLW ||
+	    lattr == LINE_ATTR_DBLH_TOP ||
+	    lattr == LINE_ATTR_DBLH_BOT) {
+		cell_w = g_cell_width * 2;
+		eff_cols = term->active_cols / 2;
+	} else {
+		cell_w = g_cell_width;
+		eff_cols = term->active_cols;
+	}
 
 	/*
 	 * Pre-compute selection column range for this row.
@@ -216,20 +230,20 @@ draw_row(Terminal *term, short row)
 				sel_end_col = ec;
 			} else if (row == sr) {
 				sel_start_col = sc;
-				sel_end_col = term->active_cols - 1;
+				sel_end_col = eff_cols - 1;
 			} else if (row == er) {
 				sel_start_col = 0;
 				sel_end_col = ec;
 			} else {
 				/* Middle row: fully selected */
 				sel_start_col = 0;
-				sel_end_col = term->active_cols - 1;
+				sel_end_col = eff_cols - 1;
 			}
 		}
 	}
 
 	col = 0;
-	while (col < term->active_cols) {
+	while (col < eff_cols) {
 		unsigned char cell_attr;
 
 		cell = terminal_get_display_cell(term, row, col);
@@ -241,7 +255,7 @@ draw_row(Terminal *term, short row)
 		run_len = 0;
 
 		/* Collect run of cells with same effective attributes */
-		while (col < term->active_cols) {
+		while (col < eff_cols) {
 			cell = terminal_get_display_cell(term, row, col);
 			cell_attr = cell->attr;
 			if (col >= sel_start_col && col <= sel_end_col)
@@ -273,10 +287,10 @@ draw_row(Terminal *term, short row)
 		if (run_attr & ATTR_DEC_GRAPHICS) {
 			short i, x;
 
-			x = col_left(run_start);
+			x = LEFT_MARGIN + run_start * cell_w;
 			for (i = 0; i < run_len; i++) {
 				draw_line_char(buf[i], x, row_y, run_attr);
-				x += g_cell_width;
+				x += cell_w;
 			}
 			continue;
 		}
@@ -285,11 +299,11 @@ draw_row(Terminal *term, short row)
 		if (run_attr & ATTR_BRAILLE) {
 			short i, x;
 
-			x = col_left(run_start);
+			x = LEFT_MARGIN + run_start * cell_w;
 			for (i = 0; i < run_len; i++) {
 				draw_braille((unsigned char)buf[i],
 				    x, row_y, run_attr);
-				x += g_cell_width;
+				x += cell_w;
 			}
 			continue;
 		}
@@ -298,13 +312,13 @@ draw_row(Terminal *term, short row)
 		if (run_attr & ATTR_GLYPH) {
 			short i, x;
 
-			x = col_left(run_start);
+			x = LEFT_MARGIN + run_start * cell_w;
 			for (i = 0; i < run_len; i++) {
 				unsigned char gid;
 
 				gid = (unsigned char)buf[i];
 				if (gid == GLYPH_WIDE_SPACER) {
-					x += g_cell_width;
+					x += cell_w;
 					continue;	/* skip second cell */
 				}
 				if (gid < GLYPH_EMOJI_BASE) {
@@ -314,7 +328,7 @@ draw_row(Terminal *term, short row)
 					draw_glyph_bitmap(gid,
 					    x, row_y, run_attr);
 				}
-				x += g_cell_width;
+				x += cell_w;
 			}
 			continue;
 		}
@@ -339,8 +353,9 @@ draw_row(Terminal *term, short row)
 
 			/* Paint background black for inverse region */
 			SetRect(&inv_r,
-			    col_left(run_start), row_y,
-			    col_left(run_start) + run_len * g_cell_width,
+			    LEFT_MARGIN + run_start * cell_w, row_y,
+			    LEFT_MARGIN + run_start * cell_w +
+			    run_len * cell_w,
 			    row_bottom(row));
 			PaintRect(&inv_r);
 
@@ -351,29 +366,29 @@ draw_row(Terminal *term, short row)
 			 * Use incremental x instead of col_left() MULU.
 			 */
 			TextMode(srcBic);
-			x = col_left(run_start);
+			x = LEFT_MARGIN + run_start * cell_w;
 			{
 				short i;
 				for (i = 0; i < run_len; i++) {
 					MoveTo(x, baseline);
 					DrawChar(buf[i]);
-					x += g_cell_width;
+					x += cell_w;
 				}
 			}
 			TextMode(srcOr);
-		} else if (run_attr & ATTR_BOLD) {
+		} else if ((run_attr & ATTR_BOLD) ||
+		    cell_w != g_cell_width) {
 			/*
-			 * Bold text: must use per-character MoveTo+DrawChar
-			 * because QuickDraw bold adds 1px per char advance
-			 * width, causing drift over a run.
-			 * Use incremental x instead of col_left() MULU.
+			 * Per-character MoveTo+DrawChar for:
+			 * - Bold text (advance width drift)
+			 * - Double-width lines (2x cell spacing)
 			 */
-			short x = col_left(run_start);
+			short x = LEFT_MARGIN + run_start * cell_w;
 			short i;
 			for (i = 0; i < run_len; i++) {
 				MoveTo(x, baseline);
 				DrawChar(buf[i]);
-				x += g_cell_width;
+				x += cell_w;
 			}
 		} else {
 			/*
@@ -1311,9 +1326,34 @@ draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 }
 
 /*
- * draw_cursor - draw or erase the block cursor at current position
+ * cursor_set_rect - compute cursor rectangle based on DECSCUSR style
+ */
+static void
+cursor_set_rect(Rect *r, short crow, short ccol, unsigned char style)
+{
+	if (style == 3 || style == 4) {
+		/* Underline cursor: bottom 2 pixels */
+		SetRect(r,
+		    col_left(ccol), row_bottom(crow) - 2,
+		    col_right(ccol), row_bottom(crow));
+	} else if (style == 5 || style == 6) {
+		/* Bar cursor: left 2 pixels */
+		SetRect(r,
+		    col_left(ccol), row_top(crow),
+		    col_left(ccol) + 2, row_bottom(crow));
+	} else {
+		/* Block cursor (0, 1, 2) */
+		SetRect(r,
+		    col_left(ccol), row_top(crow),
+		    col_right(ccol), row_bottom(crow));
+	}
+}
+
+/*
+ * draw_cursor - draw or erase the cursor at current position
  *
  * Uses XOR (patXor) so drawing twice erases it, giving us blink.
+ * Cursor shape depends on DECSCUSR style (block/underline/bar).
  */
 static void
 draw_cursor(Terminal *term, short on)
@@ -1324,9 +1364,8 @@ draw_cursor(Terminal *term, short on)
 	terminal_get_cursor(term, &crow, &ccol);
 
 	if (on) {
-		SetRect(&cur_r,
-		    col_left(ccol), row_top(crow),
-		    col_right(ccol), row_bottom(crow));
+		cursor_set_rect(&cur_r, crow, ccol,
+		    term->cursor_style);
 		PenMode(patXor);
 		PaintRect(&cur_r);
 		PenNormal();
@@ -1419,8 +1458,14 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	GrafPtr old_port;
 	short crow, ccol;
 	Rect cur_r;
+	unsigned char style;
 
 	if (!cursor_initialized || !term->cursor_visible || sel.active)
+		return;
+
+	/* Steady cursor styles don't blink */
+	style = term->cursor_style;
+	if (style == 2 || style == 4 || style == 6)
 		return;
 
 	now = TickCount();
@@ -1435,9 +1480,7 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	SetPort(win);
 
 	/* XOR the cursor rect to toggle it */
-	SetRect(&cur_r,
-	    col_left(ccol), row_top(crow),
-	    col_right(ccol), row_bottom(crow));
+	cursor_set_rect(&cur_r, crow, ccol, style);
 	PenMode(patXor);
 	PaintRect(&cur_r);
 	PenNormal();

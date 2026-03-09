@@ -42,6 +42,12 @@
 #define ATTR_GLYPH		0x10	/* ch is a glyph index */
 #define ATTR_BRAILLE		0x20	/* ch is braille dot pattern */
 
+/* Line attributes (per-row) */
+#define LINE_ATTR_NORMAL    0
+#define LINE_ATTR_DBLW      1   /* DECDWL: double-width */
+#define LINE_ATTR_DBLH_TOP  2   /* DECDHL top half */
+#define LINE_ATTR_DBLH_BOT  3   /* DECDHL bottom half */
+
 /* Parser states */
 #define PARSE_NORMAL		0
 #define PARSE_ESC		1	/* got ESC */
@@ -101,6 +107,9 @@ typedef struct {
 	/* Dirty flags: one per row, nonzero means row needs redraw */
 	unsigned char	dirty[TERM_ROWS];
 
+	/* Line attributes: one per row */
+	unsigned char	line_attr[TERM_ROWS];	/* LINE_ATTR_* per row */
+
 	/* Scrollback state */
 	short		sb_head;	/* next line to write in ring */
 	short		sb_count;	/* number of valid lines */
@@ -115,15 +124,18 @@ typedef struct {
 	unsigned char	origin_mode;		/* DECOM: 0=absolute, 1=relative */
 	unsigned char	insert_mode;		/* IRM: 0=replace, 1=insert */
 	unsigned char	bracketed_paste;	/* 0=off, 1=on */
+	unsigned char	tab_stops[TERM_COLS];	/* custom tab stops, 1=set */
 
 	/* Cursor visibility (DECTCEM: ESC[?25h / ESC[?25l) */
 	unsigned char	cursor_visible;
+	unsigned char	cursor_style;		/* DECSCUSR: 0-1=blink block, 2=steady block, 3=blink underline, 4=steady underline, 5=blink bar, 6=steady bar */
 
 	/* Alternate screen state */
 	short		alt_cur_row;
 	short		alt_cur_col;
 	unsigned char	alt_cur_attr;
 	unsigned char	alt_active;
+	unsigned char	alt_line_attr[TERM_ROWS];	/* saved line attrs for main screen */
 
 	/* Saved cursor (ESC 7 / ESC 8) */
 	short		saved_row;

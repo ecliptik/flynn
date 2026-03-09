@@ -122,6 +122,19 @@ terminal_init(Terminal *term)
 	term->saved_origin_mode = 0;
 	term->saved_autowrap = 1;
 
+	term->cursor_style = 0;
+
+	/* Tab stops: default every 8 columns */
+	memset(term->tab_stops, 0, sizeof(term->tab_stops));
+	{
+		short c;
+		for (c = 0; c < TERM_COLS; c += 8)
+			term->tab_stops[c] = 1;
+	}
+
+	/* Line attributes */
+	memset(term->line_attr, 0, sizeof(term->line_attr));
+
 	/* Clear dirty flags then mark active rows dirty */
 	memset(term->dirty, 0, sizeof(term->dirty));
 
@@ -199,11 +212,18 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					}
 					break;
 				case '\t':
-					/* Tab: advance to next 8-column tab stop */
+					/* Tab: advance to next set tab stop */
 					term->wrap_pending = 0;
-					term->cur_col = (term->cur_col + 8) & ~7;
-					if (term->cur_col >= term->active_cols)
-						term->cur_col = term->active_cols - 1;
+					{
+						short c;
+						c = term->cur_col + 1;
+						while (c < term->active_cols &&
+						    !term->tab_stops[c])
+							c++;
+						if (c >= term->active_cols)
+							c = term->active_cols - 1;
+						term->cur_col = c;
+					}
 					break;
 				case 0x07:
 					/* Bell */
@@ -554,6 +574,7 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 	for (r = top; r <= bottom - count; r++) {
 		memcpy(term->screen[r], term->screen[r + count],
 		    term->active_cols * sizeof(TermCell));
+		term->line_attr[r] = term->line_attr[r + count];
 	}
 
 	/* Clear newly exposed lines at bottom */
@@ -562,6 +583,7 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 			term->screen[r][c].ch = ' ';
 			term->screen[r][c].attr = ATTR_NORMAL;
 		}
+		term->line_attr[r] = LINE_ATTR_NORMAL;
 	}
 
 	term_dirty_range(term, top, bottom);
@@ -585,6 +607,7 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 	for (r = bottom; r >= top + count; r--) {
 		memcpy(term->screen[r], term->screen[r - count],
 		    term->active_cols * sizeof(TermCell));
+		term->line_attr[r] = term->line_attr[r - count];
 	}
 
 	/* Clear newly exposed lines at top */
@@ -593,6 +616,7 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 			term->screen[r][c].ch = ' ';
 			term->screen[r][c].attr = ATTR_NORMAL;
 		}
+		term->line_attr[r] = LINE_ATTR_NORMAL;
 	}
 
 	term_dirty_range(term, top, bottom);
@@ -818,6 +842,11 @@ term_process_esc(Terminal *term, unsigned char ch)
 		term_newline(term);
 		break;
 
+	case 'H':
+		/* HTS - Horizontal Tab Set */
+		term->tab_stops[term->cur_col] = 1;
+		return;
+
 	case '=':
 		/* DECKPAM - application keypad mode */
 		term->keypad_mode = 1;
@@ -863,11 +892,31 @@ term_process_esc(Terminal *term, unsigned char ch)
 		} else if (term->intermediate == ')') {
 			/* ESC ) X - designate G1 charset */
 			term->g1_charset = ch;
+		} else if (term->intermediate == '#') {
+			/* DEC line attributes */
+			switch (ch) {
+			case '3':	/* DECDHL top half */
+				term->line_attr[term->cur_row] =
+				    LINE_ATTR_DBLH_TOP;
+				term->dirty[term->cur_row] = 1;
+				break;
+			case '4':	/* DECDHL bottom half */
+				term->line_attr[term->cur_row] =
+				    LINE_ATTR_DBLH_BOT;
+				term->dirty[term->cur_row] = 1;
+				break;
+			case '5':	/* DECSWL single-width */
+				term->line_attr[term->cur_row] =
+				    LINE_ATTR_NORMAL;
+				term->dirty[term->cur_row] = 1;
+				break;
+			case '6':	/* DECDWL double-width */
+				term->line_attr[term->cur_row] =
+				    LINE_ATTR_DBLW;
+				term->dirty[term->cur_row] = 1;
+				break;
+			}
 		}
-		/*
-		 * For '#' or unrecognised sequences, just consume
-		 * and return to normal.
-		 */
 		term->intermediate = 0;
 		break;
 	}
@@ -1384,6 +1433,30 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		}
 		break;
 
+	case 'g':
+		/* TBC - Tabulation Clear */
+		if (term->intermediate == 0) {
+			p1 = (term->num_params >= 1) ?
+			    term->params[0] : 0;
+			if (p1 == 0)
+				term->tab_stops[term->cur_col] = 0;
+			else if (p1 == 3)
+				memset(term->tab_stops, 0,
+				    sizeof(term->tab_stops));
+		}
+		break;
+
+	case 'q':
+		/* DECSCUSR - Set Cursor Style (CSI Ps SP q) */
+		if (term->intermediate == ' ') {
+			p1 = (term->num_params >= 1) ?
+			    term->params[0] : 0;
+			if (p1 <= 6)
+				term->cursor_style =
+				    (unsigned char)p1;
+		}
+		break;
+
 	case 'p':
 		/* DECSTR - soft reset (CSI ! p) */
 		if (term->intermediate == '!') {
@@ -1403,6 +1476,17 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->saved_col = 0;
 			term->saved_attr = ATTR_NORMAL;
 			term->wrap_pending = 0;
+			term->cursor_style = 0;
+			/* Reset tab stops to defaults */
+			memset(term->tab_stops, 0,
+			    sizeof(term->tab_stops));
+			{
+				short c;
+				for (c = 0; c < TERM_COLS; c += 8)
+					term->tab_stops[c] = 1;
+			}
+			memset(term->line_attr, 0,
+			    sizeof(term->line_attr));
 		}
 		break;
 
@@ -1602,13 +1686,16 @@ term_switch_to_alt(Terminal *term)
 
 	/* Save main screen contents */
 	memcpy(term->alt_screen, term->screen, sizeof(term->screen));
+	memcpy(term->alt_line_attr, term->line_attr,
+	    sizeof(term->line_attr));
 	term->alt_cur_row = term->cur_row;
 	term->alt_cur_col = term->cur_col;
 	term->alt_cur_attr = term->cur_attr;
 	term->alt_active = 1;
 
-	/* Clear the screen for alt buffer use */
+	/* Clear the screen and line attributes for alt buffer use */
 	term_clear_region(term, 0, 0, term->active_rows - 1, term->active_cols - 1);
+	memset(term->line_attr, 0, sizeof(term->line_attr));
 	term->cur_row = 0;
 	term->cur_col = 0;
 	term->wrap_pending = 0;
@@ -1626,6 +1713,8 @@ term_switch_to_main(Terminal *term)
 
 	/* Restore main screen contents */
 	memcpy(term->screen, term->alt_screen, sizeof(term->screen));
+	memcpy(term->line_attr, term->alt_line_attr,
+	    sizeof(term->line_attr));
 	term->cur_row = term->alt_cur_row;
 	term->cur_col = term->alt_cur_col;
 	term->cur_attr = term->alt_cur_attr;

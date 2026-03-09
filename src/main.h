@@ -51,12 +51,13 @@
 #define PREFS_XTERM_ID      10
 #define PREFS_VT220_ID      11
 #define PREFS_VT100_ID      12
-/* separator = 13 */
-#define PREFS_NET_HDR       14   /* disabled section header */
-#define PREFS_DNS_ID        15
-/* separator = 16 */
-#define PREFS_MISC_HDR      17   /* disabled section header */
-#define PREFS_DARK_ID       18
+#define PREFS_XTERM256_ID   13
+/* separator = 14 */
+#define PREFS_NET_HDR       15   /* disabled section header */
+#define PREFS_DNS_ID        16
+/* separator = 17 */
+#define PREFS_MISC_HDR      18   /* disabled section header */
+#define PREFS_DARK_ID       19
 
 /* Window menu */
 #define WINDOW_MENU_ID      133
