@@ -59,26 +59,67 @@ typedef struct {
 	unsigned char	attr;		/* attribute flags */
 } TermCell;
 
-/* Terminal state */
+/*
+ * Terminal state
+ *
+ * Struct layout is optimized for 68000 addressing modes:
+ * frequently-accessed fields are placed FIRST (within 16-bit
+ * displacement of the base pointer), large arrays are LAST.
+ * The 68000 uses faster 16-bit displacement for offsets < 32768
+ * vs slower 32-bit displacement for larger offsets.
+ */
 typedef struct {
-	/* Screen buffer: rows x cols */
-	TermCell	screen[TERM_ROWS][TERM_COLS];
+	/* --- Hot fields: cursor, attributes, parser (offset < 200) --- */
 
-	/* Scrollback ring buffer */
-	TermCell	scrollback[TERM_SCROLLBACK_LINES][TERM_COLS];
-	short		sb_head;	/* next line to write in ring */
-	short		sb_count;	/* number of valid lines */
+	/* Cursor position */
+	short		cur_row;
+	short		cur_col;
+	unsigned char	cur_attr;
 
 	/* Active grid dimensions (may be < max when using larger font) */
 	short		active_cols;
 	short		active_rows;
 
-	/* Cursor */
-	short		cur_row;
-	short		cur_col;
+	/* Parser state */
+	unsigned char	parse_state;
+	short		num_params;
+	short		params[TERM_MAX_PARAMS];
+	unsigned char	intermediate;	/* intermediate byte (e.g. '?' or '#') */
 
-	/* Alternate screen buffer */
-	TermCell	alt_screen[TERM_ROWS][TERM_COLS];
+	/* Auto-wrap state */
+	unsigned char	wrap_pending;	/* cursor at right margin, next char wraps */
+
+	/* Character sets */
+	unsigned char	g0_charset;	/* 'B' = US ASCII, '0' = DEC Special Graphics */
+	unsigned char	g1_charset;	/* 'B' = US ASCII, '0' = DEC Special Graphics */
+	unsigned char	gl_charset;	/* GL points to: 0 = G0, 1 = G1 */
+
+	/* Scroll region (top and bottom, inclusive, 0-based) */
+	short		scroll_top;
+	short		scroll_bottom;
+
+	/* Dirty flags: one per row, nonzero means row needs redraw */
+	unsigned char	dirty[TERM_ROWS];
+
+	/* Scrollback state */
+	short		sb_head;	/* next line to write in ring */
+	short		sb_count;	/* number of valid lines */
+	short		scroll_offset;	/* 0 = live, >0 = scrolled back N lines */
+
+	/* --- Warm fields: modes, saved state (offset < 400) --- */
+
+	/* DEC modes */
+	unsigned char	cursor_key_mode;	/* DECCKM: 0=normal, 1=application */
+	unsigned char	keypad_mode;		/* DECKPAM: 0=normal, 1=application */
+	unsigned char	autowrap;		/* DECAWM: 1=on (default), 0=off */
+	unsigned char	origin_mode;		/* DECOM: 0=absolute, 1=relative */
+	unsigned char	insert_mode;		/* IRM: 0=replace, 1=insert */
+	unsigned char	bracketed_paste;	/* 0=off, 1=on */
+
+	/* Cursor visibility (DECTCEM: ESC[?25h / ESC[?25l) */
+	unsigned char	cursor_visible;
+
+	/* Alternate screen state */
 	short		alt_cur_row;
 	short		alt_cur_col;
 	unsigned char	alt_cur_attr;
@@ -93,44 +134,6 @@ typedef struct {
 	unsigned char	saved_gl_charset;
 	unsigned char	saved_origin_mode;
 	unsigned char	saved_autowrap;
-
-	/* Current text attributes */
-	unsigned char	cur_attr;
-
-	/* Scroll region (top and bottom, inclusive, 0-based) */
-	short		scroll_top;
-	short		scroll_bottom;
-
-	/* Character sets */
-	unsigned char	g0_charset;	/* 'B' = US ASCII, '0' = DEC Special Graphics */
-	unsigned char	g1_charset;	/* 'B' = US ASCII, '0' = DEC Special Graphics */
-	unsigned char	gl_charset;	/* GL points to: 0 = G0, 1 = G1 */
-
-	/* DEC modes */
-	unsigned char	cursor_key_mode;	/* DECCKM: 0=normal, 1=application */
-	unsigned char	keypad_mode;		/* DECKPAM: 0=normal, 1=application */
-	unsigned char	autowrap;		/* DECAWM: 1=on (default), 0=off */
-	unsigned char	origin_mode;		/* DECOM: 0=absolute, 1=relative */
-	unsigned char	insert_mode;		/* IRM: 0=replace, 1=insert */
-	unsigned char	bracketed_paste;	/* 0=off, 1=on */
-
-	/* Auto-wrap state */
-	unsigned char	wrap_pending;	/* cursor at right margin, next char wraps */
-
-	/* Parser state */
-	unsigned char	parse_state;
-	short		params[TERM_MAX_PARAMS];
-	short		num_params;
-	unsigned char	intermediate;	/* intermediate byte (e.g. '?' or '#') */
-
-	/* Dirty flags: one per row, nonzero means row needs redraw */
-	unsigned char	dirty[TERM_ROWS];
-
-	/* Scrollback view offset: 0 = live, >0 = scrolled back N lines */
-	short		scroll_offset;
-
-	/* Cursor visibility (DECTCEM: ESC[?25h / ESC[?25l) */
-	unsigned char	cursor_visible;
 
 	/* Response buffer for DA/DSR replies */
 	char		response[32];
@@ -150,6 +153,17 @@ typedef struct {
 	unsigned char	utf8_len;	/* bytes accumulated so far */
 	unsigned char	utf8_expect;	/* total bytes expected (2, 3, or 4) */
 	unsigned char	last_was_emoji;	/* absorb following modifiers */
+
+	/* --- Large arrays LAST: pushed beyond hot-path offsets --- */
+
+	/* Screen buffer: rows x cols (13,200 bytes) */
+	TermCell	screen[TERM_ROWS][TERM_COLS];
+
+	/* Alternate screen buffer (13,200 bytes) */
+	TermCell	alt_screen[TERM_ROWS][TERM_COLS];
+
+	/* Scrollback ring buffer (25,344 bytes) */
+	TermCell	scrollback[TERM_SCROLLBACK_LINES][TERM_COLS];
 } Terminal;
 
 /* Initialize terminal to default state */

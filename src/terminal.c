@@ -154,104 +154,140 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 
 		switch (term->parse_state) {
 		case PARSE_NORMAL:
-			if (ch == 0x1B) {
+			/*
+			 * Fast path first: printable ASCII (0x20-0x7E)
+			 * is by far the most common case in terminal
+			 * data streams.  Testing it first avoids ~15
+			 * comparisons per character on the 68000.
+			 */
+			if (ch >= 0x20 && ch < 0x7F) {
+				/* Inline fast path: ASCII, no wrap, standard charset */
+				if (!term->wrap_pending &&
+				    term->gl_charset == 0 &&
+				    term->g0_charset == 'B') {
+					term->screen[term->cur_row][term->cur_col].ch = ch;
+					term->screen[term->cur_row][term->cur_col].attr = term->cur_attr;
+					term->dirty[term->cur_row] = 1;
+					if (term->cur_col < term->active_cols - 1)
+						term->cur_col++;
+					else
+						term->wrap_pending = 1;
+				} else {
+					term_put_char(term, ch);
+				}
+			} else if (ch == 0x1B) {
 				/* ESC */
 				term->utf8_expect = 0;
 				term->parse_state = PARSE_ESC;
-			} else if (ch == '\r') {
-				term_carriage_return(term);
-			} else if (ch == '\n' || ch == 0x0B || ch == 0x0C) {
-				/* LF, VT, FF all treated as newline */
-				term_newline(term);
-			} else if (ch == '\b') {
-				/* Backspace: move cursor left one */
-				if (term->cur_col > 0) {
-					term->cur_col--;
+			} else if (ch < 0x20) {
+				/* C0 control characters */
+				switch (ch) {
+				case '\r':
+					term_carriage_return(term);
+					break;
+				case '\n':
+				case 0x0B:
+				case 0x0C:
+					/* LF, VT, FF all treated as newline */
+					term_newline(term);
+					break;
+				case '\b':
+					/* Backspace: move cursor left one */
+					if (term->cur_col > 0) {
+						term->cur_col--;
+						term->wrap_pending = 0;
+					}
+					break;
+				case '\t':
+					/* Tab: advance to next 8-column tab stop */
 					term->wrap_pending = 0;
+					term->cur_col = (term->cur_col + 8) & ~7;
+					if (term->cur_col >= term->active_cols)
+						term->cur_col = term->active_cols - 1;
+					break;
+				case 0x07:
+					/* Bell */
+					SysBeep(5);
+					break;
+				case 0x0E:
+					/* SO - Shift Out: activate G1 */
+					term->gl_charset = 1;
+					break;
+				case 0x0F:
+					/* SI - Shift In: activate G0 */
+					term->gl_charset = 0;
+					break;
+				default:
+					/* Other C0 codes (NUL, etc): ignore */
+					break;
 				}
-			} else if (ch == '\t') {
-				/* Tab: advance to next 8-column tab stop */
-				term->wrap_pending = 0;
-				term->cur_col = (term->cur_col + 8) & ~7;
-				if (term->cur_col >= term->active_cols)
-					term->cur_col = term->active_cols - 1;
-			} else if (ch == 0x07) {
-				/* Bell */
-				SysBeep(5);
-			} else if (ch == 0x0E) {
-				/* SO - Shift Out: activate G1 */
-				term->gl_charset = 1;
-			} else if (ch == 0x0F) {
-				/* SI - Shift In: activate G0 */
-				term->gl_charset = 0;
-			} else if (ch >= 0x80 && ch < 0xC0 &&
-			    term->utf8_expect > 0) {
-				/* UTF-8 continuation byte (priority over C1) */
-				term->utf8_buf[term->utf8_len++] = ch;
-				if (term->utf8_len == term->utf8_expect) {
-					long cp = utf8_decode(term->utf8_buf,
-					    term->utf8_expect);
-					term_put_unicode(term, cp);
+			} else if (ch >= 0x80) {
+				/* High bytes: UTF-8 continuation, C1 controls, UTF-8 start */
+				if (ch < 0xC0 && term->utf8_expect > 0) {
+					/* UTF-8 continuation byte (priority over C1) */
+					term->utf8_buf[term->utf8_len++] = ch;
+					if (term->utf8_len == term->utf8_expect) {
+						long cp = utf8_decode(term->utf8_buf,
+						    term->utf8_expect);
+						term_put_unicode(term, cp);
+						term->utf8_expect = 0;
+					}
+				} else if (ch == 0x84) {
+					/* IND (8-bit C1) - same as ESC D */
+					term_newline(term);
+				} else if (ch == 0x85) {
+					/* NEL (8-bit C1) - same as ESC E */
+					term_carriage_return(term);
+					term_newline(term);
+				} else if (ch == 0x8D) {
+					/* RI (8-bit C1) - same as ESC M */
+					if (term->cur_row == term->scroll_top)
+						term_scroll_down(term,
+						    term->scroll_top,
+						    term->scroll_bottom, 1);
+					else if (term->cur_row > 0)
+						term->cur_row--;
+					term_dirty_row(term, term->cur_row);
+				} else if (ch == 0x90) {
+					/* DCS (8-bit C1) - same as ESC P */
+					term->parse_state = PARSE_DCS;
+				} else if (ch == 0x9B) {
+					/* CSI (8-bit C1) - same as ESC [ */
+					term->parse_state = PARSE_CSI;
+					term->num_params = 0;
+					term->intermediate = 0;
+					memset(term->params, 0,
+					    sizeof(term->params));
+				} else if (ch == 0x9D) {
+					/* OSC (8-bit C1) - same as ESC ] */
+					term->parse_state = PARSE_OSC;
+					term->osc_len = 0;
+					term->osc_param = 0;
+				} else if (ch == 0x9C) {
+					/* ST (8-bit C1) - string terminator */
+				} else if (ch >= 0x80 && ch <= 0x9F) {
+					/* Other C1 codes: ignore */
+				} else if (ch >= 0xC0) {
+					/* UTF-8 start byte: begin new sequence.
+					 * If mid-sequence, abandon incomplete
+					 * one and start fresh (error recovery). */
 					term->utf8_expect = 0;
+					if (ch < 0xE0) {
+						term->utf8_expect = 2;
+					} else if (ch < 0xF0) {
+						term->utf8_expect = 3;
+					} else if (ch < 0xF8) {
+						term->utf8_expect = 4;
+					}
+					if (term->utf8_expect) {
+						term->utf8_buf[0] = ch;
+						term->utf8_len = 1;
+					}
+				} else if (ch >= 0xA0) {
+					/* Stray continuation without start */
+					term->utf8_expect = 0;
+					term_put_char(term, '?');
 				}
-			} else if (ch == 0x84) {
-				/* IND (8-bit C1) - same as ESC D */
-				term_newline(term);
-			} else if (ch == 0x85) {
-				/* NEL (8-bit C1) - same as ESC E */
-				term_carriage_return(term);
-				term_newline(term);
-			} else if (ch == 0x8D) {
-				/* RI (8-bit C1) - same as ESC M */
-				if (term->cur_row == term->scroll_top)
-					term_scroll_down(term,
-					    term->scroll_top,
-					    term->scroll_bottom, 1);
-				else if (term->cur_row > 0)
-					term->cur_row--;
-				term_dirty_row(term, term->cur_row);
-			} else if (ch == 0x90) {
-				/* DCS (8-bit C1) - same as ESC P */
-				term->parse_state = PARSE_DCS;
-			} else if (ch == 0x9B) {
-				/* CSI (8-bit C1) - same as ESC [ */
-				term->parse_state = PARSE_CSI;
-				term->num_params = 0;
-				term->intermediate = 0;
-				memset(term->params, 0,
-				    sizeof(term->params));
-			} else if (ch == 0x9D) {
-				/* OSC (8-bit C1) - same as ESC ] */
-				term->parse_state = PARSE_OSC;
-				term->osc_len = 0;
-				term->osc_param = 0;
-			} else if (ch == 0x9C) {
-				/* ST (8-bit C1) - string terminator */
-			} else if (ch >= 0x80 && ch <= 0x9F) {
-				/* Other C1 codes: ignore */
-			} else if (ch >= 0xC0) {
-				/* UTF-8 start byte: begin new sequence.
-				 * If mid-sequence, abandon incomplete
-				 * one and start fresh (error recovery). */
-				term->utf8_expect = 0;
-				if (ch < 0xE0) {
-					term->utf8_expect = 2;
-				} else if (ch < 0xF0) {
-					term->utf8_expect = 3;
-				} else if (ch < 0xF8) {
-					term->utf8_expect = 4;
-				}
-				if (term->utf8_expect) {
-					term->utf8_buf[0] = ch;
-					term->utf8_len = 1;
-				}
-			} else if (ch >= 0xA0) {
-				/* Stray continuation without start */
-				term->utf8_expect = 0;
-				term_put_char(term, '?');
-			} else if (ch >= 0x20) {
-				/* Printable character */
-				term_put_char(term, ch);
 			}
 			break;
 
@@ -459,11 +495,17 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 	c1 = term_clamp(c1, 0, term->active_cols - 1);
 	c2 = term_clamp(c2, 0, term->active_cols - 1);
 
+	/*
+	 * Word-at-a-time fill optimization: TermCell is 2 bytes
+	 * (ch + attr), so we can fill with 16-bit writes.
+	 * 68000 is big-endian: ch is high byte, attr is low byte.
+	 * fill = (' ' << 8) | ATTR_NORMAL = 0x2000
+	 */
 	for (r = r1; r <= r2; r++) {
-		for (c = c1; c <= c2; c++) {
-			term->screen[r][c].ch = ' ';
-			term->screen[r][c].attr = ATTR_NORMAL;
-		}
+		unsigned short fill = ((unsigned short)' ' << 8) | ATTR_NORMAL;
+		unsigned short *p = (unsigned short *)&term->screen[r][c1];
+		for (c = c1; c <= c2; c++)
+			*p++ = fill;
 		term_dirty_row(term, r);
 	}
 }
@@ -478,7 +520,7 @@ term_save_scrollback(Terminal *term, short row)
 		return;
 
 	memcpy(term->scrollback[term->sb_head], term->screen[row],
-	    TERM_COLS * sizeof(TermCell));
+	    term->active_cols * sizeof(TermCell));
 
 	term->sb_head++;
 	if (term->sb_head >= TERM_SCROLLBACK_LINES)
@@ -508,15 +550,15 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 			term_save_scrollback(term, r);
 	}
 
-	/* Move lines up */
+	/* Move lines up (copy only active columns for speed) */
 	for (r = top; r <= bottom - count; r++) {
 		memcpy(term->screen[r], term->screen[r + count],
-		    TERM_COLS * sizeof(TermCell));
+		    term->active_cols * sizeof(TermCell));
 	}
 
 	/* Clear newly exposed lines at bottom */
 	for (r = bottom - count + 1; r <= bottom; r++) {
-		for (c = 0; c < TERM_COLS; c++) {
+		for (c = 0; c < term->active_cols; c++) {
 			term->screen[r][c].ch = ' ';
 			term->screen[r][c].attr = ATTR_NORMAL;
 		}
@@ -539,15 +581,15 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 	if (count > (bottom - top + 1))
 		count = bottom - top + 1;
 
-	/* Move lines down */
+	/* Move lines down (copy only active columns for speed) */
 	for (r = bottom; r >= top + count; r--) {
 		memcpy(term->screen[r], term->screen[r - count],
-		    TERM_COLS * sizeof(TermCell));
+		    term->active_cols * sizeof(TermCell));
 	}
 
 	/* Clear newly exposed lines at top */
 	for (r = top; r < top + count; r++) {
-		for (c = 0; c < TERM_COLS; c++) {
+		for (c = 0; c < term->active_cols; c++) {
 			term->screen[r][c].ch = ' ';
 			term->screen[r][c].attr = ATTR_NORMAL;
 		}
