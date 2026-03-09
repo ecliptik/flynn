@@ -1,4 +1,6 @@
-# Flynn 1.0 Pre-Release Audit Plan
+# Flynn 1.0 Pre-Release Audit (Historical)
+
+> **Note:** This audit was performed prior to the v1.0.0 release. Issues documented here have been addressed.
 
 Consolidated findings from performance profiling and security analysis of all
 source files in `src/` (22 files, ~7,400 lines of C).

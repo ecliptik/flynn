@@ -1,4 +1,6 @@
-# Flynn Feature Roadmap
+# Flynn Feature Roadmap (Historical)
+
+> **Note:** All phases below were completed for v1.0.0. See `TODO.md` for the current roadmap.
 
 Generated 2026-03-06 from team-based planning analysis.
 

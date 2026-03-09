@@ -466,7 +466,7 @@ A comprehensive automation guide was written at `docs/SNOW-GUI-AUTOMATION.md`.
 
 Using the GUI automation techniques, Claude performed the entire System 6.0.8 installation unattended — launching the Installer from a floppy, clicking through the UI, and swapping four floppy disk images via Snow's Drives menu as the Installer requested them. The result is a bootable 90MB SCSI hard drive image at `diskimages/snow-sys608.img`.
 
-Creating the SCSI drive image itself required trial and error — three failed approaches before finding a pre-formatted blank HFS image with the proper Apple partition map and SCSI driver. See `docs/DEVLOG.md` for the full technical details and `docs/screenshots/` for step-by-step screenshots.
+Creating the SCSI drive image itself required trial and error — three failed approaches before finding a pre-formatted blank HFS image with the proper Apple partition map and SCSI driver.
 
 ### What's Next
 

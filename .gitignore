@@ -27,5 +27,7 @@ test_phase5.py
 test_launch.py
 tests/__pycache__/
 
-# Release artifacts
+# Release and build artifacts
 Flynn_*
+*.bin
+About_Flynn.txt
