@@ -7,7 +7,7 @@
 #include "Processes.r"
 
 resource 'MBAR' (128) {
-	{ 128, 129, 130, 133, 131, 132 }
+	{ 128, 129, 130, 131, 133, 132 }
 };
 
 resource 'MENU' (128, "Apple") {
@@ -37,7 +37,9 @@ resource 'MENU' (130, "Edit") {
 		"Cut", noIcon, "X", noMark, plain;
 		"Copy", noIcon, "C", noMark, plain;
 		"Paste", noIcon, "V", noMark, plain;
-		"Clear", noIcon, noKey, noMark, plain
+		"Clear", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Select All", noIcon, "A", noMark, plain
 	}
 };
 

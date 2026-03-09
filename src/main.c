@@ -79,6 +79,7 @@ static void do_font_change(short font_id, short font_size);
 static void do_window_resize(Session *s, short width, short height);
 static void do_copy(void);
 static void do_paste(void);
+static void do_select_all(void);
 static void do_dns_server_dialog(void);
 static short pixel_to_row(Session *s, short v);
 static short pixel_to_col(Session *s, short h);
@@ -214,14 +215,21 @@ update_menus(void)
 		DisableItem(file_menu, FILE_MENU_DISCONNECT_ID);
 	}
 
-	/* Edit menu: Copy/Paste only when connected */
-	if (connected) {
+	/* Edit menu: Copy when selection active, Paste when connected */
+	if (active_session)
+		term_ui_load_state(&active_session->ui);
+	if (term_ui_sel_active())
 		EnableItem(edit_menu, EDIT_MENU_COPY_ID);
-		EnableItem(edit_menu, EDIT_MENU_PASTE_ID);
-	} else {
+	else
 		DisableItem(edit_menu, EDIT_MENU_COPY_ID);
+	if (connected)
+		EnableItem(edit_menu, EDIT_MENU_PASTE_ID);
+	else
 		DisableItem(edit_menu, EDIT_MENU_PASTE_ID);
-	}
+	if (connected)
+		EnableItem(edit_menu, EDIT_MENU_SELALL_ID);
+	else
+		DisableItem(edit_menu, EDIT_MENU_SELALL_ID);
 
 	/* Control menu: enable only when connected */
 	if (ctrl_menu) {
@@ -335,6 +343,11 @@ main_event_loop(void)
 			Session *sess;
 			short prev_state;
 
+			/* Save user interaction state (selection, cursor)
+			 * before cycling through sessions */
+			if (active_session)
+				term_ui_save_state(&active_session->ui);
+
 			for (si = 0; si < MAX_SESSIONS; si++) {
 				sess = session_get(si);
 				if (!sess)
@@ -409,12 +422,6 @@ main_event_loop(void)
 						    send_len);
 
 					if (out_len > 0) {
-						/* Clear selection on new data */
-						if (term_ui_sel_active()) {
-							term_ui_sel_dirty_all(
-							    &sess->terminal);
-							term_ui_sel_clear();
-						}
 
 						if (sess->terminal.
 						    scroll_offset > 0) {
@@ -527,6 +534,12 @@ main_event_loop(void)
 				/* Save state back */
 				term_ui_save_state(&sess->ui);
 			}
+
+			/* Restore active session's state so globals
+			 * are correct between events */
+			if (active_session)
+				term_ui_load_state(&active_session->ui);
+
 			break;
 		}
 		case keyDown:
@@ -656,6 +669,7 @@ handle_key_down(Session *s, EventRecord *event)
 			}
 		}
 
+		update_menus();
 		handle_menu(MenuKey(key));
 		return;
 	}
@@ -869,6 +883,7 @@ handle_mouse_down(EventRecord *event)
 
 	switch (part) {
 	case inMenuBar:
+		update_menus();
 		handle_menu(MenuSelect(event->where));
 		break;
 	case inSysWindow:
@@ -931,8 +946,13 @@ handle_mouse_down(EventRecord *event)
 		sess = session_from_window(win);
 		if (win != FrontWindow()) {
 			SelectWindow(win);
-			if (sess)
+			if (sess) {
+				if (active_session)
+					term_ui_save_state(
+					    &active_session->ui);
 				active_session = sess;
+				term_ui_load_state(&sess->ui);
+			}
 			update_menus();
 		} else if (sess) {
 			handle_content_click(sess, event);
@@ -1032,7 +1052,12 @@ handle_activate(EventRecord *event)
 
 	if (event->modifiers & activeFlag) {
 		if (sess) {
+			/* Save outgoing session's UI state (selection, cursor) */
+			if (active_session)
+				term_ui_save_state(&active_session->ui);
 			active_session = sess;
+			/* Load incoming session's UI state */
+			term_ui_load_state(&sess->ui);
 			update_menus();
 		}
 	}
@@ -1111,6 +1136,9 @@ handle_menu(long menu_id)
 				break;
 			case EDIT_MENU_PASTE_ID:
 				do_paste();
+				break;
+			case EDIT_MENU_SELALL_ID:
+				do_select_all();
 				break;
 			}
 		}
@@ -1277,7 +1305,11 @@ handle_menu(long menu_id)
 					continue;
 				if (count == win_idx) {
 					SelectWindow(ws->window);
+					if (active_session)
+						term_ui_save_state(
+						    &active_session->ui);
 					active_session = ws;
+					term_ui_load_state(&ws->ui);
 					break;
 				}
 				count++;
@@ -2028,13 +2060,21 @@ do_copy(void)
 	if (!s)
 		return;
 
+	/* Ensure global sel reflects this session's selection */
+	term_ui_load_state(&s->ui);
+
 	buf_size = (long)s->terminal.active_rows *
 	    (s->terminal.active_cols + 1);
 	buf = (char *)NewPtr(buf_size);
 	if (!buf)
 		return;
 
-	if (term_ui_sel_active()) {
+	if (!term_ui_sel_active()) {
+		DisposePtr((Ptr)buf);
+		return;
+	}
+
+	{
 		short sr, sc, er, ec;
 		short c_start, c_end;
 
@@ -2082,38 +2122,6 @@ do_copy(void)
 			}
 			len += last_nonspace + 1;
 			if (row < er)
-				buf[len++] = '\r';
-		}
-	} else {
-		len = 0;
-		for (row = 0; row < s->terminal.active_rows; row++) {
-			last_nonspace = -1;
-			for (col = 0; col < s->terminal.active_cols;
-			    col++) {
-				char cc;
-				const GlyphInfo *gi;
-
-				cell = terminal_get_display_cell(
-				    &s->terminal, row, col);
-				if ((cell->attr & ATTR_GLYPH) &&
-				    cell->ch == GLYPH_WIDE_SPACER) {
-					buf[len + col] = ' ';
-					continue;
-				}
-				if (cell->attr & ATTR_GLYPH) {
-					gi = glyph_get_info(cell->ch);
-					cc = gi ? gi->copy_char : '?';
-				} else if (cell->attr & ATTR_BRAILLE) {
-					cc = '.';
-				} else {
-					cc = cell->ch;
-				}
-				buf[len + col] = cc;
-				if (cc != ' ')
-					last_nonspace = col;
-			}
-			len += last_nonspace + 1;
-			if (row < s->terminal.active_rows - 1)
 				buf[len++] = '\r';
 		}
 	}
@@ -2165,6 +2173,32 @@ do_paste(void)
 		HUnlock(h);
 	}
 	DisposeHandle(h);
+}
+
+static void
+do_select_all(void)
+{
+	Session *s = active_session;
+
+	if (!s || s->conn.state != CONN_STATE_CONNECTED)
+		return;
+
+	term_ui_sel_start(0, 0, 0);
+	term_ui_sel_extend(s->terminal.active_rows - 1,
+	    s->terminal.active_cols - 1, &s->terminal);
+	term_ui_sel_finalize();
+	term_ui_sel_dirty_all(&s->terminal);
+
+	{
+		GrafPtr save;
+
+		GetPort(&save);
+		SetPort(s->window);
+		term_ui_draw(s->window, &s->terminal);
+		SetPort(save);
+	}
+
+	update_menus();
 }
 
 static short

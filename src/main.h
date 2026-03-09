@@ -35,6 +35,8 @@
 #define EDIT_MENU_COPY_ID   4
 #define EDIT_MENU_PASTE_ID  5
 #define EDIT_MENU_CLEAR_ID  6
+/* separator = 7 */
+#define EDIT_MENU_SELALL_ID 8
 
 /* Preferences menu items — organized by section */
 #define PREFS_FONTS_HDR      1   /* disabled section header */
