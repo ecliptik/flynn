@@ -139,7 +139,7 @@ resource 'DITL' (129, "Connect") {
 
 /* About dialog */
 resource 'DLOG' (130, "About Flynn") {
-	{80, 100, 295, 400},
+	{80, 100, 315, 400},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -152,7 +152,7 @@ resource 'DLOG' (130, "About Flynn") {
 resource 'DITL' (130, "About Flynn") {
 	{
 		/* OK button */
-		{175, 115, 195, 185},
+		{195, 115, 215, 185},
 		Button { enabled, "OK" };
 
 		/* Icon */
@@ -182,6 +182,10 @@ resource 'DITL' (130, "About Flynn") {
 		/* Website */
 		{128, 30, 144, 270},
 		StaticText { disabled, "https://www.ecliptik.com" };
+
+		/* GitHub */
+		{148, 30, 164, 270},
+		StaticText { disabled, "https://github.com/ecliptik/flynn" };
 	}
 };
 
