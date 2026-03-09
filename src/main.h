@@ -26,7 +26,6 @@
 #define FILE_MENU_BOOKMARKS_ID  4
 /* separator = 5 */
 #define FILE_MENU_QUIT_ID       6
-#define FILE_MENU_BM_BASE       7	/* first bookmark menu item */
 
 /* Edit menu items */
 #define EDIT_MENU_UNDO_ID   1

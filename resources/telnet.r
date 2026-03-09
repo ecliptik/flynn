@@ -131,6 +131,10 @@ resource 'DITL' (129, "Connect") {
 
 		{75, 90, 91, 235},
 		EditText { enabled, "" };
+
+		/* Bookmarks button */
+		{125, 15, 145, 145},
+		Button { enabled, "Bookmarks\311" };
 	}
 };
 

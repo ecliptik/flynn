@@ -63,7 +63,6 @@ static void init_menus(void);
 static void update_menus(void);
 static void update_window_menu(void);
 static void update_prefs_menu(void);
-static void rebuild_bookmark_menu(void);
 static void main_event_loop(void);
 static Boolean handle_menu(long menu_id);
 static void handle_mouse_down(EventRecord *event);
@@ -95,51 +94,31 @@ main(void)
 	prefs_load(&prefs);
 	term_ui_set_dark_mode(prefs.dark_mode);
 
-	/* Create first session */
-	active_session = session_new();
-	if (!active_session) {
-		SysBeep(10);
-		ExitToShell();
+	/* Initialize font metrics without corrupting WMgr port.
+	 * We use a temporary offscreen port to measure font dimensions.
+	 * Never call term_ui_set_font() on the WMgr port — that
+	 * permanently changes the system font used for menus, title
+	 * bars, and dialogs from Chicago 12 to the terminal font. */
+	{
+		GrafPtr save_port;
+		GrafPort temp_port;
+
+		GetPort(&save_port);
+		OpenPort(&temp_port);
+		term_ui_set_font((WindowPtr)&temp_port,
+		    prefs.font_id, prefs.font_size);
+		ClosePort(&temp_port);
+		SetPort(save_port);
 	}
 
-	SetPort(active_session->window);
-	term_ui_set_font(active_session->window, prefs.font_id,
-	    prefs.font_size);
-
-	/* Compute grid and size window to fit */
-	active_session->terminal.active_cols =
-	    (MAX_WIN_WIDTH - LEFT_MARGIN * 2) / g_cell_width;
-	active_session->terminal.active_rows =
-	    (MAX_WIN_HEIGHT - TOP_MARGIN * 2) / g_cell_height;
-	if (active_session->terminal.active_cols > TERM_DEFAULT_COLS)
-		active_session->terminal.active_cols = TERM_DEFAULT_COLS;
-	if (active_session->terminal.active_rows > TERM_DEFAULT_ROWS)
-		active_session->terminal.active_rows = TERM_DEFAULT_ROWS;
-	active_session->terminal.scroll_bottom =
-	    active_session->terminal.active_rows - 1;
-
-	SizeWindow(active_session->window,
-	    LEFT_MARGIN * 2 +
-	    active_session->terminal.active_cols * g_cell_width,
-	    TOP_MARGIN * 2 +
-	    active_session->terminal.active_rows * g_cell_height, true);
-
-	term_ui_init(active_session->window, &active_session->terminal);
-
-	active_session->telnet.preferred_ttype = prefs.terminal_type;
-	active_session->telnet.cols = active_session->terminal.active_cols;
-	active_session->telnet.rows = active_session->terminal.active_rows;
-
-	if (prefs.dark_mode)
-		PaintRect(&active_session->window->portRect);
-
-	rebuild_bookmark_menu();
 	update_menus();
 	update_prefs_menu();
 
-	/* Slow MacTCP init — window is already visible */
+	/* MacTCP init before first connect */
 	conn_init();
-	active_session->conn.dns_server = ip2long(prefs.dns_server);
+
+	/* Launch directly into connect dialog */
+	do_connect();
 
 	main_event_loop();
 	return 0;
@@ -199,7 +178,6 @@ static void
 update_menus(void)
 {
 	Boolean connected;
-	short i;
 
 	connected = (active_session &&
 	    active_session->conn.state == CONN_STATE_CONNECTED);
@@ -239,17 +217,6 @@ update_menus(void)
 		}
 	}
 
-	/* Bookmark menu items: enable when active session is disconnected */
-	for (i = 0; i < prefs.bookmark_count; i++) {
-		if (connected)
-			DisableItem(file_menu,
-			    FILE_MENU_BM_BASE + i);
-		else
-			EnableItem(file_menu,
-			    FILE_MENU_BM_BASE + i);
-	}
-
-
 	update_window_menu();
 }
 
@@ -284,33 +251,6 @@ update_window_menu(void)
 	}
 }
 
-static void
-rebuild_bookmark_menu(void)
-{
-	short count, i;
-	Str255 item_str;
-	short len;
-
-	/* Remove old bookmark items (items after Quit) */
-	count = CountMItems(file_menu);
-	while (count > FILE_MENU_QUIT_ID) {
-		DeleteMenuItem(file_menu, count);
-		count--;
-	}
-
-	/* Append bookmark entries */
-	for (i = 0; i < prefs.bookmark_count; i++) {
-		/* AppendMenu with placeholder, then SetMenuItemText
-		 * to avoid metacharacter interpretation */
-		AppendMenu(file_menu, "\p ");
-		len = strlen(prefs.bookmarks[i].name);
-		if (len > 255) len = 255;
-		item_str[0] = len;
-		memcpy(&item_str[1], prefs.bookmarks[i].name, len);
-		SetMenuItemText(file_menu,
-		    FILE_MENU_BM_BASE + i, item_str);
-	}
-}
 
 static void
 main_event_loop(void)
@@ -1073,11 +1013,6 @@ handle_menu(long menu_id)
 		}
 		break;
 	case FILE_MENU_ID:
-		if (item >= FILE_MENU_BM_BASE &&
-		    item < FILE_MENU_BM_BASE + prefs.bookmark_count) {
-			do_connect_bookmark(item - FILE_MENU_BM_BASE);
-			break;
-		}
 		switch (item) {
 		case FILE_MENU_CONNECT_ID:
 			do_connect();
@@ -1320,6 +1255,90 @@ do_about(void)
 	DisposeDialog(dlg);
 }
 
+/* Bookmark popup menu, shared with dialog filter */
+static MenuHandle g_bm_popup;
+
+static pascal Boolean
+connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
+{
+	if (evt->what == mouseDown && g_bm_popup) {
+		Point pt;
+		short item_type;
+		Handle item_h;
+		Rect item_rect;
+
+		pt = evt->where;
+		SetPort(dlg);
+		GlobalToLocal(&pt);
+
+		GetDialogItem(dlg, DLOG_BOOKMARKS,
+		    &item_type, &item_h, &item_rect);
+
+		if (PtInRect(pt, &item_rect)) {
+			long choice;
+			Point popup_pt;
+
+			/* Flash the button */
+			HiliteControl((ControlHandle)item_h, 1);
+
+			popup_pt.h = item_rect.left;
+			popup_pt.v = item_rect.bottom;
+			LocalToGlobal(&popup_pt);
+
+			choice = PopUpMenuSelect(g_bm_popup,
+			    popup_pt.v, popup_pt.h, 0);
+
+			HiliteControl((ControlHandle)item_h, 0);
+
+			if (HiWord(choice) != 0) {
+				short sel;
+				Bookmark *bm;
+				Str255 pstr;
+				short i;
+
+				sel = LoWord(choice) - 1;
+				bm = &prefs.bookmarks[sel];
+
+				/* Fill host */
+				GetDialogItem(dlg,
+				    DLOG_HOST_FIELD,
+				    &item_type, &item_h,
+				    &item_rect);
+				pstr[0] = strlen(bm->host);
+				for (i = 0; i < pstr[0]; i++)
+					pstr[i + 1] = bm->host[i];
+				SetDialogItemText(item_h, pstr);
+
+				/* Fill port */
+				GetDialogItem(dlg,
+				    DLOG_PORT_FIELD,
+				    &item_type, &item_h,
+				    &item_rect);
+				sprintf((char *)&pstr[1],
+				    "%d", bm->port);
+				pstr[0] = strlen(
+				    (char *)&pstr[1]);
+				SetDialogItemText(item_h, pstr);
+
+				/* Clear username */
+				GetDialogItem(dlg,
+				    DLOG_USER_FIELD,
+				    &item_type, &item_h,
+				    &item_rect);
+				pstr[0] = 0;
+				SetDialogItemText(item_h, pstr);
+
+				SelectDialogItemText(dlg,
+				    DLOG_HOST_FIELD, 0, 32767);
+			}
+
+			*item = 0;
+			return true;  /* event handled */
+		}
+	}
+	return false;  /* let ModalDialog handle it */
+}
+
 static void
 do_connect(void)
 {
@@ -1377,48 +1396,201 @@ do_connect(void)
 
 	s->telnet.preferred_ttype = prefs.terminal_type;
 
-	if (conn_open_dialog(&s->conn)) {
-		telnet_init(&s->telnet);
-		s->telnet.preferred_ttype = prefs.terminal_type;
-		s->telnet.cols = s->terminal.active_cols;
-		s->telnet.rows = s->terminal.active_rows;
-		terminal_reset(&s->terminal);
+	/* Show connect dialog with bookmark support */
+	{
+		DialogPtr dlg;
+		short item_hit;
+		Handle item_h;
+		short item_type;
+		Rect item_rect;
+		Str255 pstr;
+		long port_num;
+		short i;
+		Boolean connected = false;
 
-		/* Save last-used host/port/username */
-		strncpy(prefs.host, s->conn.host,
-		    sizeof(prefs.host) - 1);
-		prefs.host[sizeof(prefs.host) - 1] = '\0';
-		prefs.port = s->conn.port;
-		strncpy(prefs.username, s->conn.username,
-		    sizeof(prefs.username) - 1);
-		prefs.username[sizeof(prefs.username) - 1] = '\0';
-		prefs_save(&prefs);
+		dlg = GetNewDialog(DLOG_CONNECT_ID, 0L,
+		    (WindowPtr)-1L);
+		if (!dlg) {
+			SysBeep(10);
+			update_menus();
+			return;
+		}
 
-		/* Auto-send username after connect */
+		/* Pre-fill host */
+		if (s->conn.host[0]) {
+			GetDialogItem(dlg, DLOG_HOST_FIELD,
+			    &item_type, &item_h, &item_rect);
+			pstr[0] = strlen(s->conn.host);
+			for (i = 0; i < pstr[0]; i++)
+				pstr[i + 1] = s->conn.host[i];
+			SetDialogItemText(item_h, pstr);
+		}
+		/* Pre-fill port */
+		if (s->conn.port > 0) {
+			GetDialogItem(dlg, DLOG_PORT_FIELD,
+			    &item_type, &item_h, &item_rect);
+			sprintf((char *)&pstr[1], "%d", s->conn.port);
+			pstr[0] = strlen((char *)&pstr[1]);
+			SetDialogItemText(item_h, pstr);
+		}
+		/* Pre-fill username */
 		if (s->conn.username[0]) {
-			conn_send(&s->conn, s->conn.username,
-			    strlen(s->conn.username));
-			conn_send(&s->conn, "\r", 1);
+			GetDialogItem(dlg, DLOG_USER_FIELD,
+			    &item_type, &item_h, &item_rect);
+			pstr[0] = strlen(s->conn.username);
+			for (i = 0; i < pstr[0]; i++)
+				pstr[i + 1] = s->conn.username[i];
+			SetDialogItemText(item_h, pstr);
 		}
 
-		/* Update window title */
-		{
-			char tmp[270];
-			Str255 title;
-			short tlen, ti;
-
-			tlen = sprintf(tmp, "Flynn - %s", s->conn.host);
-			if (tlen > 254) tlen = 254;
-			title[0] = tlen;
-			for (ti = 0; ti < tlen; ti++)
-				title[ti + 1] = tmp[ti];
-			SetWTitle(s->window, title);
+		/* Hide Bookmarks button if no bookmarks saved */
+		if (prefs.bookmark_count <= 0) {
+			GetDialogItem(dlg, DLOG_BOOKMARKS,
+			    &item_type, &item_h, &item_rect);
+			HideDialogItem(dlg, DLOG_BOOKMARKS);
 		}
-	} else if (s->conn.state == CONN_STATE_IDLE &&
-	    session_count() > 1) {
-		/* User cancelled on a fresh session — if it was just
-		 * created (never connected, no host set), destroy it */
-		if (!s->conn.host[0]) {
+
+		/* Build bookmark popup menu */
+		g_bm_popup = 0L;
+		if (prefs.bookmark_count > 0) {
+			short bmi;
+
+			g_bm_popup = NewMenu(200, "\p");
+			for (bmi = 0;
+			    bmi < prefs.bookmark_count;
+			    bmi++) {
+				Str255 bm_item;
+				short ni, nlen;
+
+				nlen = strlen(
+				    prefs.bookmarks[bmi].name);
+				if (nlen > 254) nlen = 254;
+				bm_item[0] = nlen;
+				for (ni = 0; ni < nlen; ni++)
+					bm_item[ni + 1] =
+					    prefs.bookmarks
+					    [bmi].name[ni];
+				AppendMenu(g_bm_popup, "\p ");
+				SetMenuItemText(g_bm_popup,
+				    bmi + 1, bm_item);
+			}
+			InsertMenu(g_bm_popup, -1);
+		}
+
+		ShowWindow(dlg);
+
+		for (;;) {
+			ModalDialog(
+			    (ModalFilterUPP)connect_dlg_filter,
+			    &item_hit);
+
+			if (item_hit == DLOG_CANCEL ||
+			    item_hit == DLOG_OK)
+				break;
+		}
+
+		if (g_bm_popup) {
+			DeleteMenu(200);
+			DisposeMenu(g_bm_popup);
+			g_bm_popup = 0L;
+		}
+
+		if (item_hit == DLOG_OK) {
+			/* Extract host */
+			GetDialogItem(dlg, DLOG_HOST_FIELD,
+			    &item_type, &item_h, &item_rect);
+			GetDialogItemText(item_h, pstr);
+			if (pstr[0] > 0) {
+				for (i = 0; i < pstr[0] &&
+				    i < (short)(sizeof(
+				    s->conn.host) - 1); i++)
+					s->conn.host[i] =
+					    pstr[i + 1];
+				s->conn.host[i] = '\0';
+			}
+
+			/* Extract port */
+			GetDialogItem(dlg, DLOG_PORT_FIELD,
+			    &item_type, &item_h, &item_rect);
+			GetDialogItemText(item_h, pstr);
+			if (pstr[0] > 0) {
+				pstr[pstr[0] + 1] = '\0';
+				StringToNum(pstr, &port_num);
+				s->conn.port = (short)port_num;
+			} else {
+				s->conn.port = DEFAULT_PORT;
+			}
+
+			/* Extract username */
+			GetDialogItem(dlg, DLOG_USER_FIELD,
+			    &item_type, &item_h, &item_rect);
+			GetDialogItemText(item_h, pstr);
+			if (pstr[0] > 0 && pstr[0] <
+			    (short)(sizeof(
+			    s->conn.username) - 1)) {
+				for (i = 0; i < pstr[0]; i++)
+					s->conn.username[i] =
+					    pstr[i + 1];
+				s->conn.username[i] = '\0';
+			} else {
+				s->conn.username[0] = '\0';
+			}
+
+			DisposeDialog(dlg);
+
+			if (s->conn.host[0])
+				connected = conn_connect(
+				    &s->conn,
+				    s->conn.host,
+				    s->conn.port);
+		} else {
+			DisposeDialog(dlg);
+		}
+
+		if (connected) {
+			telnet_init(&s->telnet);
+			s->telnet.preferred_ttype =
+			    prefs.terminal_type;
+			s->telnet.cols = s->terminal.active_cols;
+			s->telnet.rows = s->terminal.active_rows;
+			terminal_reset(&s->terminal);
+
+			/* Save last-used host/port/username */
+			strncpy(prefs.host, s->conn.host,
+			    sizeof(prefs.host) - 1);
+			prefs.host[sizeof(prefs.host) - 1] = '\0';
+			prefs.port = s->conn.port;
+			strncpy(prefs.username, s->conn.username,
+			    sizeof(prefs.username) - 1);
+			prefs.username[sizeof(prefs.username) - 1] =
+			    '\0';
+			prefs_save(&prefs);
+
+			/* Auto-send username after connect */
+			if (s->conn.username[0]) {
+				conn_send(&s->conn,
+				    s->conn.username,
+				    strlen(s->conn.username));
+				conn_send(&s->conn, "\r", 1);
+			}
+
+			/* Update window title */
+			{
+				char tmp[270];
+				Str255 title;
+				short tlen, ti;
+
+				tlen = sprintf(tmp, "Flynn - %s",
+				    s->conn.host);
+				if (tlen > 254) tlen = 254;
+				title[0] = tlen;
+				for (ti = 0; ti < tlen; ti++)
+					title[ti + 1] = tmp[ti];
+				SetWTitle(s->window, title);
+			}
+		} else if (s->conn.state == CONN_STATE_IDLE &&
+		    !s->conn.host[0]) {
+			/* User cancelled — destroy fresh session */
 			if (s == active_session)
 				active_session = 0L;
 			session_destroy(s);
@@ -1660,6 +1832,7 @@ bm_filter(DialogPtr dlg, EventRecord *event, short *item)
 	short i;
 
 	if (event->what == mouseDown) {
+		SetPort(dlg);
 		pt = event->where;
 		GlobalToLocal(&pt);
 		if (PtInRect(pt, &bm_list_rect)) {
@@ -1670,7 +1843,7 @@ bm_filter(DialogPtr dlg, EventRecord *event, short *item)
 				bm_selection = i;
 			else
 				bm_selection = -1;
-			/* Redraw list */
+			/* Redraw list in dialog port */
 			bm_list_draw((WindowPtr)dlg, BM_LIST);
 			*item = BM_LIST;
 			return true;
@@ -1710,6 +1883,10 @@ do_bookmarks(void)
 
 		if (item_hit == BM_DONE)
 			break;
+
+		/* List click handled by filter — just redraw */
+		if (item_hit == BM_LIST)
+			continue;
 
 		if (item_hit == BM_ADD) {
 			if (prefs.bookmark_count >= MAX_BOOKMARKS) {
@@ -1771,20 +1948,16 @@ do_bookmarks(void)
 				continue;
 			}
 			DisposeDialog(dlg);
-			if (changed) {
+			if (changed)
 				prefs_save(&prefs);
-				rebuild_bookmark_menu();
-			}
 			do_connect_bookmark(bm_selection);
 			return;
 		}
 	}
 
 	DisposeDialog(dlg);
-	if (changed) {
+	if (changed)
 		prefs_save(&prefs);
-		rebuild_bookmark_menu();
-	}
 }
 
 static void
