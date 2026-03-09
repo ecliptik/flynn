@@ -22,16 +22,134 @@
 #include "glyphs.h"
 
 /* ----------------------------------------------------------------
- * Codepoint-to-glyph mapping table (sorted by codepoint for bsearch)
+ * Codepoint-to-glyph mapping tables
+ *
+ * Split into three lookup paths for 68000 performance:
+ * 1. Direct-index tables for dense box-drawing (U+2500-U+253C) and
+ *    block element (U+2580-U+2593) ranges (~20 cycles vs ~600)
+ * 2. BMP table (U+0080-U+FFFF) with unsigned short keys (3 bytes/entry)
+ *    for binary search with smaller struct indexing
+ * 3. Astral table (U+10000+) with unsigned long keys, linear search
+ *    (only 11 entries -- not worth binary search overhead)
  * ---------------------------------------------------------------- */
 
+/* BMP mapping: 2-byte codepoint + 1-byte glyph ID */
 typedef struct {
-	long		codepoint;
+	unsigned short	codepoint;
 	unsigned char	glyph_id;
-} GlyphMapping;
+} GlyphMappingBMP;
 
-static const GlyphMapping glyph_map[] = {
-	/* Sorted by codepoint for binary search */
+/* Astral mapping: 4-byte codepoint + 1-byte glyph ID */
+typedef struct {
+	unsigned long	codepoint;
+	unsigned char	glyph_id;
+} GlyphMappingAstral;
+
+/* ----------------------------------------------------------------
+ * Direct lookup tables for dense Unicode ranges
+ *
+ * Box drawing U+2500-U+253C (61 slots) and block elements
+ * U+2580-U+2593 (20 slots).  Gaps filled with 0xFF (no glyph).
+ * Replaces ~7 binary search iterations with a single array index.
+ * ---------------------------------------------------------------- */
+
+#define GLYPH_NONE	0xFF	/* sentinel: no glyph at this offset */
+
+/* U+2500-U+253C: box drawing light lines (61 slots) */
+static const unsigned char box_drawing_glyphs[0x3D] = {
+	GLYPH_BOX_H,		/* U+2500 */
+	GLYPH_NONE,		/* U+2501 */
+	GLYPH_BOX_V,		/* U+2502 */
+	GLYPH_NONE,		/* U+2503 */
+	GLYPH_NONE,		/* U+2504 */
+	GLYPH_NONE,		/* U+2505 */
+	GLYPH_NONE,		/* U+2506 */
+	GLYPH_NONE,		/* U+2507 */
+	GLYPH_NONE,		/* U+2508 */
+	GLYPH_NONE,		/* U+2509 */
+	GLYPH_NONE,		/* U+250A */
+	GLYPH_NONE,		/* U+250B */
+	GLYPH_BOX_DR,		/* U+250C */
+	GLYPH_NONE,		/* U+250D */
+	GLYPH_NONE,		/* U+250E */
+	GLYPH_NONE,		/* U+250F */
+	GLYPH_BOX_DL,		/* U+2510 */
+	GLYPH_NONE,		/* U+2511 */
+	GLYPH_NONE,		/* U+2512 */
+	GLYPH_NONE,		/* U+2513 */
+	GLYPH_BOX_UR,		/* U+2514 */
+	GLYPH_NONE,		/* U+2515 */
+	GLYPH_NONE,		/* U+2516 */
+	GLYPH_NONE,		/* U+2517 */
+	GLYPH_BOX_UL,		/* U+2518 */
+	GLYPH_NONE,		/* U+2519 */
+	GLYPH_NONE,		/* U+251A */
+	GLYPH_NONE,		/* U+251B */
+	GLYPH_BOX_VR,		/* U+251C */
+	GLYPH_NONE,		/* U+251D */
+	GLYPH_NONE,		/* U+251E */
+	GLYPH_NONE,		/* U+251F */
+	GLYPH_NONE,		/* U+2520 */
+	GLYPH_NONE,		/* U+2521 */
+	GLYPH_NONE,		/* U+2522 */
+	GLYPH_NONE,		/* U+2523 */
+	GLYPH_BOX_VL,		/* U+2524 */
+	GLYPH_NONE,		/* U+2525 */
+	GLYPH_NONE,		/* U+2526 */
+	GLYPH_NONE,		/* U+2527 */
+	GLYPH_NONE,		/* U+2528 */
+	GLYPH_NONE,		/* U+2529 */
+	GLYPH_NONE,		/* U+252A */
+	GLYPH_NONE,		/* U+252B */
+	GLYPH_BOX_DH,		/* U+252C */
+	GLYPH_NONE,		/* U+252D */
+	GLYPH_NONE,		/* U+252E */
+	GLYPH_NONE,		/* U+252F */
+	GLYPH_NONE,		/* U+2530 */
+	GLYPH_NONE,		/* U+2531 */
+	GLYPH_NONE,		/* U+2532 */
+	GLYPH_NONE,		/* U+2533 */
+	GLYPH_BOX_UH,		/* U+2534 */
+	GLYPH_NONE,		/* U+2535 */
+	GLYPH_NONE,		/* U+2536 */
+	GLYPH_NONE,		/* U+2537 */
+	GLYPH_NONE,		/* U+2538 */
+	GLYPH_NONE,		/* U+2539 */
+	GLYPH_NONE,		/* U+253A */
+	GLYPH_NONE,		/* U+253B */
+	GLYPH_BOX_VH,		/* U+253C */
+};
+
+/* U+2580-U+2593: block elements and shade characters (20 slots) */
+static const unsigned char block_element_glyphs[0x14] = {
+	GLYPH_BLOCK_UPPER,	/* U+2580 */
+	GLYPH_NONE,		/* U+2581 */
+	GLYPH_NONE,		/* U+2582 */
+	GLYPH_NONE,		/* U+2583 */
+	GLYPH_BLOCK_LOWER,	/* U+2584 */
+	GLYPH_NONE,		/* U+2585 */
+	GLYPH_NONE,		/* U+2586 */
+	GLYPH_NONE,		/* U+2587 */
+	GLYPH_BLOCK_FULL,	/* U+2588 */
+	GLYPH_NONE,		/* U+2589 */
+	GLYPH_NONE,		/* U+258A */
+	GLYPH_NONE,		/* U+258B */
+	GLYPH_BLOCK_LEFT,	/* U+258C */
+	GLYPH_NONE,		/* U+258D */
+	GLYPH_NONE,		/* U+258E */
+	GLYPH_NONE,		/* U+258F */
+	GLYPH_BLOCK_RIGHT,	/* U+2590 */
+	GLYPH_SHADE_LIGHT,	/* U+2591 */
+	GLYPH_SHADE_MEDIUM,	/* U+2592 */
+	GLYPH_SHADE_DARK,	/* U+2593 */
+};
+
+/* ----------------------------------------------------------------
+ * BMP codepoint table (U+0080-U+FFFF, excludes direct-lookup ranges)
+ * Sorted by codepoint for binary search.
+ * ---------------------------------------------------------------- */
+
+static const GlyphMappingBMP glyph_map_bmp[] = {
 	{ 0x00B7, GLYPH_DOT_MIDDLE },
 	{ 0x2190, GLYPH_ARROW_LEFT },
 	{ 0x2191, GLYPH_ARROW_UP },
@@ -40,29 +158,7 @@ static const GlyphMapping glyph_map[] = {
 	{ 0x2217, GLYPH_ASTERISK_OP },
 	{ 0x22EE, GLYPH_ELLIPSIS_V },
 	{ 0x23F5, GLYPH_PLAY },
-	/* Box drawing - light lines */
-	{ 0x2500, GLYPH_BOX_H },
-	{ 0x2502, GLYPH_BOX_V },
-	{ 0x250C, GLYPH_BOX_DR },
-	{ 0x2510, GLYPH_BOX_DL },
-	{ 0x2514, GLYPH_BOX_UR },
-	{ 0x2518, GLYPH_BOX_UL },
-	{ 0x251C, GLYPH_BOX_VR },
-	{ 0x2524, GLYPH_BOX_VL },
-	{ 0x252C, GLYPH_BOX_DH },
-	{ 0x2534, GLYPH_BOX_UH },
-	{ 0x253C, GLYPH_BOX_VH },
-	/* Block elements */
-	{ 0x2580, GLYPH_BLOCK_UPPER },
-	{ 0x2584, GLYPH_BLOCK_LOWER },
-	{ 0x2588, GLYPH_BLOCK_FULL },
-	{ 0x258C, GLYPH_BLOCK_LEFT },
-	{ 0x2590, GLYPH_BLOCK_RIGHT },
-	/* Shade characters */
-	{ 0x2591, GLYPH_SHADE_LIGHT },
-	{ 0x2592, GLYPH_SHADE_MEDIUM },
-	{ 0x2593, GLYPH_SHADE_DARK },
-	/* Quadrants */
+	/* Quadrants (not in block_element_glyphs range) */
 	{ 0x2596, GLYPH_QUAD_LL },
 	{ 0x2597, GLYPH_QUAD_LR },
 	{ 0x2598, GLYPH_QUAD_UL },
@@ -107,7 +203,16 @@ static const GlyphMapping glyph_map[] = {
 	{ 0x2764, GLYPH_EMOJI_HEART },
 	{ 0x276F, GLYPH_CHEVRON_RIGHT },
 	{ 0x2B50, GLYPH_EMOJI_STAR },
-	/* Emoji (U+1Fxxx) */
+};
+
+#define GLYPH_BMP_COUNT	(sizeof(glyph_map_bmp) / sizeof(glyph_map_bmp[0]))
+
+/* ----------------------------------------------------------------
+ * Astral codepoint table (U+10000+, emoji)
+ * Small enough for linear search (~11 entries).
+ * ---------------------------------------------------------------- */
+
+static const GlyphMappingAstral glyph_map_astral[] = {
 	{ 0x1F310, GLYPH_EMOJI_GLOBE },
 	{ 0x1F40D, GLYPH_EMOJI_SNAKE },
 	{ 0x1F44D, GLYPH_EMOJI_THUMBSUP },
@@ -121,7 +226,7 @@ static const GlyphMapping glyph_map[] = {
 	{ 0x1F980, GLYPH_EMOJI_CRAB },
 };
 
-#define GLYPH_MAP_COUNT	(sizeof(glyph_map) / sizeof(glyph_map[0]))
+#define GLYPH_ASTRAL_COUNT	(sizeof(glyph_map_astral) / sizeof(glyph_map_astral[0]))
 
 /* ----------------------------------------------------------------
  * Glyph info table
@@ -467,29 +572,73 @@ static const GlyphBitmap emoji_bitmaps[] = {
  * ---------------------------------------------------------------- */
 
 /*
- * glyph_lookup - binary search for codepoint in glyph_map
+ * glyph_lookup - look up Unicode codepoint in optimized glyph tables
  *
  * Returns glyph index (0x00-0x7F) or -1 if not found.
  * Caller handles braille (U+2800-U+28FF) separately.
+ *
+ * Optimization layers (68000 @ 8MHz):
+ * 1. ASCII fast-path:   cp < 0x80 => immediate return (no lookup needed)
+ * 2. Direct index:      box drawing (U+2500-U+253C) and block elements
+ *                       (U+2580-U+2593) via offset tables (~20 cycles)
+ * 3. BMP binary search: unsigned short keys, smaller struct (~3 bytes)
+ *                       for faster MULU during array indexing
+ * 4. Astral linear:     11 emoji entries, simple scan
  */
 short
 glyph_lookup(long cp)
 {
 	short lo, hi, mid;
-	long map_cp;
+	unsigned short cp16;
+	unsigned short map_cp;
+	short i;
+	unsigned char g;
 
-	lo = 0;
-	hi = GLYPH_MAP_COUNT - 1;
+	/* Fast path: ASCII characters never have glyph entries */
+	if (cp < 0x80)
+		return -1;
 
-	while (lo <= hi) {
-		mid = (lo + hi) / 2;
-		map_cp = glyph_map[mid].codepoint;
-		if (cp == map_cp)
-			return (short)glyph_map[mid].glyph_id;
-		if (cp < map_cp)
-			hi = mid - 1;
-		else
-			lo = mid + 1;
+	/* BMP range: use direct-index tables and binary search */
+	if (cp < 0x10000L) {
+		/* Direct lookup: box drawing U+2500-U+253C */
+		if (cp >= 0x2500 && cp <= 0x253C) {
+			g = box_drawing_glyphs[cp - 0x2500];
+			if (g != GLYPH_NONE)
+				return (short)g;
+			return -1;
+		}
+
+		/* Direct lookup: block elements U+2580-U+2593 */
+		if (cp >= 0x2580 && cp <= 0x2593) {
+			g = block_element_glyphs[cp - 0x2580];
+			if (g != GLYPH_NONE)
+				return (short)g;
+			return -1;
+		}
+
+		/* Binary search BMP table with 16-bit comparisons */
+		cp16 = (unsigned short)cp;
+		lo = 0;
+		hi = GLYPH_BMP_COUNT - 1;
+
+		while (lo <= hi) {
+			mid = (lo + hi) / 2;
+			map_cp = glyph_map_bmp[mid].codepoint;
+			if (cp16 == map_cp)
+				return (short)glyph_map_bmp[mid].glyph_id;
+			if (cp16 < map_cp)
+				hi = mid - 1;
+			else
+				lo = mid + 1;
+		}
+
+		return -1;
+	}
+
+	/* Astral plane: linear search (only ~11 entries) */
+	for (i = 0; i < (short)GLYPH_ASTRAL_COUNT; i++) {
+		if (glyph_map_astral[i].codepoint == (unsigned long)cp)
+			return (short)glyph_map_astral[i].glyph_id;
 	}
 
 	return -1;
