@@ -25,6 +25,13 @@ typedef struct Session {
 	/* Per-session UI state (cursor blink, selection) */
 	UIState		ui;
 
+	/* Per-session display settings */
+	short		font_id;
+	short		font_size;
+	short		cell_width;
+	short		cell_height;
+	short		cell_baseline;
+
 	/* Keystroke send buffer */
 	char		key_send_buf[256];
 	short		key_send_len;

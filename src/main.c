@@ -36,6 +36,26 @@ static FlynnPrefs prefs;
 static RgnHandle grow_clip_rgn = 0L;
 static Session *active_session = 0L;
 
+/* Save current font metrics into session */
+static void
+session_save_font(Session *s)
+{
+	s->cell_width = g_cell_width;
+	s->cell_height = g_cell_height;
+	s->cell_baseline = g_cell_baseline;
+}
+
+/* Restore session's font metrics into globals */
+static void
+session_load_font(Session *s)
+{
+	g_cell_width = s->cell_width;
+	g_cell_height = s->cell_height;
+	g_cell_baseline = s->cell_baseline;
+	g_font_id = s->font_id;
+	g_font_size = s->font_size;
+}
+
 static void
 buffer_key_send(Session *s, const char *data, short len)
 {
@@ -265,6 +285,7 @@ update_menus(void)
 	}
 
 	update_window_menu();
+	update_prefs_menu();
 }
 
 static void
@@ -328,8 +349,9 @@ main_event_loop(void)
 				if (!sess)
 					continue;
 
-				/* Load this session's UI state */
+				/* Load this session's UI + font state */
 				term_ui_load_state(&sess->ui);
+				session_load_font(sess);
 
 				prev_state = sess->conn.state;
 				conn_idle(&sess->conn);
@@ -512,8 +534,10 @@ main_event_loop(void)
 
 			/* Restore active session's state so globals
 			 * are correct between events */
-			if (active_session)
+			if (active_session) {
 				term_ui_load_state(&active_session->ui);
+				session_load_font(active_session);
+			}
 
 			break;
 		}
@@ -902,6 +926,7 @@ handle_mouse_down(EventRecord *event)
 		sess = session_from_window(win);
 		if (!sess)
 			break;
+		session_load_font(sess);
 
 		min_w = LEFT_MARGIN * 2 + MIN_WIN_COLS * g_cell_width;
 		min_h = TOP_MARGIN * 2 + MIN_WIN_ROWS * g_cell_height;
@@ -925,6 +950,7 @@ handle_mouse_down(EventRecord *event)
 					    &active_session->ui);
 				active_session = sess;
 				term_ui_load_state(&sess->ui);
+				session_load_font(sess);
 			}
 			update_menus();
 		} else if (sess) {
@@ -955,6 +981,7 @@ handle_update(EventRecord *event)
 
 	if (sess) {
 		term_ui_load_state(&sess->ui);
+		session_load_font(sess);
 
 		if (sess->conn.state == CONN_STATE_CONNECTED) {
 			char title[270];
@@ -1029,8 +1056,9 @@ handle_activate(EventRecord *event)
 			if (active_session)
 				term_ui_save_state(&active_session->ui);
 			active_session = sess;
-			/* Load incoming session's UI state */
+			/* Load incoming session's UI + font state */
 			term_ui_load_state(&sess->ui);
+			session_load_font(sess);
 			update_menus();
 		}
 	}
@@ -1194,10 +1222,11 @@ handle_menu(long menu_id)
 		case PREFS_XTERM_ID:
 		case PREFS_VT220_ID:
 		case PREFS_VT100_ID:
-			prefs.terminal_type = item - PREFS_XTERM_ID;
 			if (active_session)
 				active_session->telnet.preferred_ttype =
-				    prefs.terminal_type;
+				    item - PREFS_XTERM_ID;
+			/* Also update global default */
+			prefs.terminal_type = item - PREFS_XTERM_ID;
 			prefs_save(&prefs);
 			update_prefs_menu();
 			if (active_session &&
@@ -1271,6 +1300,7 @@ handle_menu(long menu_id)
 						    &active_session->ui);
 					active_session = ws;
 					term_ui_load_state(&ws->ui);
+					session_load_font(ws);
 					break;
 				}
 				count++;
@@ -1411,7 +1441,10 @@ do_connect(void)
 			return;
 		}
 		SetPort(s->window);
-		term_ui_set_font(s->window, prefs.font_id, prefs.font_size);
+		s->font_id = prefs.font_id;
+		s->font_size = prefs.font_size;
+		term_ui_set_font(s->window, s->font_id, s->font_size);
+		session_save_font(s);
 		term_ui_init(s->window, &s->terminal);
 		s->conn.dns_server = ip2long(prefs.dns_server);
 		if (prefs.dark_mode)
@@ -1430,7 +1463,10 @@ do_connect(void)
 			return;
 		}
 		SetPort(s->window);
-		term_ui_set_font(s->window, prefs.font_id, prefs.font_size);
+		s->font_id = prefs.font_id;
+		s->font_size = prefs.font_size;
+		term_ui_set_font(s->window, s->font_id, s->font_size);
+		session_save_font(s);
 		term_ui_init(s->window, &s->terminal);
 		s->conn.dns_server = ip2long(prefs.dns_server);
 		if (prefs.dark_mode)
@@ -1619,9 +1655,11 @@ do_connect(void)
 			    sel_bm->font_size != 0)) {
 				short win_w, win_h;
 
+				s->font_id = sel_bm->font_id;
+				s->font_size = sel_bm->font_size;
 				term_ui_set_font(s->window,
-				    sel_bm->font_id,
-				    sel_bm->font_size);
+				    s->font_id, s->font_size);
+				session_save_font(s);
 				win_w = LEFT_MARGIN * 2 +
 				    TERM_DEFAULT_COLS *
 				    g_cell_width;
@@ -1717,7 +1755,10 @@ do_connect_bookmark(short index)
 			return;
 		}
 		SetPort(s->window);
-		term_ui_set_font(s->window, prefs.font_id, prefs.font_size);
+		s->font_id = prefs.font_id;
+		s->font_size = prefs.font_size;
+		term_ui_set_font(s->window, s->font_id, s->font_size);
+		session_save_font(s);
 		term_ui_init(s->window, &s->terminal);
 		s->conn.dns_server = ip2long(prefs.dns_server);
 		if (prefs.dark_mode)
@@ -1736,7 +1777,10 @@ do_connect_bookmark(short index)
 			return;
 		}
 		SetPort(s->window);
-		term_ui_set_font(s->window, prefs.font_id, prefs.font_size);
+		s->font_id = prefs.font_id;
+		s->font_size = prefs.font_size;
+		term_ui_set_font(s->window, s->font_id, s->font_size);
+		session_save_font(s);
 		term_ui_init(s->window, &s->terminal);
 		s->conn.dns_server = ip2long(prefs.dns_server);
 		if (prefs.dark_mode)
@@ -1756,8 +1800,11 @@ do_connect_bookmark(short index)
 	if (bm->font_id != 0 || bm->font_size != 0) {
 		short win_w, win_h;
 
-		term_ui_set_font(s->window, bm->font_id,
-		    bm->font_size);
+		s->font_id = bm->font_id;
+		s->font_size = bm->font_size;
+		term_ui_set_font(s->window, s->font_id,
+		    s->font_size);
+		session_save_font(s);
 		win_w = LEFT_MARGIN * 2 +
 		    TERM_DEFAULT_COLS * g_cell_width;
 		win_h = TOP_MARGIN * 2 +
@@ -2209,38 +2256,38 @@ do_bookmarks(void)
 static void
 do_font_change(short font_id, short font_size)
 {
-	short si;
-	Session *sess;
 	short win_w, win_h;
 
-	if (font_id == prefs.font_id && font_size == prefs.font_size)
+	if (!active_session)
 		return;
 
-	/* Save preference first — term_ui_set_font uses global metrics */
+	if (font_id == active_session->font_id &&
+	    font_size == active_session->font_size)
+		return;
+
+	/* Update active session only */
+	active_session->font_id = font_id;
+	active_session->font_size = font_size;
+	term_ui_set_font(active_session->window, font_id,
+	    font_size);
+	session_save_font(active_session);
+
+	/* Compute window size for default grid */
+	win_w = LEFT_MARGIN * 2 +
+	    TERM_DEFAULT_COLS * g_cell_width;
+	win_h = TOP_MARGIN * 2 +
+	    TERM_DEFAULT_ROWS * g_cell_height;
+	if (win_w > MAX_WIN_WIDTH)
+		win_w = MAX_WIN_WIDTH;
+	if (win_h > MAX_WIN_HEIGHT)
+		win_h = MAX_WIN_HEIGHT;
+
+	do_window_resize(active_session, win_w, win_h);
+
+	/* Also update global default for new sessions */
 	prefs.font_id = font_id;
 	prefs.font_size = font_size;
 	prefs_save(&prefs);
-
-	/* Apply to all sessions */
-	for (si = 0; si < MAX_SESSIONS; si++) {
-		sess = session_get(si);
-		if (!sess)
-			continue;
-
-		term_ui_set_font(sess->window, font_id, font_size);
-
-		/* Compute window size for default grid */
-		win_w = LEFT_MARGIN * 2 +
-		    TERM_DEFAULT_COLS * g_cell_width;
-		win_h = TOP_MARGIN * 2 +
-		    TERM_DEFAULT_ROWS * g_cell_height;
-		if (win_w > MAX_WIN_WIDTH)
-			win_w = MAX_WIN_WIDTH;
-		if (win_h > MAX_WIN_HEIGHT)
-			win_h = MAX_WIN_HEIGHT;
-
-		do_window_resize(sess, win_w, win_h);
-	}
 
 	update_prefs_menu();
 }
@@ -2251,6 +2298,9 @@ do_window_resize(Session *s, short width, short height)
 	short new_cols, new_rows;
 	GrafPtr save;
 	short i;
+
+	/* Ensure we use this session's font metrics */
+	session_load_font(s);
 
 	/* Compute grid from pixel dimensions */
 	new_cols = (width - LEFT_MARGIN * 2) / g_cell_width;
@@ -2310,26 +2360,40 @@ do_window_resize(Session *s, short width, short height)
 static void
 update_prefs_menu(void)
 {
+	short fid, fsz, ttype;
+
 	if (!prefs_menu)
 		return;
+
+	/* Read from active session if available, else global prefs */
+	if (active_session) {
+		fid = active_session->font_id;
+		fsz = active_session->font_size;
+		ttype = active_session->telnet.preferred_ttype;
+	} else {
+		fid = prefs.font_id;
+		fsz = prefs.font_size;
+		ttype = prefs.terminal_type;
+	}
+
 	CheckItem(prefs_menu, PREFS_FONT9_ID,
-	    prefs.font_id == 4 && prefs.font_size == 9);
+	    fid == 4 && fsz == 9);
 	CheckItem(prefs_menu, PREFS_FONT12_ID,
-	    prefs.font_id == 4 && prefs.font_size == 12);
+	    fid == 4 && fsz == 12);
 	CheckItem(prefs_menu, PREFS_FONT_C10,
-	    prefs.font_id == 22 && prefs.font_size == 10);
+	    fid == 22 && fsz == 10);
 	CheckItem(prefs_menu, PREFS_FONT_CH12,
-	    prefs.font_id == 0 && prefs.font_size == 12);
+	    fid == 0 && fsz == 12);
 	CheckItem(prefs_menu, PREFS_FONT_G9,
-	    prefs.font_id == 3 && prefs.font_size == 9);
+	    fid == 3 && fsz == 9);
 	CheckItem(prefs_menu, PREFS_FONT_G10,
-	    prefs.font_id == 3 && prefs.font_size == 10);
+	    fid == 3 && fsz == 10);
 	CheckItem(prefs_menu, PREFS_XTERM_ID,
-	    prefs.terminal_type == 0);
+	    ttype == 0);
 	CheckItem(prefs_menu, PREFS_VT220_ID,
-	    prefs.terminal_type == 1);
+	    ttype == 1);
 	CheckItem(prefs_menu, PREFS_VT100_ID,
-	    prefs.terminal_type == 2);
+	    ttype == 2);
 	CheckItem(prefs_menu, PREFS_DARK_ID,
 	    prefs.dark_mode != 0);
 }

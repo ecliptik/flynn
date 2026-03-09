@@ -42,9 +42,9 @@ static Selection	sel;
 /* Runtime cell dimensions */
 short			g_cell_width = CELL_WIDTH;
 short			g_cell_height = CELL_HEIGHT;
-static short		g_cell_baseline = CELL_HEIGHT - 2;
-static short		g_font_id = 4;
-static short		g_font_size = 9;
+short			g_cell_baseline = CELL_HEIGHT - 2;
+short			g_font_id = 4;
+short			g_font_size = 9;
 static short		g_dark_mode = 0;
 
 /* Row pixel helpers */

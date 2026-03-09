@@ -30,6 +30,9 @@
 /* Runtime cell dimensions (set by term_ui_set_font) */
 extern short g_cell_width;
 extern short g_cell_height;
+extern short g_cell_baseline;
+extern short g_font_id;
+extern short g_font_size;
 
 /* Margins within the terminal window */
 #define LEFT_MARGIN		2
