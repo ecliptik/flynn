@@ -60,9 +60,7 @@
 
 /* Window menu */
 #define WINDOW_MENU_ID      133
-#define WIN_MENU_CLOSE      1
-/* separator = 2 */
-#define WIN_MENU_FIRST_WIN  3
+#define WIN_MENU_FIRST_WIN  1
 
 /* Control menu items */
 #define CTRL_MENU_CTRLC     1

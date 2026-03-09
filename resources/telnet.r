@@ -21,7 +21,7 @@ resource 'MENU' (129, "File") {
 	129, textMenuProc, allEnabled, enabled, "File",
 	{
 		"New Session\311", noIcon, "N", noMark, plain;
-		"Close Session", noIcon, noKey, noMark, plain;
+		"Close Session", noIcon, "W", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Bookmarks\311", noIcon, "B", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
@@ -70,8 +70,6 @@ resource 'MENU' (131, "Preferences") {
 resource 'MENU' (133, "Window") {
 	133, textMenuProc, allEnabled, enabled, "Window",
 	{
-		"Close Window", noIcon, "W", noMark, plain;
-		"-", noIcon, noKey, noMark, plain
 	}
 };
 

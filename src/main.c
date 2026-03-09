@@ -73,7 +73,6 @@ static void handle_activate(EventRecord *event);
 static void do_about(void);
 static void do_connect(void);
 static void do_connect_bookmark(short index);
-static void do_disconnect(void);
 static void do_bookmarks(void);
 static void do_font_change(short font_id, short font_size);
 static void do_window_resize(Session *s, short width, short height);
@@ -205,15 +204,12 @@ update_menus(void)
 	connected = (active_session &&
 	    active_session->conn.state == CONN_STATE_CONNECTED);
 
-	/* Session menu: Connect vs Disconnect */
-	if (connected) {
-		/* When connected, Connect opens a new session window */
-		EnableItem(file_menu, FILE_MENU_CONNECT_ID);
+	/* File menu: New Session always enabled, Close when session exists */
+	EnableItem(file_menu, FILE_MENU_CONNECT_ID);
+	if (active_session)
 		EnableItem(file_menu, FILE_MENU_DISCONNECT_ID);
-	} else {
-		EnableItem(file_menu, FILE_MENU_CONNECT_ID);
+	else
 		DisableItem(file_menu, FILE_MENU_DISCONNECT_ID);
-	}
 
 	/* Edit menu: Copy when selection active, Paste when connected */
 	if (active_session)
@@ -253,14 +249,6 @@ update_menus(void)
 			    FILE_MENU_BM_BASE + i);
 	}
 
-	/* Window menu: Close only when there's an active session */
-	if (window_menu) {
-		if (active_session)
-			EnableItem(window_menu, WIN_MENU_CLOSE);
-		else
-			DisableItem(window_menu, WIN_MENU_CLOSE);
-
-	}
 
 	update_window_menu();
 }
@@ -275,7 +263,7 @@ update_window_menu(void)
 	if (!window_menu)
 		return;
 
-	/* Remove dynamic items (after separator at position 3) */
+	/* Remove all dynamic items */
 	count = CountMItems(window_menu);
 	while (count > WIN_MENU_FIRST_WIN - 1) {
 		DeleteMenuItem(window_menu, count);
@@ -916,8 +904,6 @@ handle_mouse_down(EventRecord *event)
 					    session_from_window(front);
 				}
 				update_menus();
-				if (session_count() == 0)
-					running = false;
 			}
 		}
 		break;
@@ -1097,7 +1083,24 @@ handle_menu(long menu_id)
 			do_connect();
 			break;
 		case FILE_MENU_DISCONNECT_ID:
-			do_disconnect();
+			if (active_session) {
+				if (active_session->conn.state ==
+				    CONN_STATE_CONNECTED) {
+					ParamText(
+					    "\pDisconnect and close "
+					    "session?",
+					    "\p", "\p", "\p");
+					if (CautionAlert(128, 0L) != 1)
+						break;
+				}
+				term_ui_load_state(
+				    &active_session->ui);
+				session_destroy(active_session);
+				active_session =
+				    session_from_window(
+				    FrontWindow());
+				update_menus();
+			}
 			break;
 		case FILE_MENU_BOOKMARKS_ID:
 			do_bookmarks();
@@ -1270,30 +1273,6 @@ handle_menu(long menu_id)
 		}
 		break;
 	case WINDOW_MENU_ID:
-		switch (item) {
-		case WIN_MENU_CLOSE:
-		{
-			if (active_session) {
-				if (active_session->conn.state ==
-				    CONN_STATE_CONNECTED) {
-					ParamText(
-					    "\pDisconnect and close "
-					    "window?",
-					    "\p", "\p", "\p");
-					if (CautionAlert(128, 0L) != 1)
-						break;
-				}
-				term_ui_load_state(&active_session->ui);
-				session_destroy(active_session);
-				active_session =
-				    session_from_window(
-				    FrontWindow());
-				if (session_count() == 0)
-					running = false;
-			}
-			break;
-		}
-		default:
 		{
 			/* Window list item */
 			short win_idx = item - WIN_MENU_FIRST_WIN;
@@ -1315,7 +1294,6 @@ handle_menu(long menu_id)
 				count++;
 			}
 			break;
-		}
 		}
 		update_menus();
 		break;
@@ -1807,40 +1785,6 @@ do_bookmarks(void)
 		prefs_save(&prefs);
 		rebuild_bookmark_menu();
 	}
-}
-
-static void
-do_disconnect(void)
-{
-	Session *s = active_session;
-	short i;
-
-	if (!s || s->conn.state != CONN_STATE_CONNECTED)
-		return;
-
-	conn_close(&s->conn);
-	terminal_reset(&s->terminal);
-	telnet_init(&s->telnet);
-	s->telnet.preferred_ttype = prefs.terminal_type;
-	s->key_send_len = 0;
-	SetWTitle(s->window, "\pFlynn");
-
-	{
-		GrafPtr save;
-
-		GetPort(&save);
-		SetPort(s->window);
-		if (prefs.dark_mode)
-			PaintRect(&s->window->portRect);
-		else
-			EraseRect(&s->window->portRect);
-		for (i = 0; i < s->terminal.active_rows; i++)
-			s->terminal.dirty[i] = 1;
-		term_ui_draw(s->window, &s->terminal);
-		SetPort(save);
-	}
-
-	update_menus();
 }
 
 static void
