@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.1.1
+                    Version 1.5.0
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -45,7 +45,7 @@ Getting Started
 
 2. Double-click the Flynn application to launch it.
 
-3. Choose "Connect..." from the Session menu, or
+3. Choose "New Session..." from the File menu, or
    press Command-N.
 
 4. Enter the hostname or IP address of the server
@@ -61,8 +61,8 @@ Getting Started
 7. You should see a login prompt from the remote
    host. Type your password to begin your session.
 
-8. To disconnect, choose "Disconnect" from the
-   Session menu, or simply close the window.
+8. To disconnect, choose "Close Session" from the
+   File menu, or simply close the window.
 
 
 Features
@@ -92,6 +92,8 @@ Features
   - Username auto-login
   - Control menu for sending Ctrl-C, Ctrl-D, Ctrl-Z,
     Escape, Ctrl-L, and Break without a Ctrl key
+  - Multiple simultaneous sessions (up to 4 windows)
+  - Window menu with Close Window and window list
   - Keystroke buffering for reliable fast typing
   - Application cursor keys and keypad mode
   - Bracketed paste mode
@@ -107,7 +109,8 @@ and USB keyboards.
 
   Menu Commands
   ~~~~~~~~~~~~~
-  Command-N       Connect to a host
+  Command-N       New session (new window if connected)
+  Command-W       Close active session window
   Command-B       Open Bookmark Manager
   Command-C       Copy (selection or full screen)
   Command-V       Paste clipboard to connection
@@ -190,6 +193,35 @@ fonts produce fewer columns and rows; smaller fonts
 produce more.
 
 
+Multiple Sessions
+-----------------
+
+Flynn supports up to 4 simultaneous sessions in
+separate windows. Each window has its own terminal
+buffer, connection state, cursor, and text selection.
+
+  Opening Additional Sessions:
+  - Press Command-N while already connected to open
+    a new session window. If not connected, the
+    current window's connect dialog appears instead.
+  - Select a bookmark from the File menu to connect
+    in a new window if the current session is active.
+
+  Switching Between Sessions:
+  - Click on any session window to bring it forward.
+  - The Window menu lists all open sessions with a
+    checkmark on the active window.
+
+  Closing a Session:
+  - Close the window via the close box or Command-W.
+  - Choose "Close Session" from the File menu.
+  - If connected, you will be asked to confirm.
+  - Flynn quits when the last session window closes.
+
+Font changes and dark mode apply to all open
+session windows simultaneously.
+
+
 Session Bookmarks
 -----------------
 
@@ -197,7 +229,7 @@ Flynn can store up to 8 session bookmarks for
 servers you connect to frequently.
 
   Adding a Bookmark:
-  1. Choose "Bookmarks..." from the Session menu,
+  1. Choose "Bookmarks..." from the File menu,
      or press Command-B.
   2. Click the "Add" button.
   3. Enter a name, hostname, and port (default 23).
@@ -205,7 +237,7 @@ servers you connect to frequently.
 
   Connecting via Bookmark:
   - Your bookmarks appear at the bottom of the
-    Session menu. Simply choose one to connect.
+    File menu. Simply choose one to connect.
   - You can also select a bookmark in the manager
     and click "Connect."
 

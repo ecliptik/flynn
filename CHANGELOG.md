@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.5.0] - 2026-03-09
 
 ### Added
 - Multiple simultaneous sessions (up to 4) in separate windows
@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Close box on individual windows closes just that session
 
 ### Changed
+- Version: 1.1.1 → 1.5.0
 - SIZE resource increased from 512KB/384KB to 640KB/512KB
 - Memory per session: ~73KB (Terminal 52KB + Connection 12.5KB + TCP 8KB + misc)
 - New source files: `session.c`, `session.h`
