@@ -5,13 +5,17 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	6
+#define PREFS_VERSION	7
 #define MAX_BOOKMARKS	8
 
 typedef struct {
 	char		name[32];
 	char		host[128];
 	unsigned short	port;
+	char		username[64];
+	short		terminal_type;	/* 0=xterm, 1=VT220, 2=VT100; -1=use global */
+	short		font_id;	/* 0=use global default */
+	short		font_size;	/* 0=use global default */
 } Bookmark;
 
 typedef struct {

@@ -93,6 +93,12 @@
 #define BME_HOST_FIELD      6
 #define BME_PORT_LABEL      7
 #define BME_PORT_FIELD      8
+#define BME_USER_LABEL      9
+#define BME_USER_FIELD      10
+#define BME_TTYPE_LABEL     11
+#define BME_TTYPE_BTN       12
+#define BME_FONT_LABEL      13
+#define BME_FONT_BTN        14
 
 /* Max window content area for grid computation */
 #define MAX_WIN_WIDTH       500

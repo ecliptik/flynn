@@ -84,6 +84,53 @@ static short pixel_to_col(Session *s, short h);
 static void handle_content_click(Session *s, EventRecord *event);
 static void track_selection_drag(Session *s);
 
+/* Font preset table for bookmark font cycling */
+typedef struct {
+	short	font_id;
+	short	font_size;
+	char	name[16];
+} FontPreset;
+
+static FontPreset font_presets[] = {
+	{ 4, 9, "Monaco 9" },
+	{ 4, 12, "Monaco 12" },
+	{ 22, 10, "Courier 10" },
+	{ 0, 12, "Chicago 12" },
+	{ 3, 9, "Geneva 9" },
+	{ 3, 10, "Geneva 10" }
+};
+#define NUM_FONT_PRESETS 6
+
+static void
+ttype_to_str(short ttype, char *buf)
+{
+	switch (ttype) {
+	case 0:  strcpy(buf, "xterm"); break;
+	case 1:  strcpy(buf, "VT220"); break;
+	case 2:  strcpy(buf, "VT100"); break;
+	default: strcpy(buf, "Default"); break;
+	}
+}
+
+static void
+font_to_str(short font_id, short font_size, char *buf)
+{
+	short i;
+
+	if (font_id == 0 && font_size == 0) {
+		strcpy(buf, "Default");
+		return;
+	}
+	for (i = 0; i < NUM_FONT_PRESETS; i++) {
+		if (font_presets[i].font_id == font_id &&
+		    font_presets[i].font_size == font_size) {
+			strcpy(buf, font_presets[i].name);
+			return;
+		}
+	}
+	sprintf(buf, "Font %d/%d", font_id, font_size);
+}
+
 int
 main(void)
 {
@@ -1257,6 +1304,7 @@ do_about(void)
 
 /* Bookmark popup menu, shared with dialog filter */
 static MenuHandle g_bm_popup;
+static short g_bm_selected = -1;  /* bookmark index selected from popup */
 
 static pascal Boolean
 connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
@@ -1297,6 +1345,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 				short i;
 
 				sel = LoWord(choice) - 1;
+				g_bm_selected = sel;
 				bm = &prefs.bookmarks[sel];
 
 				/* Fill host */
@@ -1320,12 +1369,21 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 				    (char *)&pstr[1]);
 				SetDialogItemText(item_h, pstr);
 
-				/* Clear username */
+				/* Fill username from bookmark */
 				GetDialogItem(dlg,
 				    DLOG_USER_FIELD,
 				    &item_type, &item_h,
 				    &item_rect);
-				pstr[0] = 0;
+				if (bm->username[0]) {
+					pstr[0] = strlen(
+					    bm->username);
+					for (i = 0;
+					    i < pstr[0]; i++)
+						pstr[i + 1] =
+						    bm->username[i];
+				} else {
+					pstr[0] = 0;
+				}
 				SetDialogItemText(item_h, pstr);
 
 				SelectDialogItemText(dlg,
@@ -1452,6 +1510,7 @@ do_connect(void)
 
 		/* Build bookmark popup menu */
 		g_bm_popup = 0L;
+		g_bm_selected = -1;
 		if (prefs.bookmark_count > 0) {
 			short bmi;
 
@@ -1548,9 +1607,46 @@ do_connect(void)
 		}
 
 		if (connected) {
+			Bookmark *sel_bm = 0L;
+
+			if (g_bm_selected >= 0 &&
+			    g_bm_selected < prefs.bookmark_count)
+				sel_bm = &prefs.bookmarks[
+				    g_bm_selected];
+
+			/* Apply bookmark-specific font */
+			if (sel_bm && (sel_bm->font_id != 0 ||
+			    sel_bm->font_size != 0)) {
+				short win_w, win_h;
+
+				term_ui_set_font(s->window,
+				    sel_bm->font_id,
+				    sel_bm->font_size);
+				win_w = LEFT_MARGIN * 2 +
+				    TERM_DEFAULT_COLS *
+				    g_cell_width;
+				win_h = TOP_MARGIN * 2 +
+				    TERM_DEFAULT_ROWS *
+				    g_cell_height;
+				if (win_w > MAX_WIN_WIDTH)
+					win_w = MAX_WIN_WIDTH;
+				if (win_h > MAX_WIN_HEIGHT)
+					win_h = MAX_WIN_HEIGHT;
+				do_window_resize(s, win_w, win_h);
+			}
+
 			telnet_init(&s->telnet);
-			s->telnet.preferred_ttype =
-			    prefs.terminal_type;
+
+			/* Apply bookmark terminal type,
+			 * fall back to global */
+			if (sel_bm &&
+			    sel_bm->terminal_type >= 0)
+				s->telnet.preferred_ttype =
+				    sel_bm->terminal_type;
+			else
+				s->telnet.preferred_ttype =
+				    prefs.terminal_type;
+
 			s->telnet.cols = s->terminal.active_cols;
 			s->telnet.rows = s->terminal.active_rows;
 			terminal_reset(&s->terminal);
@@ -1655,9 +1751,33 @@ do_connect_bookmark(short index)
 	}
 
 	bm = &prefs.bookmarks[index];
+
+	/* Apply bookmark-specific font before connect (affects grid size) */
+	if (bm->font_id != 0 || bm->font_size != 0) {
+		short win_w, win_h;
+
+		term_ui_set_font(s->window, bm->font_id,
+		    bm->font_size);
+		win_w = LEFT_MARGIN * 2 +
+		    TERM_DEFAULT_COLS * g_cell_width;
+		win_h = TOP_MARGIN * 2 +
+		    TERM_DEFAULT_ROWS * g_cell_height;
+		if (win_w > MAX_WIN_WIDTH) win_w = MAX_WIN_WIDTH;
+		if (win_h > MAX_WIN_HEIGHT) win_h = MAX_WIN_HEIGHT;
+		do_window_resize(s, win_w, win_h);
+	}
+
 	if (conn_connect(&s->conn, bm->host, bm->port)) {
 		telnet_init(&s->telnet);
-		s->telnet.preferred_ttype = prefs.terminal_type;
+
+		/* Apply bookmark terminal type, fall back to global */
+		if (bm->terminal_type >= 0)
+			s->telnet.preferred_ttype =
+			    bm->terminal_type;
+		else
+			s->telnet.preferred_ttype =
+			    prefs.terminal_type;
+
 		s->telnet.cols = s->terminal.active_cols;
 		s->telnet.rows = s->terminal.active_rows;
 		terminal_reset(&s->terminal);
@@ -1667,6 +1787,13 @@ do_connect_bookmark(short index)
 		prefs.host[sizeof(prefs.host) - 1] = '\0';
 		prefs.port = s->conn.port;
 		prefs_save(&prefs);
+
+		/* Auto-send username from bookmark */
+		if (bm->username[0]) {
+			conn_send(&s->conn, bm->username,
+			    strlen(bm->username));
+			conn_send(&s->conn, "\r", 1);
+		}
 
 		/* Update window title */
 		{
@@ -1733,6 +1860,24 @@ bm_list_draw(WindowPtr win, short item)
 	}
 }
 
+static void
+bme_set_btn_title(DialogPtr dlg, short item, const char *text)
+{
+	short item_type;
+	Handle item_h;
+	Rect item_rect;
+	Str255 pstr;
+	short len, i;
+
+	GetDialogItem(dlg, item, &item_type, &item_h, &item_rect);
+	len = strlen(text);
+	if (len > 254) len = 254;
+	pstr[0] = len;
+	for (i = 0; i < len; i++)
+		pstr[i + 1] = text[i];
+	SetControlTitle((ControlHandle)item_h, pstr);
+}
+
 static Boolean
 bm_edit_dialog(Bookmark *bm, Boolean is_new)
 {
@@ -1744,10 +1889,18 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	Str255 str;
 	long num;
 	short i;
+	short cur_ttype;
+	short cur_font_id, cur_font_size;
+	char btn_text[32];
 
 	dlg = GetNewDialog(DLOG_BM_EDIT_ID, 0L, (WindowPtr)-1L);
 	if (!dlg)
 		return false;
+
+	/* Initialize cycling state from bookmark */
+	cur_ttype = is_new ? -1 : bm->terminal_type;
+	cur_font_id = is_new ? 0 : bm->font_id;
+	cur_font_size = is_new ? 0 : bm->font_size;
 
 	/* Pre-fill fields */
 	if (!is_new) {
@@ -1768,7 +1921,22 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 		sprintf((char *)&str[1], "%u", bm->port);
 		str[0] = strlen((char *)&str[1]);
 		SetDialogItemText(item_h, str);
+
+		/* Pre-fill username */
+		GetDialogItem(dlg, BME_USER_FIELD, &item_type,
+		    &item_h, &item_rect);
+		str[0] = strlen(bm->username);
+		memcpy(&str[1], bm->username, str[0]);
+		SetDialogItemText(item_h, str);
 	}
+
+	/* Set terminal type button text */
+	ttype_to_str(cur_ttype, btn_text);
+	bme_set_btn_title(dlg, BME_TTYPE_BTN, btn_text);
+
+	/* Set font button text */
+	font_to_str(cur_font_id, cur_font_size, btn_text);
+	bme_set_btn_title(dlg, BME_FONT_BTN, btn_text);
 
 	ShowWindow(dlg);
 
@@ -1780,6 +1948,67 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 		}
 		if (item_hit == BME_OK)
 			break;
+
+		/* Cycle terminal type: Default->xterm->VT220->VT100->Default */
+		if (item_hit == BME_TTYPE_BTN) {
+			if (cur_ttype == -1)
+				cur_ttype = 0;
+			else if (cur_ttype == 0)
+				cur_ttype = 1;
+			else if (cur_ttype == 1)
+				cur_ttype = 2;
+			else
+				cur_ttype = -1;
+			ttype_to_str(cur_ttype, btn_text);
+			bme_set_btn_title(dlg, BME_TTYPE_BTN,
+			    btn_text);
+		}
+
+		/* Cycle font: Default->Monaco 9->...->Geneva 10->Default */
+		if (item_hit == BME_FONT_BTN) {
+			short fi;
+			Boolean found = false;
+
+			if (cur_font_id == 0 && cur_font_size == 0) {
+				/* Default -> first preset */
+				cur_font_id = font_presets[0].font_id;
+				cur_font_size =
+				    font_presets[0].font_size;
+			} else {
+				for (fi = 0; fi < NUM_FONT_PRESETS;
+				    fi++) {
+					if (font_presets[fi].font_id ==
+					    cur_font_id &&
+					    font_presets[fi].font_size ==
+					    cur_font_size) {
+						found = true;
+						if (fi + 1 <
+						    NUM_FONT_PRESETS) {
+							cur_font_id =
+							    font_presets
+							    [fi + 1]
+							    .font_id;
+							cur_font_size =
+							    font_presets
+							    [fi + 1]
+							    .font_size;
+						} else {
+							cur_font_id = 0;
+							cur_font_size = 0;
+						}
+						break;
+					}
+				}
+				if (!found) {
+					cur_font_id = 0;
+					cur_font_size = 0;
+				}
+			}
+			font_to_str(cur_font_id, cur_font_size,
+			    btn_text);
+			bme_set_btn_title(dlg, BME_FONT_BTN,
+			    btn_text);
+		}
 	}
 
 	/* Extract name */
@@ -1819,6 +2048,23 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	} else {
 		bm->port = 23;
 	}
+
+	/* Extract username */
+	GetDialogItem(dlg, BME_USER_FIELD, &item_type,
+	    &item_h, &item_rect);
+	GetDialogItemText(item_h, str);
+	if (str[0] > 0 && str[0] < (short)(sizeof(bm->username) - 1)) {
+		for (i = 0; i < str[0]; i++)
+			bm->username[i] = str[i + 1];
+		bm->username[i] = '\0';
+	} else {
+		bm->username[0] = '\0';
+	}
+
+	/* Store terminal type and font from cycling state */
+	bm->terminal_type = cur_ttype;
+	bm->font_id = cur_font_id;
+	bm->font_size = cur_font_size;
 
 	DisposeDialog(dlg);
 	return true;
@@ -1895,6 +2141,7 @@ do_bookmarks(void)
 			memset(&prefs.bookmarks[prefs.bookmark_count],
 			    0, sizeof(Bookmark));
 			prefs.bookmarks[prefs.bookmark_count].port = 23;
+			prefs.bookmarks[prefs.bookmark_count].terminal_type = -1;
 			if (bm_edit_dialog(
 			    &prefs.bookmarks[prefs.bookmark_count],
 			    true)) {

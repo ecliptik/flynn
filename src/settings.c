@@ -60,6 +60,7 @@ prefs_load(FlynnPrefs *prefs)
 		for (i = 0; i < MAX_BOOKMARKS; i++) {
 			prefs->bookmarks[i].name[sizeof(prefs->bookmarks[i].name) - 1] = '\0';
 			prefs->bookmarks[i].host[sizeof(prefs->bookmarks[i].host) - 1] = '\0';
+			prefs->bookmarks[i].username[sizeof(prefs->bookmarks[i].username) - 1] = '\0';
 		}
 	}
 
@@ -109,6 +110,21 @@ prefs_load(FlynnPrefs *prefs)
 	if (prefs->version == 5) {
 		/* v5→v6 migration: add username */
 		prefs->username[0] = '\0';
+		/* fall through to v6→v7 migration */
+		prefs->version = 6;
+	}
+
+	if (prefs->version == 6) {
+		/* v6→v7 migration: add per-bookmark settings */
+		{
+			short i;
+			for (i = 0; i < MAX_BOOKMARKS; i++) {
+				prefs->bookmarks[i].username[0] = '\0';
+				prefs->bookmarks[i].terminal_type = -1;
+				prefs->bookmarks[i].font_id = 0;
+				prefs->bookmarks[i].font_size = 0;
+			}
+		}
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

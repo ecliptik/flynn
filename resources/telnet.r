@@ -261,7 +261,7 @@ resource 'DITL' (131, "Bookmarks") {
 
 /* Bookmark add/edit dialog */
 resource 'DLOG' (132, "Edit Bookmark") {
-	{70, 90, 230, 420},
+	{40, 90, 310, 420},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -273,34 +273,61 @@ resource 'DLOG' (132, "Edit Bookmark") {
 
 resource 'DITL' (132, "Edit Bookmark") {
 	{
-		/* OK button */
-		{125, 245, 145, 315},
+		/* 1: OK button */
+		{235, 245, 255, 315},
 		Button { enabled, "OK" };
 
-		/* Cancel button */
-		{125, 155, 145, 225},
+		/* 2: Cancel button */
+		{235, 155, 255, 225},
 		Button { enabled, "Cancel" };
 
-		/* Name label + field */
-		{15, 15, 31, 60},
+		/* 3: Name label */
+		{15, 15, 31, 75},
 		StaticText { disabled, "Name:" };
 
-		{15, 65, 31, 315},
+		/* 4: Name field */
+		{15, 80, 31, 315},
 		EditText { enabled, "" };
 
-		/* Host label + field */
-		{50, 15, 66, 60},
+		/* 5: Host label */
+		{45, 15, 61, 75},
 		StaticText { disabled, "Host:" };
 
-		{50, 65, 66, 315},
+		/* 6: Host field */
+		{45, 80, 61, 315},
 		EditText { enabled, "" };
 
-		/* Port label + field */
-		{85, 15, 101, 60},
+		/* 7: Port label */
+		{75, 15, 91, 75},
 		StaticText { disabled, "Port:" };
 
-		{85, 65, 101, 135},
+		/* 8: Port field */
+		{75, 80, 91, 150},
 		EditText { enabled, "23" };
+
+		/* 9: Username label */
+		{105, 15, 121, 85},
+		StaticText { disabled, "Username:" };
+
+		/* 10: Username field */
+		{105, 90, 121, 250},
+		EditText { enabled, "" };
+
+		/* 11: Terminal label */
+		{140, 15, 156, 85},
+		StaticText { disabled, "Terminal:" };
+
+		/* 12: Terminal type button */
+		{140, 90, 160, 200},
+		Button { enabled, "Default" };
+
+		/* 13: Font label */
+		{170, 15, 186, 85},
+		StaticText { disabled, "Font:" };
+
+		/* 14: Font button */
+		{170, 90, 190, 200},
+		Button { enabled, "Default" };
 	}
 };
 
