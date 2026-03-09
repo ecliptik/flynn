@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-03-08
+
+### Added
+- Unicode glyph rendering system (`glyphs.c`/`glyphs.h`)
+  - 51 QuickDraw primitive glyphs: arrows, geometric shapes, block elements,
+    card suits, musical notes, mathematical symbols, and more — drawn natively
+    with LineTo, PaintRect, PaintOval, PaintPoly, and PaintArc
+  - 15 monochrome 10x10 bitmap emoji rendered via CopyBits (2-cell wide):
+    grinning face, heart eyes, thumbs up, fire, star, checkmark, crossmark,
+    warning, lightning, sun, moon, skull, rocket, party popper, sparkles
+  - Braille pattern rendering (U+2800-U+28FF) — 256 dot-grid patterns drawn
+    as filled circles in a 2x4 grid per cell
+  - Binary search codepoint-to-glyph lookup table for fast mapping
+  - Bold variants: thicker lines (PenSize 2,1) and larger fills for primitives
+  - U+00B7 middle dot rendered as centered PaintOval (was misrouted through
+    Latin-1 Mac Roman table producing wrong character)
+
+### Fixed
+- Bold text spacing drift: DrawText() with bold TextFace increases advance
+  width by 1px per character, causing cumulative rightward drift that consumed
+  adjacent spaces. Replaced all DrawText calls with per-character
+  MoveTo+DrawChar for absolute positioning (draw_row, draw_line_char fallback,
+  draw_glyph_prim fallback)
+- DCS parser content leak: ESC inside DCS string shared PARSE_OSC_ESC state,
+  causing DCS content to leak as visible text. Added dedicated PARSE_DCS_ESC
+  state
+- CSI parameter overflow: TERM_MAX_PARAMS was 8, but truecolor SGR sequences
+  (38;2;R;G;B foreground + 48;2;R;G;B background) need 12+ params. Increased
+  to 16 with bounds checking
+- CSI colon sub-parameter parsing for SGR 38:2:R:G:B truecolor sequences
+  (colon-separated variant)
+- UTF-8 error recovery: new start byte mid-sequence now resets decoder and
+  reprocesses (was producing garbage output)
+- Invisible Unicode characters (ZWSP, ZWJ, variation selectors, combining
+  marks, BOM) now absorbed silently instead of rendering as '?'
+- Unicode spaces (en space, em space, thin space, hair space) mapped to ASCII
+  space instead of '?'
+
+### Changed
+- Version: 1.0.1 → 1.1.0
+- Terminal parser expanded to 9 states (added PARSE_DCS_ESC)
+- TERM_MAX_PARAMS: 8 → 16
+- New source files: `glyphs.c`, `glyphs.h`
+- Build size: ~110KB (up from ~98KB, glyph tables and bitmap data added)
+
 ## [1.0.1] - 2026-03-07
 
 ### Fixed

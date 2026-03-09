@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.0.1
+                    Version 1.1.0
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -75,6 +75,9 @@ Features
     (tmux borders, dialog boxes, Midnight Commander)
   - UTF-8 support for accented characters, curly
     quotes, em dashes, and other Unicode symbols
+  - Unicode glyph rendering: arrows, shapes, blocks,
+    card suits, monochrome emoji, and braille patterns
+    drawn natively via QuickDraw primitives
   - Alternate screen buffer for full-screen apps
     (vi, nano, less, tmux)
   - 96-line scrollback buffer

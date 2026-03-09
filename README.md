@@ -30,7 +30,7 @@ No build toolchain required — just download and run.
 
 - **VT100/VT220/xterm terminal emulation** — runs vi, nano, tmux, mc, and other full-screen TUI apps over telnet
 - **Box-drawing characters** — DEC Special Graphics rendered natively via QuickDraw for clean tmux panes, mc panels, and dialog borders
-- **UTF-8 support** — accented characters, curly quotes, and symbols decoded and mapped to Mac Roman
+- **Unicode glyph rendering** — 51 QuickDraw-drawn symbols (arrows, shapes, blocks, suits), 15 monochrome bitmap emoji, and braille patterns (U+2800-U+28FF), plus Latin-1/Mac Roman mapping for accented characters and curly quotes
 - **Resizable window** — drag the grow box from 80x24 up to 132x50 cells, with NAWS negotiation
 - **6 fonts** — Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10, including proportional font rendering
 - **Session bookmarks** — save up to 8 hosts with one-click connect from the Session menu
@@ -42,7 +42,7 @@ No build toolchain required — just download and run.
 - **M0110 keyboard support** — Option key as Ctrl, Cmd+. as Escape, Cmd+1-0 for F-keys, designed for the original Mac Plus keyboard
 - **Dark mode** — inverted display option for late-night telnet sessions
 - **Settings persistence** — host, port, bookmarks, font, and preferences saved across launches
-- **4MB Mac Plus** — ~98KB on disk, ~60KB RAM footprint (~1.5% of 4MB). Runs on a Macintosh Plus with System 6.0.8 and MacTCP 2.1. Also compatible with System 7.5.5 and Open Transport
+- **4MB Mac Plus** — ~110KB on disk, ~60KB RAM footprint (~1.5% of 4MB). Runs on a Macintosh Plus with System 6.0.8 and MacTCP 2.1. Also compatible with System 7.5.5 and Open Transport
 
 ## Keyboard Shortcuts
 

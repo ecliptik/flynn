@@ -2,12 +2,12 @@
 
 ## Future (v2.0)
 - [ ] Color support (for System 7 / color Macs)
-- [ ] Emoji rendering via bitmap resources (CopyBits into terminal cells)
-  - Store common emoji as small monochrome bitmaps in custom resources
-  - UTF-8 decoder already identifies emoji codepoints (currently renders `??`)
-  - Look up bitmap table and CopyBits into cell instead of DrawChar
-  - Support 2-cell-wide emoji for better legibility at small sizes
-  - Bypasses font system entirely — no 256 glyph limit
+- [ ] Expanded emoji and glyph coverage
+  - Currently: 15 monochrome 10x10 bitmap emoji (2-cell wide via CopyBits)
+  - Currently: 51 QuickDraw primitive glyphs (arrows, shapes, blocks, suits, etc.)
+  - Currently: Braille pattern rendering (U+2800-U+28FF dot grids)
+  - Add more emoji bitmaps as needed (faces, objects, flags, etc.)
+  - Consider larger bitmap sizes for better detail at bigger font sizes
 - [x] ~~SUPDUP protocol support (RFC 734)~~ — **Won't do.** SUPDUP uses its own display protocol (%TD codes) rather than VT100/ANSI, requiring either a parallel rendering path or lossy translation. Too fundamental a change for a Telnet-focused client, and very few servers exist to connect to.
 - [ ] ANSI-BBS emulation with CP437 character set
   - Code Page 437 box-drawing, shading blocks, card suits, etc.
