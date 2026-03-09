@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-03-09
+
+### Added
+- Default button outlines on all dialogs (Connect, About, Bookmarks, Edit
+  Bookmark, DNS Server, Alert) using UserItem draw procs with 3px
+  FrameRoundRect per Apple HIG
+- Cmd+. (Cancel) keyboard shortcut in all dialogs per Apple HIG
+- Tab key cycles through edit fields in Connect and Edit Bookmark dialogs
+- Connection progress window with status updates (Resolving host, Connecting,
+  Connected) and watch cursor during DNS/TCP operations
+- Scrollback position indicator on right edge of terminal (rail line + thumb)
+  visible when scrolled back, with dark mode support
+- Session count header ("N of 4 Sessions") in Window menu
+- Save as Bookmark (Cmd+S): auto-populates name (from window title
+  user@hostname), host, port, username, terminal type, and font from the
+  active session
+- Bookmarks popup in Connect dialog now matches Terminal Type popup style:
+  shows selected bookmark name on button, checkmark on current selection,
+  popup anchored at button top
+
+### Changed
+- All error alerts use StopAlert (stop icon), info alerts use NoteAlert
+  (note icon) per Apple HIG alert guidelines
+- DNS timeout reduced from 15s to 5s per attempt for faster failure feedback
+- Session windows cascade with 30px offset (was 20px)
+- Remote disconnect shows "(disconnected)" in window title bar
+- Bookmarks button in Connect dialog renamed from "Bookmarks..." to
+  "Bookmarks" (popup selector, not action button)
+
 ## [1.5.2] - 2026-03-09
 
 ### Added

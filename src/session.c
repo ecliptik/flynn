@@ -48,8 +48,10 @@ session_new(void)
 	s->terminal.active_cols = TERM_DEFAULT_COLS;
 	s->terminal.active_rows = TERM_DEFAULT_ROWS;
 
-	/* Create window with cascading offset */
-	offset = slot * 20;
+	/* Create window with cascading offset.
+	 * Use 30px steps so 4 windows (0,30,60,90) all stay visible
+	 * on the 512x342 Mac Plus screen (usable area ~512x322). */
+	offset = slot * 30;
 	win_w = LEFT_MARGIN * 2 + g_cell_width * TERM_DEFAULT_COLS;
 	win_h = TOP_MARGIN * 2 + g_cell_height * TERM_DEFAULT_ROWS;
 	SetRect(&bounds, 2 + offset, 40 + offset,

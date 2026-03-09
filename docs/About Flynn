@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.5.0
+                    Version 1.6.0
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -114,6 +114,7 @@ and USB keyboards.
   ~~~~~~~~~~~~~
   Command-N       New session (new window if connected)
   Command-W       Close active session window
+  Command-S       Save as Bookmark
   Command-B       Open Bookmark Manager
   Command-C       Copy (selection or full screen)
   Command-V       Paste clipboard to connection
@@ -221,9 +222,9 @@ buffer, connection state, cursor, and text selection.
   - If connected, you will be asked to confirm.
   - Flynn quits when the last session window closes.
 
-Font and terminal type changes from the Preferences
+Font and terminal type changes from the Options
 menu apply only to the active session window. Dark
-mode applies to all windows. The Preferences menu
+mode applies to all windows. The Options menu
 checkmarks update to reflect the active session.
 
 
@@ -249,6 +250,13 @@ servers you connect to frequently.
   These overrides apply only to the session opened
   from that bookmark, not to other windows.
 
+  Save as Bookmark:
+  While connected, choose "Save as Bookmark" from
+  the File menu (Command-S) to save the current
+  session as a bookmark. The name, host, port,
+  username, and settings are pre-filled from the
+  active session.
+
   Connecting via Bookmark:
   - Your 5 most recently used bookmarks appear in
     the File menu under Bookmarks for quick access.
@@ -265,10 +273,10 @@ Bookmarks and all preferences are saved to a file
 called "Flynn Prefs" in the System Folder.
 
 
-Preferences
------------
+Options
+-------
 
-The Preferences menu contains settings for fonts,
+The Options menu contains settings for fonts,
 terminal type, networking, and display mode.
 
   Fonts

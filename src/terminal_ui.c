@@ -166,6 +166,64 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 	terminal_clear_dirty(term);
 
+	/* Draw scrollback position indicator on right edge */
+	if (term->scroll_offset > 0 && term->sb_count > 0) {
+		Rect indicator_r;
+		short win_height, indicator_y, indicator_h;
+		short right_edge;
+		short bottom_y;
+
+		/* Calculate position proportional to scroll offset */
+		right_edge = win->portRect.right - 2;
+		win_height = win->portRect.bottom - TOP_MARGIN * 2;
+
+		/* Erase the rail area first to avoid artifacts */
+		SetRect(&indicator_r, right_edge - 4, TOP_MARGIN,
+		    right_edge + 1, TOP_MARGIN + win_height);
+		if (g_dark_mode)
+			PaintRect(&indicator_r);
+		else
+			EraseRect(&indicator_r);
+
+		/* Draw thin rail line for full scroll area */
+		PenNormal();
+		if (g_dark_mode) {
+			PenPat(&qd.white);
+		}
+		PenSize(1, 1);
+		MoveTo(right_edge - 2, TOP_MARGIN);
+		LineTo(right_edge - 2, TOP_MARGIN + win_height);
+		PenNormal();
+
+		/* Indicator height = visible fraction of total */
+		indicator_h = (win_height * term->active_rows) /
+		    (term->active_rows + term->sb_count);
+		if (indicator_h < 8)
+			indicator_h = 8;
+
+		/* Indicator position = proportional to scroll offset */
+		indicator_y = TOP_MARGIN +
+		    ((win_height - indicator_h) *
+		    (term->sb_count - term->scroll_offset)) /
+		    term->sb_count;
+
+		SetRect(&indicator_r, right_edge - 3, indicator_y,
+		    right_edge, indicator_y + indicator_h);
+
+		/* Draw filled rectangle as scroll indicator */
+		if (g_dark_mode)
+			EraseRect(&indicator_r);
+		else
+			PaintRect(&indicator_r);
+
+		/* Draw "scrolled back" separator at bottom */
+		bottom_y = row_top(term->active_rows - 1) + g_cell_height;
+		PenPat(&qd.gray);
+		MoveTo(LEFT_MARGIN, bottom_y + 1);
+		LineTo(win->portRect.right - LEFT_MARGIN, bottom_y + 1);
+		PenNormal();
+	}
+
 	/* Draw cursor only when viewing live terminal and cursor enabled */
 	if (term->scroll_offset == 0 && term->cursor_visible)
 		draw_cursor(term, 1);

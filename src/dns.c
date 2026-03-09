@@ -15,7 +15,7 @@
 #define DNS_BUF_SIZE     512   /* max UDP DNS message */
 #define DNS_UDP_BUF     4096   /* UDP stream receive buffer */
 #define DNS_RETRY_COUNT    2   /* send attempts */
-#define DNS_TIMEOUT       15   /* seconds per attempt */
+#define DNS_TIMEOUT        5   /* seconds per attempt */
 #define DNS_PORT          53
 
 /* Header offsets */

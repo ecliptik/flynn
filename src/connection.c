@@ -15,10 +15,80 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <Windows.h>
+#include <Fonts.h>
+
 #include "MacTCP.h"
 #include "tcp.h"
 #include "dns.h"
 #include "connection.h"
+
+/* Status window dimensions (centered on 512x342 screen) */
+#define STATUS_WIN_W   240
+#define STATUS_WIN_H    40
+
+WindowPtr
+conn_status_show(const char *msg)
+{
+	WindowPtr w;
+	Rect r;
+	Str255 title;
+	GrafPtr save;
+	Str255 ps;
+	short len;
+
+	SetRect(&r,
+	    (512 - STATUS_WIN_W) / 2,
+	    (342 - STATUS_WIN_H) / 2 + 20,  /* +20 for menu bar */
+	    (512 + STATUS_WIN_W) / 2,
+	    (342 + STATUS_WIN_H) / 2 + 20);
+	title[0] = 0;
+	w = NewWindow(0L, &r, title, true, dBoxProc,
+	    (WindowPtr)-1L, false, 0L);
+	if (w) {
+		GetPort(&save);
+		SetPort(w);
+		TextFont(0);   /* Chicago */
+		TextSize(12);
+		len = strlen(msg);
+		if (len > 255) len = 255;
+		ps[0] = len;
+		memcpy(ps + 1, msg, len);
+		MoveTo(10, 26);
+		DrawString(ps);
+		SetPort(save);
+	}
+	return w;
+}
+
+void
+conn_status_update(WindowPtr w, const char *msg)
+{
+	GrafPtr save;
+	Rect r;
+	Str255 ps;
+	short len;
+
+	if (!w) return;
+	GetPort(&save);
+	SetPort(w);
+	SetRect(&r, 0, 0, STATUS_WIN_W, STATUS_WIN_H);
+	EraseRect(&r);
+	len = strlen(msg);
+	if (len > 255) len = 255;
+	ps[0] = len;
+	memcpy(ps + 1, msg, len);
+	MoveTo(10, 26);
+	DrawString(ps);
+	SetPort(save);
+}
+
+void
+conn_status_close(WindowPtr w)
+{
+	if (w)
+		DisposeWindow(w);
+}
 
 OSErr
 conn_init(void)
@@ -126,7 +196,7 @@ conn_open_dialog(Connection *conn)
 
 	DisposeDialog(dlg);
 
-	return conn_connect(conn, conn->host, conn->port);
+	return conn_connect(conn, conn->host, conn->port, 0L);
 }
 
 static Boolean
@@ -178,10 +248,12 @@ conn_validate_host(const char *host)
 }
 
 Boolean
-conn_connect(Connection *conn, const char *host, short port)
+conn_connect(Connection *conn, const char *host, short port,
+    WindowPtr status_win)
 {
 	OSErr err;
 	unsigned long ip;
+	char status_msg[80];
 
 	if (conn->state != CONN_STATE_IDLE) {
 		SysBeep(10);
@@ -198,18 +270,25 @@ conn_connect(Connection *conn, const char *host, short port)
 	/* Validate hostname before attempting resolution */
 	if (!conn_validate_host(conn->host)) {
 		ParamText("\pInvalid hostname or IP address", "\p", "\p", "\p");
-		Alert(128, 0L);
+		StopAlert(128, 0L);
 		return false;
 	}
 
 	/* Resolve hostname */
 	conn->state = CONN_STATE_RESOLVING;
 
+	/* Show watch cursor during blocking DNS/TCP operations */
+	SetCursor(*GetCursor(watchCursor));
+
 	/* Try as IP address first */
 	ip = ip2long(conn->host);
 	if (ip != 0) {
 		conn->remote_ip = ip;
 	} else {
+		/* Show DNS resolution status */
+		sprintf(status_msg, "Resolving %.40s\311", conn->host);
+		conn_status_update(status_win, status_msg);
+
 		/* DNS lookup via UDP */
 		short dns_err = dns_resolve(conn->host, &ip,
 		    conn->dns_server);
@@ -219,31 +298,39 @@ conn_connect(Connection *conn, const char *host, short port)
 			break;
 		case DNS_ERR_NXDOMAIN:
 			conn->state = CONN_STATE_IDLE;
+			InitCursor();
 			ParamText("\pHost not found", "\p", "\p", "\p");
-			Alert(128, 0L);
+			StopAlert(128, 0L);
 			return false;
 		case DNS_ERR_TIMEOUT:
 			conn->state = CONN_STATE_IDLE;
+			InitCursor();
 			ParamText("\pDNS lookup timed out",
 			    "\p", "\p", "\p");
-			Alert(128, 0L);
+			StopAlert(128, 0L);
 			return false;
 		default:
 			conn->state = CONN_STATE_IDLE;
+			InitCursor();
 			ParamText("\pDNS lookup failed", "\p", "\p", "\p");
-			Alert(128, 0L);
+			StopAlert(128, 0L);
 			return false;
 		}
 	}
 
 	conn->remote_port = conn->port;
 
+	/* Show TCP connect status */
+	sprintf(status_msg, "Connecting to %.40s\311", conn->host);
+	conn_status_update(status_win, status_msg);
+
 	/* Allocate receive buffer */
 	conn->rcv_buf = NewPtr(TCP_RCV_BUFSIZ);
 	if (!conn->rcv_buf) {
 		conn->state = CONN_STATE_IDLE;
+		InitCursor();
 		ParamText("\pOut of memory", "\p", "\p", "\p");
-		Alert(128, 0L);
+		StopAlert(128, 0L);
 		return false;
 	}
 
@@ -254,8 +341,9 @@ conn_connect(Connection *conn, const char *host, short port)
 		conn->state = CONN_STATE_IDLE;
 		DisposePtr(conn->rcv_buf);
 		conn->rcv_buf = 0L;
+		InitCursor();
 		ParamText("\pFailed to create TCP stream", "\p", "\p", "\p");
-		Alert(128, 0L);
+		StopAlert(128, 0L);
 		return false;
 	}
 
@@ -272,10 +360,14 @@ conn_connect(Connection *conn, const char *host, short port)
 		DisposePtr(conn->rcv_buf);
 		conn->rcv_buf = 0L;
 		conn->stream = 0L;
+		InitCursor();
 		ParamText("\pFailed to connect", "\p", "\p", "\p");
-		Alert(128, 0L);
+		StopAlert(128, 0L);
 		return false;
 	}
+
+	/* Restore arrow cursor after successful connect */
+	InitCursor();
 
 	conn->state = CONN_STATE_CONNECTED;
 	conn->read_len = 0;

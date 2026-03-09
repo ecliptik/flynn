@@ -137,9 +137,9 @@ resource 'DITL' (129, "Connect") {
 		{75, 90, 91, 235},
 		EditText { enabled, "" };
 
-		/* 10: Bookmarks button */
+		/* 10: Bookmarks popup */
 		{155, 15, 175, 145},
-		Button { enabled, "Bookmarks\311" };
+		Button { enabled, "Bookmarks" };
 
 		/* 11: Terminal label */
 		{105, 15, 121, 85},
@@ -148,6 +148,10 @@ resource 'DITL' (129, "Connect") {
 		/* 12: Terminal type button */
 		{103, 90, 123, 235},
 		Button { enabled, "xterm" };
+
+		/* 13: Default button outline (UserItem) */
+		{151, 246, 179, 324},
+		UserItem { disabled };
 	}
 };
 
@@ -179,7 +183,7 @@ resource 'DITL' (130, "About Flynn") {
 
 		/* Version */
 		{33, 55, 49, 280},
-		StaticText { disabled, "Version 1.5.2" };
+		StaticText { disabled, "Version 1.6.0" };
 
 		/* Description */
 		{62, 30, 78, 270},
@@ -200,6 +204,10 @@ resource 'DITL' (130, "About Flynn") {
 		/* GitHub */
 		{148, 30, 164, 270},
 		StaticText { disabled, "https://github.com/ecliptik/flynn" };
+
+		/* 10: Default button outline (UserItem) */
+		{191, 111, 219, 189},
+		UserItem { disabled };
 	}
 };
 
@@ -229,6 +237,10 @@ resource 'DITL' (128, "Alert") {
 		/* Text */
 		{15, 75, 70, 325},
 		StaticText { disabled, "^0" };
+
+		/* 4: Default button outline (UserItem) */
+		{81, 246, 109, 324},
+		UserItem { disabled };
 	}
 };
 
@@ -272,6 +284,10 @@ resource 'DITL' (131, "Bookmarks") {
 
 		/* List area (UserItem) */
 		{25, 15, 210, 265},
+		UserItem { disabled };
+
+		/* 8: Default button outline (UserItem) */
+		{216, 276, 244, 354},
 		UserItem { disabled };
 	}
 };
@@ -345,6 +361,10 @@ resource 'DITL' (132, "Edit Bookmark") {
 		/* 14: Font button */
 		{168, 95, 188, 205},
 		Button { enabled, "Default" };
+
+		/* 15: Default button outline (UserItem) */
+		{231, 241, 259, 319},
+		UserItem { disabled };
 	}
 };
 
@@ -381,6 +401,10 @@ resource 'DITL' (133, "DNS Server") {
 		/* Info text */
 		{50, 15, 66, 280},
 		StaticText { disabled, "Enter IP address (default: 1.1.1.1)" };
+
+		/* 6: Default button outline (UserItem) */
+		{81, 206, 109, 284},
+		UserItem { disabled };
 	}
 };
 

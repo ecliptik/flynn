@@ -39,7 +39,7 @@
 /* separator = 7 */
 #define EDIT_MENU_SELALL_ID 8
 
-/* Preferences menu items — organized by section */
+/* Options menu items — organized by section */
 #define PREFS_FONTS_HDR      1   /* disabled section header */
 #define PREFS_FONT9_ID       2   /* Monaco 9 */
 #define PREFS_FONT12_ID      3   /* Monaco 12 */
@@ -62,7 +62,7 @@
 
 /* Window menu */
 #define WINDOW_MENU_ID      133
-#define WIN_MENU_FIRST_WIN  1
+#define WIN_MENU_FIRST_WIN  3	/* after count header + separator */
 
 /* Control menu items */
 #define CTRL_MENU_CTRLC     1
@@ -87,6 +87,7 @@
 #define BM_CONNECT          5
 #define BM_LABEL            6
 #define BM_LIST             7	/* UserItem for list area */
+#define BM_DEFAULT_BTN      8	/* UserItem for default button outline */
 
 /* Bookmark add/edit dialog items */
 #define BME_OK              1
@@ -103,6 +104,7 @@
 #define BME_TTYPE_BTN       12
 #define BME_FONT_LABEL      13
 #define BME_FONT_BTN        14
+#define BME_DEFAULT_BTN     15	/* UserItem for default button outline */
 
 /* Max window content area for grid computation */
 #define MAX_WIN_WIDTH       500

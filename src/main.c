@@ -59,6 +59,36 @@ session_load_font(Session *s)
 	g_font_size = s->font_size;
 }
 
+/* Draw a 3-pixel rounded rect outline around the default button (item 1) */
+static pascal void
+draw_default_button(WindowPtr dlg, short item)
+{
+	short item_type;
+	Handle item_h;
+	Rect item_rect, outline_r;
+
+	(void)item;  /* unused — we always outline item 1 */
+	GetDialogItem((DialogPtr)dlg, 1, &item_type, &item_h, &item_rect);
+	outline_r = item_rect;
+	InsetRect(&outline_r, -4, -4);
+	PenSize(3, 3);
+	FrameRoundRect(&outline_r, 16, 16);
+	PenNormal();
+}
+
+/* Register the default button outline UserItem in a dialog */
+static void
+setup_default_button_outline(DialogPtr dlg, short outline_item)
+{
+	short item_type;
+	Handle item_h;
+	Rect item_rect;
+
+	GetDialogItem(dlg, outline_item, &item_type, &item_h, &item_rect);
+	SetDialogItem(dlg, outline_item, userItem,
+	    (Handle)draw_default_button, &item_rect);
+}
+
 static void
 buffer_key_send(Session *s, const char *data, short len)
 {
@@ -105,6 +135,8 @@ static void do_copy(void);
 static void do_paste(void);
 static void do_select_all(void);
 static void do_dns_server_dialog(void);
+static pascal Boolean std_dlg_filter(DialogPtr dlg, EventRecord *evt,
+    short *item);
 static short pixel_to_row(Session *s, short v);
 static short pixel_to_col(Session *s, short h);
 static void handle_content_click(Session *s, EventRecord *event);
@@ -311,18 +343,37 @@ update_window_menu(void)
 	short count, i, item;
 	Str255 title;
 	Session *s;
+	char count_str[32];
+	short sess_count;
 
 	if (!window_menu)
 		return;
 
-	/* Remove all dynamic items */
+	/* Remove all items */
 	count = CountMItems(window_menu);
-	while (count > WIN_MENU_FIRST_WIN - 1) {
+	while (count > 0) {
 		DeleteMenuItem(window_menu, count);
 		count--;
 	}
 
-	/* Append one item per session */
+	/* Add count header (disabled) */
+	sess_count = session_count();
+	sprintf(count_str, "%d of %d Sessions", sess_count, MAX_SESSIONS);
+	{
+		Str255 ps;
+		short len = strlen(count_str);
+
+		ps[0] = len;
+		memcpy(ps + 1, count_str, len);
+		AppendMenu(window_menu, "\p ");
+		SetMenuItemText(window_menu, 1, ps);
+	}
+	DisableItem(window_menu, 1);
+
+	/* Separator */
+	AppendMenu(window_menu, "\p(-");
+
+	/* Append one item per session (starting at WIN_MENU_FIRST_WIN) */
 	for (i = 0; i < MAX_SESSIONS; i++) {
 		s = session_get(i);
 		if (!s)
@@ -384,7 +435,32 @@ main_event_loop(void)
 					sess->telnet.preferred_ttype =
 					    prefs.terminal_type;
 					sess->key_send_len = 0;
-					SetWTitle(sess->window, "\pFlynn");
+
+					/* Set title to show disconnected state */
+					if (sess->conn.host[0]) {
+						char dtmp[80];
+						Str255 dtitle;
+						short dl, di;
+
+						dl = sprintf(dtmp,
+						    "Flynn - %s "
+						    "(disconnected)",
+						    sess->conn.host);
+						if (dl > 254)
+							dl = 254;
+						dtitle[0] = dl;
+						for (di = 0;
+						    di < dl; di++)
+							dtitle[di + 1] =
+							    dtmp[di];
+						SetWTitle(
+						    sess->window,
+						    dtitle);
+					} else {
+						SetWTitle(
+						    sess->window,
+						    "\pFlynn");
+					}
 
 					GetPort(&save);
 					SetPort(sess->window);
@@ -413,7 +489,7 @@ main_event_loop(void)
 						    "\pConnection closed "
 						    "by remote host",
 						    "\p", "\p", "\p");
-						Alert(128, 0L);
+						NoteAlert(128, 0L);
 					}
 					continue;
 				}
@@ -1289,7 +1365,7 @@ handle_menu(long menu_id)
 				    "\pTerminal type change takes "
 				    "effect on next connection.",
 				    "\p", "\p", "\p");
-				Alert(128, 0L);
+				NoteAlert(128, 0L);
 			}
 			break;
 		case PREFS_DARK_ID:
@@ -1381,7 +1457,10 @@ do_about(void)
 	if (!dlg)
 		return;
 
-	ModalDialog(0L, &item);
+	/* Register default button outline */
+	setup_default_button_outline(dlg, 10);
+
+	ModalDialog((ModalFilterUPP)std_dlg_filter, &item);
 	DisposeDialog(dlg);
 }
 
@@ -1404,9 +1483,30 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			*item = 1;  /* Connect button */
 			return true;
 		}
+		/* Cmd+. maps to Cancel button */
+		if ((evt->modifiers & cmdKey) && key == '.') {
+			*item = 2;  /* Cancel button */
+			return true;
+		}
+		/* Tab cycles through edit fields: Host(4)->Port(6)->User(9) */
+		if (key == '\t') {
+			DialogPeek dp = (DialogPeek)dlg;
+			short cur = dp->editField + 1;  /* 1-based */
+			short next;
+
+			if (cur == DLOG_HOST_FIELD)
+				next = DLOG_PORT_FIELD;
+			else if (cur == DLOG_PORT_FIELD)
+				next = DLOG_USER_FIELD;
+			else
+				next = DLOG_HOST_FIELD;
+			SelectDialogItemText(dlg, next, 0, 32767);
+			*item = next;
+			return true;
+		}
 	}
 
-	if (evt->what == mouseDown && g_bm_popup) {
+	if (evt->what == mouseDown) {
 		Point pt;
 		short item_type;
 		Handle item_h;
@@ -1416,96 +1516,171 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 		SetPort(dlg);
 		GlobalToLocal(&pt);
 
-		GetDialogItem(dlg, DLOG_BOOKMARKS,
+		/* Terminal type popup menu */
+		GetDialogItem(dlg, DLOG_TTYPE_BTN,
 		    &item_type, &item_h, &item_rect);
-
 		if (PtInRect(pt, &item_rect)) {
-			long choice;
+			MenuHandle popup;
 			Point popup_pt;
+			long result;
+			short choice;
 
-			/* Flash the button */
-			HiliteControl((ControlHandle)item_h, 1);
+			popup = NewMenu(201, "\p");
+			AppendMenu(popup, "\pxterm");
+			AppendMenu(popup, "\pVT220");
+			AppendMenu(popup, "\pVT100");
+			AppendMenu(popup, "\pxterm-256color");
+			InsertMenu(popup, -1);
+
+			CheckItem(popup, g_connect_ttype + 1, true);
 
 			popup_pt.h = item_rect.left;
-			popup_pt.v = item_rect.bottom;
+			popup_pt.v = item_rect.top;
 			LocalToGlobal(&popup_pt);
 
-			choice = PopUpMenuSelect(g_bm_popup,
-			    popup_pt.v, popup_pt.h, 0);
+			result = PopUpMenuSelect(popup,
+			    popup_pt.v, popup_pt.h,
+			    g_connect_ttype + 1);
+			choice = LoWord(result);
 
-			HiliteControl((ControlHandle)item_h, 0);
+			if (choice > 0) {
+				char btn_text[32];
 
-			if (HiWord(choice) != 0) {
-				short sel;
-				Bookmark *bm;
-				Str255 pstr;
-				short i;
+				g_connect_ttype = choice - 1;
+				ttype_to_str(g_connect_ttype,
+				    btn_text);
+				bme_set_btn_title(dlg,
+				    DLOG_TTYPE_BTN, btn_text);
+			}
 
-				sel = LoWord(choice) - 1;
-				g_bm_selected = sel;
-				bm = &prefs.bookmarks[sel];
+			DeleteMenu(201);
+			DisposeMenu(popup);
 
-				/* Fill host */
-				GetDialogItem(dlg,
-				    DLOG_HOST_FIELD,
-				    &item_type, &item_h,
-				    &item_rect);
-				pstr[0] = strlen(bm->host);
-				for (i = 0; i < pstr[0]; i++)
-					pstr[i + 1] = bm->host[i];
-				SetDialogItemText(item_h, pstr);
+			*item = DLOG_TTYPE_BTN;
+			return true;
+		}
 
-				/* Fill port */
-				GetDialogItem(dlg,
-				    DLOG_PORT_FIELD,
-				    &item_type, &item_h,
-				    &item_rect);
-				sprintf((char *)&pstr[1],
-				    "%d", bm->port);
-				pstr[0] = strlen(
-				    (char *)&pstr[1]);
-				SetDialogItemText(item_h, pstr);
+		/* Bookmark popup menu */
+		if (g_bm_popup) {
+			GetDialogItem(dlg, DLOG_BOOKMARKS,
+			    &item_type, &item_h, &item_rect);
 
-				/* Fill username from bookmark */
-				GetDialogItem(dlg,
-				    DLOG_USER_FIELD,
-				    &item_type, &item_h,
-				    &item_rect);
-				if (bm->username[0]) {
-					pstr[0] = strlen(
-					    bm->username);
+			if (PtInRect(pt, &item_rect)) {
+				long choice;
+				Point popup_pt;
+
+				if (g_bm_selected >= 0)
+					CheckItem(g_bm_popup,
+					    g_bm_selected + 1,
+					    true);
+
+				popup_pt.h = item_rect.left;
+				popup_pt.v = item_rect.top;
+				LocalToGlobal(&popup_pt);
+
+				choice = PopUpMenuSelect(g_bm_popup,
+				    popup_pt.v, popup_pt.h,
+				    g_bm_selected >= 0 ?
+				    g_bm_selected + 1 : 0);
+
+				if (g_bm_selected >= 0)
+					CheckItem(g_bm_popup,
+					    g_bm_selected + 1,
+					    false);
+
+				if (HiWord(choice) != 0) {
+					short sel;
+					Bookmark *bm;
+					Str255 pstr;
+					short i;
+
+					sel = LoWord(choice) - 1;
+					g_bm_selected = sel;
+					bm = &prefs.bookmarks[sel];
+
+					/* Update button to
+					   show bookmark name */
+					bme_set_btn_title(dlg,
+					    DLOG_BOOKMARKS,
+					    bm->name);
+
+					/* Fill host */
+					GetDialogItem(dlg,
+					    DLOG_HOST_FIELD,
+					    &item_type, &item_h,
+					    &item_rect);
+					pstr[0] = strlen(bm->host);
 					for (i = 0;
 					    i < pstr[0]; i++)
 						pstr[i + 1] =
-						    bm->username[i];
-				} else {
-					pstr[0] = 0;
-				}
-				SetDialogItemText(item_h, pstr);
+						    bm->host[i];
+					SetDialogItemText(
+					    item_h, pstr);
 
-				/* Fill terminal type from bookmark */
-				if (bm->terminal_type >= 0)
-					g_connect_ttype =
-					    bm->terminal_type;
-				else
-					g_connect_ttype =
-					    prefs.terminal_type;
-				{
-					char btn_text[32];
-					ttype_to_str(
-					    g_connect_ttype,
-					    btn_text);
-					bme_set_btn_title(dlg,
-					    DLOG_TTYPE_BTN,
-					    btn_text);
+					/* Fill port */
+					GetDialogItem(dlg,
+					    DLOG_PORT_FIELD,
+					    &item_type, &item_h,
+					    &item_rect);
+					sprintf(
+					    (char *)&pstr[1],
+					    "%d", bm->port);
+					pstr[0] = strlen(
+					    (char *)&pstr[1]);
+					SetDialogItemText(
+					    item_h, pstr);
+
+					/* Fill username */
+					GetDialogItem(dlg,
+					    DLOG_USER_FIELD,
+					    &item_type, &item_h,
+					    &item_rect);
+					if (bm->username[0]) {
+						pstr[0] = strlen(
+						    bm->username);
+						for (i = 0;
+						    i < pstr[0];
+						    i++)
+							pstr[i+1] =
+							    bm->
+							    username
+							    [i];
+					} else {
+						pstr[0] = 0;
+					}
+					SetDialogItemText(
+					    item_h, pstr);
+
+					/* Fill terminal type */
+					if (bm->terminal_type
+					    >= 0)
+						g_connect_ttype =
+						    bm->
+						    terminal_type;
+					else
+						g_connect_ttype =
+						    prefs.
+						    terminal_type;
+					{
+						char btn_text[32];
+						ttype_to_str(
+						    g_connect_ttype,
+						    btn_text);
+						bme_set_btn_title(
+						    dlg,
+						    DLOG_TTYPE_BTN,
+						    btn_text);
+					}
+
+					SelectDialogItemText(
+					    dlg,
+					    DLOG_HOST_FIELD,
+					    0, 32767);
 				}
 
-				SelectDialogItemText(dlg,
-				    DLOG_HOST_FIELD, 0, 32767);
+				*item = 0;
+				return true;
 			}
-
-			*item = 0;
-			return true;  /* event handled */
 		}
 	}
 	return false;  /* let ModalDialog handle it */
@@ -1521,7 +1696,7 @@ do_connect(void)
 		s = session_new();
 		if (!s) {
 			ParamText("\pOut of memory", "\p", "\p", "\p");
-			Alert(128, 0L);
+			StopAlert(128, 0L);
 			return;
 		}
 		SetPort(s->window);
@@ -1543,7 +1718,7 @@ do_connect(void)
 		if (!s) {
 			ParamText("\pMaximum sessions reached",
 			    "\p", "\p", "\p");
-			Alert(128, 0L);
+			StopAlert(128, 0L);
 			update_menus();
 			return;
 		}
@@ -1666,6 +1841,10 @@ do_connect(void)
 			    btn_text);
 		}
 
+		/* Register default button outline */
+		setup_default_button_outline(dlg,
+		    DLOG_DEFAULT_BTN);
+
 		ShowWindow(dlg);
 
 		for (;;) {
@@ -1677,18 +1856,7 @@ do_connect(void)
 			    item_hit == DLOG_OK)
 				break;
 
-			/* Cycle terminal type */
-			if (item_hit == DLOG_TTYPE_BTN) {
-				char btn_text[32];
-				if (g_connect_ttype >= 3)
-					g_connect_ttype = 0;
-				else
-					g_connect_ttype++;
-				ttype_to_str(g_connect_ttype,
-				    btn_text);
-				bme_set_btn_title(dlg,
-				    DLOG_TTYPE_BTN, btn_text);
-			}
+			/* Terminal type handled by filter proc popup */
 		}
 
 		if (g_bm_popup) {
@@ -1740,11 +1908,20 @@ do_connect(void)
 
 			DisposeDialog(dlg);
 
-			if (s->conn.host[0])
+			if (s->conn.host[0]) {
+				WindowPtr sw;
+				char smsg[80];
+
+				sprintf(smsg,
+				    "Resolving %.40s\311",
+				    s->conn.host);
+				sw = conn_status_show(smsg);
 				connected = conn_connect(
 				    &s->conn,
 				    s->conn.host,
-				    s->conn.port);
+				    s->conn.port, sw);
+				conn_status_close(sw);
+			}
 		} else {
 			DisposeDialog(dlg);
 		}
@@ -1859,7 +2036,7 @@ do_connect_bookmark(short index)
 		s = session_new();
 		if (!s) {
 			ParamText("\pOut of memory", "\p", "\p", "\p");
-			Alert(128, 0L);
+			StopAlert(128, 0L);
 			return;
 		}
 		SetPort(s->window);
@@ -1881,7 +2058,7 @@ do_connect_bookmark(short index)
 		if (!s) {
 			ParamText("\pMaximum sessions reached",
 			    "\p", "\p", "\p");
-			Alert(128, 0L);
+			StopAlert(128, 0L);
 			update_menus();
 			return;
 		}
@@ -1924,7 +2101,22 @@ do_connect_bookmark(short index)
 		do_window_resize(s, win_w, win_h);
 	}
 
-	if (conn_connect(&s->conn, bm->host, bm->port)) {
+	{
+		WindowPtr sw;
+		char smsg[80];
+		Boolean ok;
+
+		sprintf(smsg, "Resolving %.40s\311", bm->host);
+		sw = conn_status_show(smsg);
+		ok = conn_connect(&s->conn, bm->host, bm->port, sw);
+		conn_status_close(sw);
+
+		if (!ok) {
+			update_menus();
+			return;
+		}
+	}
+	{
 		telnet_init(&s->telnet);
 
 		/* Apply bookmark terminal type, fall back to global */
@@ -2036,6 +2228,205 @@ bme_set_btn_title(DialogPtr dlg, short item, const char *text)
 	SetControlTitle((ControlHandle)item_h, pstr);
 }
 
+/* Simple dialog filter for Return=OK, Cmd+.=Cancel */
+static pascal Boolean
+std_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
+{
+	(void)dlg;
+	if (evt->what == keyDown) {
+		char key = evt->message & charCodeMask;
+		if (key == '\r' || key == '\n' || key == 0x03) {
+			*item = 1;  /* OK button */
+			return true;
+		}
+		if ((evt->modifiers & cmdKey) && key == '.') {
+			*item = 2;  /* Cancel button */
+			return true;
+		}
+	}
+	return false;
+}
+
+/* Bookmark edit dialog state shared with filter proc */
+static short g_bme_ttype;
+static short g_bme_font_id;
+static short g_bme_font_size;
+
+static pascal Boolean
+bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
+{
+	if (evt->what == keyDown) {
+		char key = evt->message & charCodeMask;
+		/* Return/Enter = OK */
+		if (key == '\r' || key == '\n' || key == 0x03) {
+			*item = 1;  /* OK button */
+			return true;
+		}
+		/* Cmd+. = Cancel */
+		if ((evt->modifiers & cmdKey) && key == '.') {
+			*item = 2;  /* Cancel button */
+			return true;
+		}
+		/* Tab cycles: Name(4)->Host(6)->Port(8)->User(10) */
+		if (key == '\t') {
+			DialogPeek dp = (DialogPeek)dlg;
+			short cur = dp->editField + 1;
+			short next;
+
+			if (cur == BME_NAME_FIELD)
+				next = BME_HOST_FIELD;
+			else if (cur == BME_HOST_FIELD)
+				next = BME_PORT_FIELD;
+			else if (cur == BME_PORT_FIELD)
+				next = BME_USER_FIELD;
+			else
+				next = BME_NAME_FIELD;
+			SelectDialogItemText(dlg, next, 0, 32767);
+			*item = next;
+			return true;
+		}
+	}
+
+	if (evt->what == mouseDown) {
+		Point pt;
+		short item_type;
+		Handle item_h;
+		Rect item_rect;
+
+		pt = evt->where;
+		SetPort(dlg);
+		GlobalToLocal(&pt);
+
+		/* Terminal type popup menu */
+		GetDialogItem(dlg, BME_TTYPE_BTN,
+		    &item_type, &item_h, &item_rect);
+		if (PtInRect(pt, &item_rect)) {
+			MenuHandle popup;
+			Point popup_pt;
+			long result;
+			short choice;
+
+			popup = NewMenu(202, "\p");
+			AppendMenu(popup, "\pDefault");
+			AppendMenu(popup, "\pxterm");
+			AppendMenu(popup, "\pVT220");
+			AppendMenu(popup, "\pVT100");
+			AppendMenu(popup, "\pxterm-256color");
+			InsertMenu(popup, -1);
+
+			/* Checkmark: -1=Default(1), 0=xterm(2),
+			 * 1=VT220(3), 2=VT100(4), 3=xterm-256(5) */
+			CheckItem(popup, g_bme_ttype + 2, true);
+
+			popup_pt.h = item_rect.left;
+			popup_pt.v = item_rect.top;
+			LocalToGlobal(&popup_pt);
+
+			result = PopUpMenuSelect(popup,
+			    popup_pt.v, popup_pt.h,
+			    g_bme_ttype + 2);
+			choice = LoWord(result);
+
+			if (choice > 0) {
+				char btn_text[32];
+
+				g_bme_ttype = choice - 2;
+				ttype_to_str(g_bme_ttype,
+				    btn_text);
+				bme_set_btn_title(dlg,
+				    BME_TTYPE_BTN, btn_text);
+			}
+
+			DeleteMenu(202);
+			DisposeMenu(popup);
+
+			*item = BME_TTYPE_BTN;
+			return true;
+		}
+
+		/* Font popup menu */
+		GetDialogItem(dlg, BME_FONT_BTN,
+		    &item_type, &item_h, &item_rect);
+		if (PtInRect(pt, &item_rect)) {
+			MenuHandle popup;
+			Point popup_pt;
+			long result;
+			short choice, fi;
+			short cur_item = 1;  /* Default */
+
+			popup = NewMenu(203, "\p");
+			AppendMenu(popup, "\pDefault");
+			for (fi = 0; fi < NUM_FONT_PRESETS; fi++) {
+				Str255 ps;
+				short len;
+
+				len = strlen(font_presets[fi].name);
+				ps[0] = len;
+				memcpy(ps + 1,
+				    font_presets[fi].name, len);
+				AppendMenu(popup, "\p ");
+				SetMenuItemText(popup,
+				    fi + 2, ps);
+			}
+			InsertMenu(popup, -1);
+
+			/* Find current selection for checkmark */
+			if (g_bme_font_id == 0 &&
+			    g_bme_font_size == 0) {
+				cur_item = 1;  /* Default */
+			} else {
+				for (fi = 0;
+				    fi < NUM_FONT_PRESETS;
+				    fi++) {
+					if (font_presets[fi].font_id
+					    == g_bme_font_id &&
+					    font_presets[fi].font_size
+					    == g_bme_font_size) {
+						cur_item = fi + 2;
+						break;
+					}
+				}
+			}
+			CheckItem(popup, cur_item, true);
+
+			popup_pt.h = item_rect.left;
+			popup_pt.v = item_rect.top;
+			LocalToGlobal(&popup_pt);
+
+			result = PopUpMenuSelect(popup,
+			    popup_pt.v, popup_pt.h, cur_item);
+			choice = LoWord(result);
+
+			if (choice > 0) {
+				char btn_text[32];
+
+				if (choice == 1) {
+					g_bme_font_id = 0;
+					g_bme_font_size = 0;
+				} else {
+					g_bme_font_id =
+					    font_presets
+					    [choice - 2].font_id;
+					g_bme_font_size =
+					    font_presets
+					    [choice - 2].font_size;
+				}
+				font_to_str(g_bme_font_id,
+				    g_bme_font_size, btn_text);
+				bme_set_btn_title(dlg,
+				    BME_FONT_BTN, btn_text);
+			}
+
+			DeleteMenu(203);
+			DisposeMenu(popup);
+
+			*item = BME_FONT_BTN;
+			return true;
+		}
+	}
+	return false;
+}
+
 static Boolean
 bm_edit_dialog(Bookmark *bm, Boolean is_new)
 {
@@ -2047,40 +2438,43 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	Str255 str;
 	long num;
 	short i;
-	short cur_ttype;
-	short cur_font_id, cur_font_size;
 	char btn_text[32];
 
 	dlg = GetNewDialog(DLOG_BM_EDIT_ID, 0L, (WindowPtr)-1L);
 	if (!dlg)
 		return false;
 
-	/* Initialize cycling state from bookmark */
-	cur_ttype = is_new ? -1 : bm->terminal_type;
-	cur_font_id = is_new ? 0 : bm->font_id;
-	cur_font_size = is_new ? 0 : bm->font_size;
+	/* Initialize shared state for filter proc from bookmark */
+	g_bme_ttype = bm->terminal_type;
+	g_bme_font_id = bm->font_id;
+	g_bme_font_size = bm->font_size;
 
-	/* Pre-fill fields */
-	if (!is_new) {
+	/* Pre-fill fields from bookmark struct */
+	if (bm->name[0]) {
 		GetDialogItem(dlg, BME_NAME_FIELD, &item_type,
 		    &item_h, &item_rect);
 		str[0] = strlen(bm->name);
 		memcpy(&str[1], bm->name, str[0]);
 		SetDialogItemText(item_h, str);
+	}
 
+	if (bm->host[0]) {
 		GetDialogItem(dlg, BME_HOST_FIELD, &item_type,
 		    &item_h, &item_rect);
 		str[0] = strlen(bm->host);
 		memcpy(&str[1], bm->host, str[0]);
 		SetDialogItemText(item_h, str);
+	}
 
+	if (bm->port > 0) {
 		GetDialogItem(dlg, BME_PORT_FIELD, &item_type,
 		    &item_h, &item_rect);
 		sprintf((char *)&str[1], "%u", bm->port);
 		str[0] = strlen((char *)&str[1]);
 		SetDialogItemText(item_h, str);
+	}
 
-		/* Pre-fill username */
+	if (bm->username[0]) {
 		GetDialogItem(dlg, BME_USER_FIELD, &item_type,
 		    &item_h, &item_rect);
 		str[0] = strlen(bm->username);
@@ -2089,17 +2483,22 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	}
 
 	/* Set terminal type button text */
-	ttype_to_str(cur_ttype, btn_text);
+	ttype_to_str(g_bme_ttype, btn_text);
 	bme_set_btn_title(dlg, BME_TTYPE_BTN, btn_text);
 
 	/* Set font button text */
-	font_to_str(cur_font_id, cur_font_size, btn_text);
+	font_to_str(g_bme_font_id, g_bme_font_size, btn_text);
 	bme_set_btn_title(dlg, BME_FONT_BTN, btn_text);
+
+	/* Register default button outline */
+	setup_default_button_outline(dlg, BME_DEFAULT_BTN);
 
 	ShowWindow(dlg);
 
 	for (;;) {
-		ModalDialog(0L, &item_hit);
+		ModalDialog(
+		    (ModalFilterUPP)bme_dlg_filter,
+		    &item_hit);
 		if (item_hit == BME_CANCEL) {
 			DisposeDialog(dlg);
 			return false;
@@ -2107,68 +2506,8 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 		if (item_hit == BME_OK)
 			break;
 
-		/* Cycle terminal type: Default->xterm->VT220->VT100->xterm-256color->Default */
-		if (item_hit == BME_TTYPE_BTN) {
-			if (cur_ttype == -1)
-				cur_ttype = 0;
-			else if (cur_ttype == 0)
-				cur_ttype = 1;
-			else if (cur_ttype == 1)
-				cur_ttype = 2;
-			else if (cur_ttype == 2)
-				cur_ttype = 3;
-			else
-				cur_ttype = -1;
-			ttype_to_str(cur_ttype, btn_text);
-			bme_set_btn_title(dlg, BME_TTYPE_BTN,
-			    btn_text);
-		}
-
-		/* Cycle font: Default->Monaco 9->...->Geneva 10->Default */
-		if (item_hit == BME_FONT_BTN) {
-			short fi;
-			Boolean found = false;
-
-			if (cur_font_id == 0 && cur_font_size == 0) {
-				/* Default -> first preset */
-				cur_font_id = font_presets[0].font_id;
-				cur_font_size =
-				    font_presets[0].font_size;
-			} else {
-				for (fi = 0; fi < NUM_FONT_PRESETS;
-				    fi++) {
-					if (font_presets[fi].font_id ==
-					    cur_font_id &&
-					    font_presets[fi].font_size ==
-					    cur_font_size) {
-						found = true;
-						if (fi + 1 <
-						    NUM_FONT_PRESETS) {
-							cur_font_id =
-							    font_presets
-							    [fi + 1]
-							    .font_id;
-							cur_font_size =
-							    font_presets
-							    [fi + 1]
-							    .font_size;
-						} else {
-							cur_font_id = 0;
-							cur_font_size = 0;
-						}
-						break;
-					}
-				}
-				if (!found) {
-					cur_font_id = 0;
-					cur_font_size = 0;
-				}
-			}
-			font_to_str(cur_font_id, cur_font_size,
-			    btn_text);
-			bme_set_btn_title(dlg, BME_FONT_BTN,
-			    btn_text);
-		}
+		/* Terminal type and font handled by filter
+		 * proc popup menus */
 	}
 
 	/* Extract name */
@@ -2221,10 +2560,10 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 		bm->username[0] = '\0';
 	}
 
-	/* Store terminal type and font from cycling state */
-	bm->terminal_type = cur_ttype;
-	bm->font_id = cur_font_id;
-	bm->font_size = cur_font_size;
+	/* Store terminal type and font from filter proc state */
+	bm->terminal_type = g_bme_ttype;
+	bm->font_id = g_bme_font_id;
+	bm->font_size = g_bme_font_size;
 
 	DisposeDialog(dlg);
 	return true;
@@ -2235,6 +2574,15 @@ bm_filter(DialogPtr dlg, EventRecord *event, short *item)
 {
 	Point pt;
 	short i;
+
+	/* Cmd+. maps to Done button */
+	if (event->what == keyDown) {
+		char key = event->message & charCodeMask;
+		if ((event->modifiers & cmdKey) && key == '.') {
+			*item = BM_DONE;
+			return true;
+		}
+	}
 
 	if (event->what == mouseDown) {
 		SetPort(dlg);
@@ -2279,6 +2627,9 @@ do_bookmarks(void)
 	bm_list_rect = item_rect;
 	SetDialogItem(dlg, BM_LIST, item_type,
 	    (Handle)bm_list_draw, &item_rect);
+
+	/* Register default button outline */
+	setup_default_button_outline(dlg, BM_DEFAULT_BTN);
 
 	ShowWindow(dlg);
 
@@ -2421,13 +2772,41 @@ do_save_as_bookmark(void)
 	else
 		bm.terminal_type = -1;
 
-	/* Auto-generate name from host */
-	strncpy(bm.name, s->conn.host, sizeof(bm.name) - 1);
+	/* Auto-generate name from window title (user@hostname:path).
+	 * Extract just user@hostname, stripping :path and beyond.
+	 * If title is empty or has no '@', build from connection. */
+	bm.name[0] = '\0';
+	if (s->terminal.window_title[0]) {
+		char *src = s->terminal.window_title;
+		short ni = 0;
+		Boolean have_at = false;
+
+		while (src[ni] && src[ni] != ':' && src[ni] != ' ' &&
+		    ni < (short)(sizeof(bm.name) - 1)) {
+			if (src[ni] == '@')
+				have_at = true;
+			bm.name[ni] = src[ni];
+			ni++;
+		}
+		bm.name[ni] = '\0';
+
+		if (!have_at)
+			bm.name[0] = '\0';  /* not user@host, discard */
+	}
+	if (!bm.name[0]) {
+		if (s->conn.username[0])
+			sprintf(bm.name, "%.15s@%.15s",
+			    s->conn.username, s->conn.host);
+		else
+			strncpy(bm.name, s->conn.host,
+			    sizeof(bm.name) - 1);
+	}
 
 	if (bm_edit_dialog(&bm, true)) {
 		prefs.bookmarks[prefs.bookmark_count] = bm;
 		prefs.bookmark_count++;
 		s->bookmark_index = prefs.bookmark_count - 1;
+		add_recent_bookmark(s->bookmark_index);
 		prefs_save(&prefs);
 		rebuild_file_menu();
 	}
@@ -2677,6 +3056,31 @@ add_recent_bookmark(short index)
 	rebuild_file_menu();
 }
 
+static pascal Boolean
+dns_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
+{
+	if (evt->what == keyDown) {
+		char key = evt->message & charCodeMask;
+		/* Return/Enter = OK */
+		if (key == '\r' || key == '\n' || key == 0x03) {
+			*item = 1;  /* OK button */
+			return true;
+		}
+		/* Cmd+. = Cancel */
+		if ((evt->modifiers & cmdKey) && key == '.') {
+			*item = 2;  /* Cancel button */
+			return true;
+		}
+		/* Only one edit field (item 4) — keep Tab on it */
+		if (key == '\t') {
+			SelectDialogItemText(dlg, 4, 0, 32767);
+			*item = 4;
+			return true;
+		}
+	}
+	return false;
+}
+
 static void
 do_dns_server_dialog(void)
 {
@@ -2704,10 +3108,15 @@ do_dns_server_dialog(void)
 		ip_str[i + 1] = prefs.dns_server[i];
 	SetDialogItemText(item_h, ip_str);
 
+	/* Register default button outline */
+	setup_default_button_outline(dlg, 6);
+
 	ShowWindow(dlg);
 
 	for (;;) {
-		ModalDialog(0L, &item_hit);
+		ModalDialog(
+		    (ModalFilterUPP)dns_dlg_filter,
+		    &item_hit);
 
 		if (item_hit == 2) {  /* Cancel */
 			DisposeDialog(dlg);
@@ -2733,7 +3142,7 @@ do_dns_server_dialog(void)
 	if (ip == 0) {
 		ParamText("\pInvalid DNS server IP address",
 		    "\p", "\p", "\p");
-		Alert(128, 0L);
+		StopAlert(128, 0L);
 		return;
 	}
 
