@@ -23,9 +23,10 @@
 #define FILE_MENU_CONNECT_ID    1
 #define FILE_MENU_DISCONNECT_ID 2
 /* separator = 3 */
-#define FILE_MENU_BOOKMARKS_ID  4
-/* separator = 5 */
-/* items 6..N are recent bookmarks (dynamic) */
+#define FILE_MENU_SAVE_BM_ID    4
+#define FILE_MENU_BOOKMARKS_ID  5
+/* separator = 6 */
+/* items 7..N are recent bookmarks (dynamic) */
 /* Quit is always last item — use CountMItems() */
 
 /* Edit menu items */

@@ -38,6 +38,9 @@ typedef struct Session {
 
 	/* Session slot index (0..MAX_SESSIONS-1) */
 	short		id;
+
+	/* Bookmark this session was launched from (-1 = none) */
+	short		bookmark_index;
 } Session;
 
 /* Create a new session with window. Returns NULL on failure. */

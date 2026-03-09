@@ -29,7 +29,7 @@
 #include "glyphs.h"
 
 /* Number of static items in File menu (before dynamic recent bookmarks) */
-#define FILE_MENU_STATIC_ITEMS  4
+#define FILE_MENU_STATIC_ITEMS  5
 
 /* Globals */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
@@ -98,6 +98,7 @@ static void do_about(void);
 static void do_connect(void);
 static void do_connect_bookmark(short index);
 static void do_bookmarks(void);
+static void do_save_as_bookmark(void);
 static void do_font_change(short font_id, short font_size);
 static void do_window_resize(Session *s, short width, short height);
 static void do_copy(void);
@@ -262,6 +263,15 @@ update_menus(void)
 		EnableItem(file_menu, FILE_MENU_DISCONNECT_ID);
 	else
 		DisableItem(file_menu, FILE_MENU_DISCONNECT_ID);
+
+	/* Save as Bookmark: only when connected and not already from a bookmark */
+	if (active_session &&
+	    active_session->conn.state == CONN_STATE_CONNECTED &&
+	    active_session->bookmark_index < 0 &&
+	    prefs.bookmark_count < MAX_BOOKMARKS)
+		EnableItem(file_menu, FILE_MENU_SAVE_BM_ID);
+	else
+		DisableItem(file_menu, FILE_MENU_SAVE_BM_ID);
 
 	/* Edit menu: Copy when selection active, Paste when connected */
 	if (active_session)
@@ -1119,6 +1129,9 @@ handle_menu(long menu_id)
 				update_menus();
 			}
 			break;
+		case FILE_MENU_SAVE_BM_ID:
+			do_save_as_bookmark();
+			break;
 		case FILE_MENU_BOOKMARKS_ID:
 			do_bookmarks();
 			break;
@@ -1255,6 +1268,16 @@ handle_menu(long menu_id)
 			if (active_session)
 				active_session->telnet.preferred_ttype =
 				    item - PREFS_XTERM_ID;
+			/* Auto-save to originating bookmark */
+			if (active_session &&
+			    active_session->bookmark_index >= 0 &&
+			    active_session->bookmark_index <
+			    prefs.bookmark_count) {
+				prefs.bookmarks[
+				    active_session->bookmark_index
+				    ].terminal_type =
+				    item - PREFS_XTERM_ID;
+			}
 			/* Also update global default */
 			prefs.terminal_type = item - PREFS_XTERM_ID;
 			prefs_save(&prefs);
@@ -1782,6 +1805,8 @@ do_connect(void)
 			if (g_bm_selected >= 0)
 				add_recent_bookmark(
 				    g_bm_selected);
+			if (g_bm_selected >= 0)
+				s->bookmark_index = g_bm_selected;
 
 			/* Auto-send username after connect */
 			if (s->conn.username[0]) {
@@ -1919,6 +1944,7 @@ do_connect_bookmark(short index)
 		prefs.host[sizeof(prefs.host) - 1] = '\0';
 		prefs.port = s->conn.port;
 		add_recent_bookmark(index);
+		s->bookmark_index = index;
 
 		/* Auto-send username from bookmark */
 		if (bm->username[0]) {
@@ -2331,6 +2357,22 @@ do_bookmarks(void)
 			}
 			prefs.recent_count = wi;
 
+			/* Fix bookmark_index in live sessions */
+			{
+				short si;
+				Session *sess;
+				for (si = 0; si < MAX_SESSIONS; si++) {
+					sess = session_get(si);
+					if (!sess)
+						continue;
+					if (sess->bookmark_index == del_idx)
+						sess->bookmark_index = -1;
+					else if (sess->bookmark_index >
+					    del_idx)
+						sess->bookmark_index--;
+				}
+			}
+
 			changed = true;
 			SetPort(dlg);
 			bm_list_draw((WindowPtr)dlg, BM_LIST);
@@ -2352,6 +2394,40 @@ do_bookmarks(void)
 
 	DisposeDialog(dlg);
 	if (changed) {
+		prefs_save(&prefs);
+		rebuild_file_menu();
+	}
+}
+
+static void
+do_save_as_bookmark(void)
+{
+	Session *s = active_session;
+	Bookmark bm;
+
+	if (!s || prefs.bookmark_count >= MAX_BOOKMARKS)
+		return;
+
+	memset(&bm, 0, sizeof(Bookmark));
+	strncpy(bm.host, s->conn.host, sizeof(bm.host) - 1);
+	bm.port = s->conn.port;
+	if (s->conn.username[0])
+		strncpy(bm.username, s->conn.username,
+		    sizeof(bm.username) - 1);
+	bm.font_id = s->font_id;
+	bm.font_size = s->font_size;
+	if (s->telnet.preferred_ttype >= 0)
+		bm.terminal_type = s->telnet.preferred_ttype;
+	else
+		bm.terminal_type = -1;
+
+	/* Auto-generate name from host */
+	strncpy(bm.name, s->conn.host, sizeof(bm.name) - 1);
+
+	if (bm_edit_dialog(&bm, true)) {
+		prefs.bookmarks[prefs.bookmark_count] = bm;
+		prefs.bookmark_count++;
+		s->bookmark_index = prefs.bookmark_count - 1;
 		prefs_save(&prefs);
 		rebuild_file_menu();
 	}
@@ -2387,6 +2463,15 @@ do_font_change(short font_id, short font_size)
 		win_h = MAX_WIN_HEIGHT;
 
 	do_window_resize(active_session, win_w, win_h);
+
+	/* Auto-save to originating bookmark */
+	if (active_session->bookmark_index >= 0 &&
+	    active_session->bookmark_index < prefs.bookmark_count) {
+		prefs.bookmarks[active_session->bookmark_index].font_id =
+		    font_id;
+		prefs.bookmarks[active_session->bookmark_index].font_size =
+		    font_size;
+	}
 
 	/* Also update global default for new sessions */
 	prefs.font_id = font_id;
