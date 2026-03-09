@@ -28,6 +28,7 @@ No build toolchain required — just download and run.
 
 ## Features
 
+- **Multiple sessions** (up to 4 simultaneous windows)
 - **VT100/VT220/xterm terminal emulation**
 - **Box-drawing characters**
 - **Unicode glyph rendering**
@@ -42,7 +43,7 @@ No build toolchain required — just download and run.
 - **M0110 keyboard support**
 - **Dark mode**
 - **Settings persistence**
-- **4MB Mac Plus** (~110KB on disk, ~60KB RAM)
+- **4MB Mac Plus** (~110KB on disk, ~73KB RAM per session)
 
 ## Keyboard Shortcuts
 
@@ -63,7 +64,8 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | Paste | Cmd+V | Sends clipboard to connection |
 | F1-F10 | Cmd+1..0 | For M0110 keyboards without function keys |
 | Bookmarks | Cmd+B | Open bookmark manager |
-| Connect | Cmd+N | Open connect dialog |
+| New Session | Cmd+N | New session (new window if connected) |
+| Close Window | Cmd+W | Close active session window |
 
 ## Building
 

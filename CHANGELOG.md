@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Multiple simultaneous sessions (up to 4) in separate windows
+  - Session struct bundles Window, Connection, TelnetState, Terminal per session
+  - UIState save/load pattern for per-session cursor blink and text selection
+  - Per-connection idle polling skip counter (moved from file-scope static)
+- Window menu (MENU 133, between Edit and Preferences)
+  - Close Window (Cmd+W) closes active session window
+  - Dynamic window list with checkmark on active session
+  - Clicking between windows switches active session
+- File menu (renamed from "Session")
+  - "New Session..." (Cmd+N, was "Connect...") — auto-creates new window if
+    current session is already connected
+  - "Close Session" (was "Disconnect") — disconnects active session
+  - Bookmarks open in new session if current is connected
+- Per-session event routing via window refCon
+  - Mouse events routed via FindWindow → session_from_window
+  - Key events routed to front window's session
+  - Update/activate events routed via WindowPtr
+- Font changes and dark mode toggle apply to all session windows
+- Quit confirms if any session is connected, destroys all on exit
+- Close box on individual windows closes just that session
+
+### Changed
+- SIZE resource increased from 512KB/384KB to 640KB/512KB
+- Memory per session: ~73KB (Terminal 52KB + Connection 12.5KB + TCP 8KB + misc)
+- New source files: `session.c`, `session.h`
+- Single-session performance overhead: ~100µs per idle tick (negligible)
+
 ## [1.1.1] - 2026-03-09
 
 ### Added

@@ -56,6 +56,12 @@
 #define PREFS_MISC_HDR      17   /* disabled section header */
 #define PREFS_DARK_ID       18
 
+/* Window menu */
+#define WINDOW_MENU_ID      133
+#define WIN_MENU_CLOSE      1
+/* separator = 2 */
+#define WIN_MENU_FIRST_WIN  3
+
 /* Control menu items */
 #define CTRL_MENU_CTRLC     1
 #define CTRL_MENU_CTRLD     2

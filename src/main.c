@@ -20,6 +20,7 @@
 #include <stdio.h>
 
 #include "main.h"
+#include "session.h"
 #include "connection.h"
 #include "telnet.h"
 #include "terminal.h"
@@ -29,49 +30,44 @@
 
 /* Globals */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
-static WindowPtr term_window;
+static MenuHandle window_menu;
 static Boolean running = true;
-static Connection conn;
-static TelnetState telnet;
-static Terminal terminal;
 static FlynnPrefs prefs;
 static RgnHandle grow_clip_rgn = 0L;
-
-/* Keystroke send buffer — batches multiple keystrokes into one TCP send */
-static char key_send_buf[256];
-static short key_send_len = 0;
+static Session *active_session = 0L;
 
 static void
-buffer_key_send(const char *data, short len)
+buffer_key_send(Session *s, const char *data, short len)
 {
 	short i;
 
-	for (i = 0; i < len && key_send_len < (short)sizeof(key_send_buf); i++)
-		key_send_buf[key_send_len++] = data[i];
+	for (i = 0; i < len && s->key_send_len < (short)sizeof(s->key_send_buf);
+	    i++)
+		s->key_send_buf[s->key_send_len++] = data[i];
 }
 
 static void
-flush_key_send(void)
+flush_key_send(Session *s)
 {
-	if (key_send_len > 0 && conn.state == CONN_STATE_CONNECTED) {
-		conn_send(&conn, key_send_buf, key_send_len);
-		key_send_len = 0;
+	if (s->key_send_len > 0 && s->conn.state == CONN_STATE_CONNECTED) {
+		conn_send(&s->conn, s->key_send_buf, s->key_send_len);
+		s->key_send_len = 0;
 	} else {
-		key_send_len = 0;
+		s->key_send_len = 0;
 	}
 }
 
 /* Forward declarations */
 static void init_toolbox(void);
 static void init_menus(void);
-static void init_window(void);
 static void update_menus(void);
+static void update_window_menu(void);
 static void update_prefs_menu(void);
 static void rebuild_bookmark_menu(void);
 static void main_event_loop(void);
 static Boolean handle_menu(long menu_id);
 static void handle_mouse_down(EventRecord *event);
-static void handle_key_down(EventRecord *event);
+static void handle_key_down(Session *s, EventRecord *event);
 static void handle_update(EventRecord *event);
 static void handle_activate(EventRecord *event);
 static void do_about(void);
@@ -80,14 +76,14 @@ static void do_connect_bookmark(short index);
 static void do_disconnect(void);
 static void do_bookmarks(void);
 static void do_font_change(short font_id, short font_size);
-static void do_window_resize(short width, short height);
+static void do_window_resize(Session *s, short width, short height);
 static void do_copy(void);
 static void do_paste(void);
 static void do_dns_server_dialog(void);
-static short pixel_to_row(short v);
-static short pixel_to_col(short h);
-static void handle_content_click(EventRecord *event);
-static void track_selection_drag(void);
+static short pixel_to_row(Session *s, short v);
+static short pixel_to_col(Session *s, short h);
+static void handle_content_click(Session *s, EventRecord *event);
+static void track_selection_drag(Session *s);
 
 int
 main(void)
@@ -98,39 +94,52 @@ main(void)
 	/* Load prefs and fast init before showing window */
 	prefs_load(&prefs);
 	term_ui_set_dark_mode(prefs.dark_mode);
-	telnet_init(&telnet);
-	terminal_init(&terminal);
-	telnet.preferred_ttype = prefs.terminal_type;
 
-	/* Show window with correct grid from the start */
-	init_window();
-	term_ui_set_font(term_window, prefs.font_id, prefs.font_size);
+	/* Create first session */
+	active_session = session_new();
+	if (!active_session) {
+		SysBeep(10);
+		ExitToShell();
+	}
+
+	SetPort(active_session->window);
+	term_ui_set_font(active_session->window, prefs.font_id,
+	    prefs.font_size);
 
 	/* Compute grid and size window to fit */
-	terminal.active_cols = (MAX_WIN_WIDTH - LEFT_MARGIN * 2) /
-	    g_cell_width;
-	terminal.active_rows = (MAX_WIN_HEIGHT - TOP_MARGIN * 2) /
-	    g_cell_height;
-	if (terminal.active_cols > TERM_DEFAULT_COLS)
-		terminal.active_cols = TERM_DEFAULT_COLS;
-	if (terminal.active_rows > TERM_DEFAULT_ROWS)
-		terminal.active_rows = TERM_DEFAULT_ROWS;
-	terminal.scroll_bottom = terminal.active_rows - 1;
-	telnet.cols = terminal.active_cols;
-	telnet.rows = terminal.active_rows;
+	active_session->terminal.active_cols =
+	    (MAX_WIN_WIDTH - LEFT_MARGIN * 2) / g_cell_width;
+	active_session->terminal.active_rows =
+	    (MAX_WIN_HEIGHT - TOP_MARGIN * 2) / g_cell_height;
+	if (active_session->terminal.active_cols > TERM_DEFAULT_COLS)
+		active_session->terminal.active_cols = TERM_DEFAULT_COLS;
+	if (active_session->terminal.active_rows > TERM_DEFAULT_ROWS)
+		active_session->terminal.active_rows = TERM_DEFAULT_ROWS;
+	active_session->terminal.scroll_bottom =
+	    active_session->terminal.active_rows - 1;
 
-	SizeWindow(term_window,
-	    LEFT_MARGIN * 2 + terminal.active_cols * g_cell_width,
-	    TOP_MARGIN * 2 + terminal.active_rows * g_cell_height, true);
+	SizeWindow(active_session->window,
+	    LEFT_MARGIN * 2 +
+	    active_session->terminal.active_cols * g_cell_width,
+	    TOP_MARGIN * 2 +
+	    active_session->terminal.active_rows * g_cell_height, true);
+
+	term_ui_init(active_session->window, &active_session->terminal);
+
+	active_session->telnet.preferred_ttype = prefs.terminal_type;
+	active_session->telnet.cols = active_session->terminal.active_cols;
+	active_session->telnet.rows = active_session->terminal.active_rows;
+
+	if (prefs.dark_mode)
+		PaintRect(&active_session->window->portRect);
 
 	rebuild_bookmark_menu();
 	update_menus();
 	update_prefs_menu();
 
 	/* Slow MacTCP init — window is already visible */
-	memset(&conn, 0, sizeof(conn));
 	conn_init();
-	conn.dns_server = ip2long(prefs.dns_server);
+	active_session->conn.dns_server = ip2long(prefs.dns_server);
 
 	main_event_loop();
 	return 0;
@@ -173,6 +182,7 @@ init_menus(void)
 	edit_menu = GetMenuHandle(EDIT_MENU_ID);
 	prefs_menu = GetMenuHandle(PREFS_MENU_ID);
 	ctrl_menu = GetMenuHandle(CTRL_MENU_ID);
+	window_menu = GetMenuHandle(WINDOW_MENU_ID);
 
 	/* Disable section header items */
 	if (prefs_menu) {
@@ -186,32 +196,18 @@ init_menus(void)
 }
 
 static void
-init_window(void)
-{
-	Rect bounds;
-
-	SetRect(&bounds, 10, 40,
-	    10 + MAX_WIN_WIDTH, 40 + MAX_WIN_HEIGHT);
-	term_window = NewWindow(0L, &bounds, "\pFlynn", true,
-	    documentProc, (WindowPtr)-1L, true, 0L);
-
-	if (term_window) {
-		SetPort(term_window);
-		term_ui_init(term_window, &terminal);
-	}
-}
-
-static void
 update_menus(void)
 {
 	Boolean connected;
 	short i;
 
-	connected = (conn.state == CONN_STATE_CONNECTED);
+	connected = (active_session &&
+	    active_session->conn.state == CONN_STATE_CONNECTED);
 
 	/* Session menu: Connect vs Disconnect */
 	if (connected) {
-		DisableItem(file_menu, FILE_MENU_CONNECT_ID);
+		/* When connected, Connect opens a new session window */
+		EnableItem(file_menu, FILE_MENU_CONNECT_ID);
 		EnableItem(file_menu, FILE_MENU_DISCONNECT_ID);
 	} else {
 		EnableItem(file_menu, FILE_MENU_CONNECT_ID);
@@ -239,7 +235,7 @@ update_menus(void)
 		}
 	}
 
-	/* Bookmark menu items: enable only when disconnected */
+	/* Bookmark menu items: enable when active session is disconnected */
 	for (i = 0; i < prefs.bookmark_count; i++) {
 		if (connected)
 			DisableItem(file_menu,
@@ -247,6 +243,48 @@ update_menus(void)
 		else
 			EnableItem(file_menu,
 			    FILE_MENU_BM_BASE + i);
+	}
+
+	/* Window menu: Close only when there's an active session */
+	if (window_menu) {
+		if (active_session)
+			EnableItem(window_menu, WIN_MENU_CLOSE);
+		else
+			DisableItem(window_menu, WIN_MENU_CLOSE);
+
+	}
+
+	update_window_menu();
+}
+
+static void
+update_window_menu(void)
+{
+	short count, i, item;
+	Str255 title;
+	Session *s;
+
+	if (!window_menu)
+		return;
+
+	/* Remove dynamic items (after separator at position 3) */
+	count = CountMItems(window_menu);
+	while (count > WIN_MENU_FIRST_WIN - 1) {
+		DeleteMenuItem(window_menu, count);
+		count--;
+	}
+
+	/* Append one item per session */
+	for (i = 0; i < MAX_SESSIONS; i++) {
+		s = session_get(i);
+		if (!s)
+			continue;
+		GetWTitle(s->window, title);
+		AppendMenu(window_menu, "\p ");
+		item = CountMItems(window_menu);
+		SetMenuItemText(window_menu, item, title);
+		if (s == active_session)
+			CheckItem(window_menu, item, true);
 	}
 }
 
@@ -283,138 +321,226 @@ main_event_loop(void)
 {
 	EventRecord event;
 	long wait_ticks;
-	short prev_state;
+	static unsigned char out_buf[TCP_READ_BUFSIZ];
+	static unsigned char send_buf[TCP_READ_BUFSIZ];
 
 	while (running) {
-		wait_ticks = (conn.state == CONN_STATE_CONNECTED) ? 1L : 30L;
+		wait_ticks = session_any_connected() ? 1L : 30L;
 		WaitNextEvent(everyEvent, &event, wait_ticks, 0L);
 
 		switch (event.what) {
 		case nullEvent:
-			prev_state = conn.state;
-			conn_idle(&conn);
+		{
+			short si;
+			Session *sess;
+			short prev_state;
 
-			/* Detect connection lost */
-			if (prev_state == CONN_STATE_CONNECTED &&
-			    conn.state == CONN_STATE_IDLE) {
-				GrafPtr save;
-				short i;
+			for (si = 0; si < MAX_SESSIONS; si++) {
+				sess = session_get(si);
+				if (!sess)
+					continue;
 
-				terminal_reset(&terminal);
-				telnet_init(&telnet);
-				telnet.preferred_ttype =
-				    prefs.terminal_type;
-				SetWTitle(term_window, "\pFlynn");
+				/* Load this session's UI state */
+				term_ui_load_state(&sess->ui);
 
-				GetPort(&save);
-				SetPort(term_window);
-				if (prefs.dark_mode)
-					PaintRect(
-					    &term_window->portRect);
-				else
-					EraseRect(
-					    &term_window->portRect);
-				for (i = 0; i < terminal.active_rows;
-				    i++)
-					terminal.dirty[i] = 1;
-				term_ui_draw(term_window, &terminal);
-				SetPort(save);
+				prev_state = sess->conn.state;
+				conn_idle(&sess->conn);
 
-				update_menus();
-				ParamText("\pConnection closed by remote host",
-				    "\p", "\p", "\p");
-				Alert(128, 0L);
-			}
-
-			if (conn.read_len > 0) {
-				static unsigned char out_buf[TCP_READ_BUFSIZ];
-				static unsigned char send_buf[TCP_READ_BUFSIZ];
-				short out_len = 0, send_len = 0;
-
-				telnet_process(&telnet,
-				    (unsigned char *)conn.read_buf,
-				    conn.read_len, out_buf, &out_len,
-				    send_buf, &send_len);
-
-				if (send_len > 0)
-					conn_send(&conn, (char *)send_buf,
-					    send_len);
-
-				if (out_len > 0) {
+				/* Detect remote disconnect */
+				if (prev_state == CONN_STATE_CONNECTED &&
+				    sess->conn.state == CONN_STATE_IDLE) {
+					short ri;
 					GrafPtr save;
 
-					/* Clear selection on new data */
-					if (term_ui_sel_active()) {
-						term_ui_sel_dirty_all(
-						    &terminal);
-						term_ui_sel_clear();
+					terminal_reset(&sess->terminal);
+					telnet_init(&sess->telnet);
+					sess->telnet.preferred_ttype =
+					    prefs.terminal_type;
+					sess->key_send_len = 0;
+					SetWTitle(sess->window, "\pFlynn");
+
+					GetPort(&save);
+					SetPort(sess->window);
+					if (prefs.dark_mode)
+						PaintRect(
+						    &sess->window->portRect);
+					else
+						EraseRect(
+						    &sess->window->portRect);
+					for (ri = 0;
+					    ri < sess->terminal.active_rows;
+					    ri++)
+						sess->terminal.dirty[ri] = 1;
+					term_ui_draw(sess->window,
+					    &sess->terminal);
+					SetPort(save);
+
+					if (sess == active_session)
+						update_menus();
+
+					term_ui_save_state(&sess->ui);
+
+					/* Show alert only for active session */
+					if (sess == active_session) {
+						ParamText(
+						    "\pConnection closed "
+						    "by remote host",
+						    "\p", "\p", "\p");
+						Alert(128, 0L);
 					}
+					continue;
+				}
 
-					terminal.scroll_offset = 0;
-					terminal_process(&terminal, out_buf,
-					    out_len);
+				/* Process incoming data */
+				if (sess->conn.read_len > 0) {
+					short out_len = 0;
+					short send_len = 0;
 
-					/* Send any terminal responses (DA, DSR) */
-					if (terminal.response_len > 0) {
-						conn_send(&conn,
-						    terminal.response,
-						    terminal.response_len);
-						terminal.response_len = 0;
-					}
+					telnet_process(&sess->telnet,
+					    (unsigned char *)
+					    sess->conn.read_buf,
+					    sess->conn.read_len,
+					    out_buf, &out_len,
+					    send_buf, &send_len);
 
-					/* Update window title from OSC */
-					if (terminal.title_changed) {
-						if (terminal.window_title[0]) {
-							char tmp[80];
-							Str255 pt;
-							short tl, ti;
+					if (send_len > 0)
+						conn_send(&sess->conn,
+						    (char *)send_buf,
+						    send_len);
 
-							tl = sprintf(tmp,
-							    "Flynn - %s",
-							    terminal.
-							    window_title);
-							if (tl > 254) tl = 254;
-							pt[0] = tl;
-							for (ti = 0;
-							    ti < tl; ti++)
-								pt[ti+1] =
-								    tmp[ti];
-							SetWTitle(
-							    term_window, pt);
-						} else {
-							SetWTitle(
-							    term_window,
-							    "\pFlynn");
+					if (out_len > 0) {
+						/* Clear selection on new data */
+						if (term_ui_sel_active()) {
+							term_ui_sel_dirty_all(
+							    &sess->terminal);
+							term_ui_sel_clear();
 						}
-						terminal.title_changed = 0;
+
+						if (sess->terminal.
+						    scroll_offset > 0) {
+							short ri2;
+
+							sess->terminal.
+							    scroll_offset = 0;
+							for (ri2 = 0;
+							    ri2 < sess->
+							    terminal.
+							    active_rows;
+							    ri2++)
+								sess->
+								    terminal.
+								    dirty
+								    [ri2] = 1;
+						}
+
+						terminal_process(
+						    &sess->terminal,
+						    out_buf, out_len);
+
+						/* Send terminal responses */
+						if (sess->terminal.
+						    response_len > 0) {
+							conn_send(&sess->conn,
+							    sess->terminal.
+							    response,
+							    sess->terminal.
+							    response_len);
+							sess->terminal.
+							    response_len = 0;
+						}
+
+						/* Update window title */
+						if (sess->terminal.
+						    title_changed) {
+							if (sess->terminal.
+							    window_title[0]) {
+								char tmp[80];
+								Str255 pt;
+								short tl, ti;
+
+								tl = sprintf(
+								    tmp,
+								    "Flynn"
+								    " - %s",
+								    sess->
+								    terminal.
+								    window_title
+								    );
+								if (tl > 254)
+									tl =
+									    254;
+								pt[0] = tl;
+								for (ti = 0;
+								    ti < tl;
+								    ti++)
+									pt[ti
+									    +1]
+									    =
+									    tmp
+									    [ti
+									    ];
+								SetWTitle(
+								    sess->
+								    window,
+								    pt);
+							} else {
+								SetWTitle(
+								    sess->
+								    window,
+								    "\pFlynn"
+								    );
+							}
+							sess->terminal.
+							    title_changed = 0;
+							update_window_menu();
+						}
+
+						{
+							GrafPtr save;
+
+							GetPort(&save);
+							SetPort(
+							    sess->window);
+							term_ui_draw(
+							    sess->window,
+							    &sess->terminal);
+							SetPort(save);
+						}
 					}
 
-						GetPort(&save);
-					SetPort(term_window);
-					term_ui_draw(term_window,
-					    &terminal);
+					sess->conn.read_len = 0;
+				}
+
+				/* Cursor blink only for front session */
+				if (sess == active_session &&
+				    sess->conn.state ==
+				    CONN_STATE_CONNECTED) {
+					GrafPtr save;
+
+					GetPort(&save);
+					SetPort(sess->window);
+					term_ui_cursor_blink(sess->window,
+					    &sess->terminal);
 					SetPort(save);
 				}
 
-				conn.read_len = 0;
+				/* Save state back */
+				term_ui_save_state(&sess->ui);
 			}
-			if (conn.state == CONN_STATE_CONNECTED)
-				term_ui_cursor_blink(term_window,
-				    &terminal);
 			break;
+		}
 		case keyDown:
 		case autoKey:
-			/* Drain all pending key events into buffer,
-			 * then flush once (one TCP send for N keys) */
-			handle_key_down(&event);
-			{
+			if (active_session) {
 				EventRecord pending;
 
+				handle_key_down(active_session, &event);
 				while (GetNextEvent(keyDownMask |
 				    autoKeyMask, &pending))
-					handle_key_down(&pending);
+					handle_key_down(active_session,
+					    &pending);
+				flush_key_send(active_session);
 			}
-			flush_key_send();
 			break;
 		case mouseDown:
 			handle_mouse_down(&event);
@@ -431,19 +557,30 @@ main_event_loop(void)
 		}
 	}
 
+	/* Clean up all sessions before quit */
+	{
+		short si;
+		Session *sess;
+
+		for (si = MAX_SESSIONS - 1; si >= 0; si--) {
+			sess = session_get(si);
+			if (sess)
+				session_destroy(sess);
+		}
+	}
+	active_session = 0L;
+
 	if (grow_clip_rgn)
 		DisposeRgn(grow_clip_rgn);
-	if (term_window)
-		DisposeWindow(term_window);
+
 	ExitToShell();
 }
 
 static void
-handle_key_down(EventRecord *event)
+handle_key_down(Session *s, EventRecord *event)
 {
 	char key;
 	short vkey;
-	char esc_seq[8];
 
 	key = event->message & charCodeMask;
 	vkey = (event->message >> 8) & 0xFF;
@@ -456,61 +593,66 @@ handle_key_down(EventRecord *event)
 
 			if (vkey == 0x7E || key == 0x1E) {
 				if (event->modifiers & shiftKey)
-					terminal_scroll_back(&terminal,
-					    terminal.active_rows);
+					terminal_scroll_back(
+					    &s->terminal,
+					    s->terminal.active_rows);
 				else
-					terminal_scroll_back(&terminal, 1);
+					terminal_scroll_back(
+					    &s->terminal, 1);
 			} else {
 				if (event->modifiers & shiftKey)
-					terminal_scroll_forward(&terminal,
-					    terminal.active_rows);
+					terminal_scroll_forward(
+					    &s->terminal,
+					    s->terminal.active_rows);
 				else
-					terminal_scroll_forward(&terminal, 1);
+					terminal_scroll_forward(
+					    &s->terminal, 1);
 			}
 
 			GetPort(&save);
-			SetPort(term_window);
-			term_ui_draw(term_window, &terminal);
+			SetPort(s->window);
+			term_ui_draw(s->window, &s->terminal);
 
-			if (terminal.scroll_offset > 0) {
+			if (s->terminal.scroll_offset > 0) {
 				Str255 title;
 				char tmp[32];
 				short i, len;
 
 				len = sprintf(tmp, "Flynn [-%d]",
-				    terminal.scroll_offset);
+				    s->terminal.scroll_offset);
 				title[0] = len;
 				for (i = 0; i < len; i++)
 					title[i + 1] = tmp[i];
-				SetWTitle(term_window, title);
+				SetWTitle(s->window, title);
 			} else {
-				SetWTitle(term_window, "\pFlynn");
+				SetWTitle(s->window, "\pFlynn");
 			}
 
 			SetPort(save);
 			return;
 		}
 		/* Cmd+. sends Escape (classic Mac convention) */
-		if (key == '.' && conn.state == CONN_STATE_CONNECTED) {
+		if (key == '.' &&
+		    s->conn.state == CONN_STATE_CONNECTED) {
 			char esc = 0x1B;
-			buffer_key_send(&esc, 1);
+			buffer_key_send(s, &esc, 1);
 			return;
 		}
 
-		/* Cmd+1..0 → F1-F10 for M0110 keyboards */
-		if (conn.state == CONN_STATE_CONNECTED &&
+		/* Cmd+1..0 -> F1-F10 for M0110 keyboards */
+		if (s->conn.state == CONN_STATE_CONNECTED &&
 		    key >= '0' && key <= '9') {
 			switch (key) {
-			case '1': buffer_key_send("\033OP", 3); return;
-			case '2': buffer_key_send("\033OQ", 3); return;
-			case '3': buffer_key_send("\033OR", 3); return;
-			case '4': buffer_key_send("\033OS", 3); return;
-			case '5': buffer_key_send("\033[15~", 5); return;
-			case '6': buffer_key_send("\033[17~", 5); return;
-			case '7': buffer_key_send("\033[18~", 5); return;
-			case '8': buffer_key_send("\033[19~", 5); return;
-			case '9': buffer_key_send("\033[20~", 5); return;
-			case '0': buffer_key_send("\033[21~", 5); return;
+			case '1': buffer_key_send(s, "\033OP", 3); return;
+			case '2': buffer_key_send(s, "\033OQ", 3); return;
+			case '3': buffer_key_send(s, "\033OR", 3); return;
+			case '4': buffer_key_send(s, "\033OS", 3); return;
+			case '5': buffer_key_send(s, "\033[15~", 5); return;
+			case '6': buffer_key_send(s, "\033[17~", 5); return;
+			case '7': buffer_key_send(s, "\033[18~", 5); return;
+			case '8': buffer_key_send(s, "\033[19~", 5); return;
+			case '9': buffer_key_send(s, "\033[20~", 5); return;
+			case '0': buffer_key_send(s, "\033[21~", 5); return;
 			}
 		}
 
@@ -522,136 +664,136 @@ handle_key_down(EventRecord *event)
 	if (term_ui_sel_active()) {
 		GrafPtr save;
 
-		term_ui_sel_dirty_all(&terminal);
+		term_ui_sel_dirty_all(&s->terminal);
 		term_ui_sel_clear();
 		GetPort(&save);
-		SetPort(term_window);
-		term_ui_draw(term_window, &terminal);
+		SetPort(s->window);
+		term_ui_draw(s->window, &s->terminal);
 		SetPort(save);
 	}
 
-	if (conn.state != CONN_STATE_CONNECTED)
+	if (s->conn.state != CONN_STATE_CONNECTED)
 		return;
 
 	/* Application keypad mode (DECKPAM): numpad sends SS3 sequences */
-	if (terminal.keypad_mode) {
+	if (s->terminal.keypad_mode) {
 		switch (vkey) {
-		case 0x52: buffer_key_send("\033Op", 3); return;  /* KP 0 */
-		case 0x53: buffer_key_send("\033Oq", 3); return;  /* KP 1 */
-		case 0x54: buffer_key_send("\033Or", 3); return;  /* KP 2 */
-		case 0x55: buffer_key_send("\033Os", 3); return;  /* KP 3 */
-		case 0x56: buffer_key_send("\033Ot", 3); return;  /* KP 4 */
-		case 0x57: buffer_key_send("\033Ou", 3); return;  /* KP 5 */
-		case 0x58: buffer_key_send("\033Ov", 3); return;  /* KP 6 */
-		case 0x59: buffer_key_send("\033Ow", 3); return;  /* KP 7 */
-		case 0x5B: buffer_key_send("\033Ox", 3); return;  /* KP 8 */
-		case 0x5C: buffer_key_send("\033Oy", 3); return;  /* KP 9 */
-		case 0x41: buffer_key_send("\033On", 3); return;  /* KP . */
-		case 0x4C: buffer_key_send("\033OM", 3); return;  /* KP Enter */
-		case 0x45: buffer_key_send("\033Ok", 3); return;  /* KP + */
-		case 0x4E: buffer_key_send("\033Om", 3); return;  /* KP - */
-		case 0x43: buffer_key_send("\033Oj", 3); return;  /* KP * */
+		case 0x52: buffer_key_send(s, "\033Op", 3); return;
+		case 0x53: buffer_key_send(s, "\033Oq", 3); return;
+		case 0x54: buffer_key_send(s, "\033Or", 3); return;
+		case 0x55: buffer_key_send(s, "\033Os", 3); return;
+		case 0x56: buffer_key_send(s, "\033Ot", 3); return;
+		case 0x57: buffer_key_send(s, "\033Ou", 3); return;
+		case 0x58: buffer_key_send(s, "\033Ov", 3); return;
+		case 0x59: buffer_key_send(s, "\033Ow", 3); return;
+		case 0x5B: buffer_key_send(s, "\033Ox", 3); return;
+		case 0x5C: buffer_key_send(s, "\033Oy", 3); return;
+		case 0x41: buffer_key_send(s, "\033On", 3); return;
+		case 0x4C: buffer_key_send(s, "\033OM", 3); return;
+		case 0x45: buffer_key_send(s, "\033Ok", 3); return;
+		case 0x4E: buffer_key_send(s, "\033Om", 3); return;
+		case 0x43: buffer_key_send(s, "\033Oj", 3); return;
 		}
 	}
 
 	/* Map special keys to escape sequences */
 	switch (vkey) {
 	case 0x7E:	/* Up arrow */
-		if (terminal.cursor_key_mode)
-			buffer_key_send("\033OA", 3);
+		if (s->terminal.cursor_key_mode)
+			buffer_key_send(s, "\033OA", 3);
 		else
-			buffer_key_send("\033[A", 3);
+			buffer_key_send(s, "\033[A", 3);
 		return;
 	case 0x7D:	/* Down arrow */
-		if (terminal.cursor_key_mode)
-			buffer_key_send("\033OB", 3);
+		if (s->terminal.cursor_key_mode)
+			buffer_key_send(s, "\033OB", 3);
 		else
-			buffer_key_send("\033[B", 3);
+			buffer_key_send(s, "\033[B", 3);
 		return;
 	case 0x7C:	/* Right arrow */
-		if (terminal.cursor_key_mode)
-			buffer_key_send("\033OC", 3);
+		if (s->terminal.cursor_key_mode)
+			buffer_key_send(s, "\033OC", 3);
 		else
-			buffer_key_send("\033[C", 3);
+			buffer_key_send(s, "\033[C", 3);
 		return;
 	case 0x7B:	/* Left arrow */
-		if (terminal.cursor_key_mode)
-			buffer_key_send("\033OD", 3);
+		if (s->terminal.cursor_key_mode)
+			buffer_key_send(s, "\033OD", 3);
 		else
-			buffer_key_send("\033[D", 3);
+			buffer_key_send(s, "\033[D", 3);
 		return;
 	case 0x73:	/* Home */
-		buffer_key_send("\033[H", 3);
+		buffer_key_send(s, "\033[H", 3);
 		return;
 	case 0x77:	/* End */
-		buffer_key_send("\033[F", 3);
+		buffer_key_send(s, "\033[F", 3);
 		return;
 	case 0x74:	/* Page Up */
-		buffer_key_send("\033[5~", 4);
+		buffer_key_send(s, "\033[5~", 4);
 		return;
 	case 0x79:	/* Page Down */
-		buffer_key_send("\033[6~", 4);
+		buffer_key_send(s, "\033[6~", 4);
 		return;
 	case 0x75:	/* Forward Delete */
-		buffer_key_send("\033[3~", 4);
+		buffer_key_send(s, "\033[3~", 4);
 		return;
-	case 0x33:	/* Delete/Backspace → DEL */
+	case 0x33:	/* Delete/Backspace -> DEL */
 		key = 0x7F;
-		buffer_key_send(&key, 1);
+		buffer_key_send(s, &key, 1);
 		return;
 	case 0x35:	/* Escape */
 		key = 0x1B;
-		buffer_key_send(&key, 1);
+		buffer_key_send(s, &key, 1);
 		return;
 	case 0x24:	/* Return */
 	case 0x4C:	/* Keypad Enter */
 		key = 0x0D;
-		buffer_key_send(&key, 1);
+		buffer_key_send(s, &key, 1);
 		return;
 	case 0x30:	/* Tab */
 		key = 0x09;
-		buffer_key_send(&key, 1);
+		buffer_key_send(s, &key, 1);
 		return;
-	case 0x47:	/* Clear/NumLock → Escape (M0110A keypad) */
+	case 0x47:	/* Clear/NumLock -> Escape (M0110A keypad) */
 		key = 0x1B;
-		buffer_key_send(&key, 1);
+		buffer_key_send(s, &key, 1);
 		return;
 	/* Function keys F1-F12 (ADB extended keyboards) */
 	case 0x7A:	/* F1 */
-		buffer_key_send("\033OP", 3);
+		buffer_key_send(s, "\033OP", 3);
 		return;
 	case 0x78:	/* F2 */
-		buffer_key_send("\033OQ", 3);
+		buffer_key_send(s, "\033OQ", 3);
 		return;
 	case 0x63:	/* F3 */
-		buffer_key_send("\033OR", 3);
+		buffer_key_send(s, "\033OR", 3);
 		return;
 	case 0x76:	/* F4 */
-		buffer_key_send("\033OS", 3);
+		buffer_key_send(s, "\033OS", 3);
 		return;
 	case 0x60:	/* F5 */
-		buffer_key_send("\033[15~", 5);
+		buffer_key_send(s, "\033[15~", 5);
 		return;
 	case 0x61:	/* F6 */
-		buffer_key_send("\033[17~", 5);
+		buffer_key_send(s, "\033[17~", 5);
 		return;
 	case 0x62:	/* F7 */
-		buffer_key_send("\033[18~", 5);
+		buffer_key_send(s, "\033[18~", 5);
 		return;
 	case 0x64:	/* F8 */
-		buffer_key_send("\033[19~", 5);
+		buffer_key_send(s, "\033[19~", 5);
 		return;
 	case 0x65:	/* F9 */
-		buffer_key_send("\033[20~", 5);
+		buffer_key_send(s, "\033[20~", 5);
 		return;
 	case 0x6D:	/* F10 */
-		buffer_key_send("\033[21~", 5);
+		buffer_key_send(s, "\033[21~", 5);
 		return;
 	case 0x67:	/* F11 */
-		buffer_key_send("\033[23~", 5);
+		buffer_key_send(s, "\033[23~", 5);
 		return;
 	case 0x6F:	/* F12 */
-		buffer_key_send("\033[24~", 5);
+		buffer_key_send(s, "\033[24~", 5);
 		return;
 	}
 
@@ -660,7 +802,7 @@ handle_key_down(EventRecord *event)
 	if (key >= 0x1C && key <= 0x1F) {
 		const char *seq;
 
-		if (terminal.cursor_key_mode) {
+		if (s->terminal.cursor_key_mode) {
 			switch (key) {
 			case 0x1C: seq = "\033OD"; break; /* Left */
 			case 0x1D: seq = "\033OC"; break; /* Right */
@@ -675,13 +817,13 @@ handle_key_down(EventRecord *event)
 			case 0x1F: seq = "\033[B"; break;
 			}
 		}
-		buffer_key_send((char *)seq, 3);
+		buffer_key_send(s, (char *)seq, 3);
 		return;
 	}
 
 	/* ESC character from any source (keyboard adapters, Clear key) */
 	if (key == 0x1B) {
-		buffer_key_send(&key, 1);
+		buffer_key_send(s, &key, 1);
 		return;
 	}
 
@@ -700,7 +842,7 @@ handle_key_down(EventRecord *event)
 
 		if (vkey < 48 && vkey_to_base[vkey]) {
 			key = vkey_to_base[vkey] & 0x1F;
-			buffer_key_send(&key, 1);
+			buffer_key_send(s, &key, 1);
 			return;
 		}
 	}
@@ -708,12 +850,12 @@ handle_key_down(EventRecord *event)
 	/* Ctrl+key with physical Control key (extended keyboards) */
 	if (event->modifiers & ControlKey) {
 		key = key & 0x1F;
-		buffer_key_send(&key, 1);
+		buffer_key_send(s, &key, 1);
 		return;
 	}
 
 	/* Regular printable character */
-	buffer_key_send(&key, 1);
+	buffer_key_send(s, &key, 1);
 }
 
 static void
@@ -721,6 +863,7 @@ handle_mouse_down(EventRecord *event)
 {
 	WindowPtr win;
 	short part;
+	Session *sess;
 
 	part = FindWindow(event->where, &win);
 
@@ -736,20 +879,41 @@ handle_mouse_down(EventRecord *event)
 		break;
 	case inGoAway:
 		if (TrackGoAway(win, event->where)) {
-			if (conn.state == CONN_STATE_CONNECTED) {
-				ParamText("\pDisconnect and quit?",
-				    "\p", "\p", "\p");
-				if (CautionAlert(128, 0L) != 1)
-					break;
+			sess = session_from_window(win);
+			if (sess) {
+				if (sess->conn.state ==
+				    CONN_STATE_CONNECTED) {
+					ParamText(
+					    "\pDisconnect and close "
+					    "window?",
+					    "\p", "\p", "\p");
+					if (CautionAlert(128, 0L) != 1)
+						break;
+				}
+				term_ui_load_state(&sess->ui);
+				if (sess == active_session)
+					active_session = 0L;
+				session_destroy(sess);
+				/* Update active to new front window */
+				if (!active_session) {
+					WindowPtr front = FrontWindow();
+					active_session =
+					    session_from_window(front);
+				}
+				update_menus();
+				if (session_count() == 0)
+					running = false;
 			}
-			do_disconnect();
-			running = false;
 		}
 		break;
 	case inGrow: {
 		long new_size;
 		Rect limit_rect;
 		short min_w, min_h, max_w, max_h;
+
+		sess = session_from_window(win);
+		if (!sess)
+			break;
 
 		min_w = LEFT_MARGIN * 2 + MIN_WIN_COLS * g_cell_width;
 		min_h = TOP_MARGIN * 2 + MIN_WIN_ROWS * g_cell_height;
@@ -759,15 +923,20 @@ handle_mouse_down(EventRecord *event)
 		SetRect(&limit_rect, min_w, min_h, max_w, max_h);
 		new_size = GrowWindow(win, event->where, &limit_rect);
 		if (new_size != 0)
-			do_window_resize(LoWord(new_size),
+			do_window_resize(sess, LoWord(new_size),
 			    HiWord(new_size));
 		break;
 	}
 	case inContent:
-		if (win != FrontWindow())
+		sess = session_from_window(win);
+		if (win != FrontWindow()) {
 			SelectWindow(win);
-		else
-			handle_content_click(event);
+			if (sess)
+				active_session = sess;
+			update_menus();
+		} else if (sess) {
+			handle_content_click(sess, event);
+		}
 		break;
 	}
 }
@@ -777,8 +946,11 @@ handle_update(EventRecord *event)
 {
 	WindowPtr win;
 	GrafPtr old_port;
+	Session *sess;
 
 	win = (WindowPtr)event->message;
+	sess = session_from_window(win);
+
 	GetPort(&old_port);
 	SetPort(win);
 	BeginUpdate(win);
@@ -788,36 +960,44 @@ handle_update(EventRecord *event)
 	else
 		EraseRect(&win->portRect);
 
-	if (conn.state == CONN_STATE_CONNECTED) {
-		char title[270];
-		Str255 ptitle;
-		short i, len;
+	if (sess) {
+		term_ui_load_state(&sess->ui);
 
-		if (terminal.window_title[0])
-			len = sprintf(title, "Flynn - %s",
-			    terminal.window_title);
-		else
-			len = sprintf(title, "Flynn - %s", conn.host);
-		if (len > 254) len = 254;
-		ptitle[0] = len;
-		for (i = 0; i < len; i++)
-			ptitle[i + 1] = title[i];
-		SetWTitle(term_window, ptitle);
+		if (sess->conn.state == CONN_STATE_CONNECTED) {
+			char title[270];
+			Str255 ptitle;
+			short i, len;
 
-		/* Mark all rows dirty for full update repaints */
-		for (i = 0; i < terminal.active_rows; i++)
-			terminal.dirty[i] = 1;
-		term_ui_draw(term_window, &terminal);
-	} else {
-		SetWTitle(term_window, "\pFlynn");
-		/* In dark mode, still need to invert rows */
-		if (prefs.dark_mode) {
-			short i;
+			if (sess->terminal.window_title[0])
+				len = sprintf(title, "Flynn - %s",
+				    sess->terminal.window_title);
+			else
+				len = sprintf(title, "Flynn - %s",
+				    sess->conn.host);
+			if (len > 254) len = 254;
+			ptitle[0] = len;
+			for (i = 0; i < len; i++)
+				ptitle[i + 1] = title[i];
+			SetWTitle(sess->window, ptitle);
 
-			for (i = 0; i < terminal.active_rows; i++)
-				terminal.dirty[i] = 1;
-			term_ui_draw(term_window, &terminal);
+			/* Mark all rows dirty for full repaints */
+			for (i = 0; i < sess->terminal.active_rows; i++)
+				sess->terminal.dirty[i] = 1;
+			term_ui_draw(sess->window, &sess->terminal);
+		} else {
+			SetWTitle(sess->window, "\pFlynn");
+			if (prefs.dark_mode) {
+				short i;
+
+				for (i = 0;
+				    i < sess->terminal.active_rows; i++)
+					sess->terminal.dirty[i] = 1;
+				term_ui_draw(sess->window,
+				    &sess->terminal);
+			}
 		}
+
+		term_ui_save_state(&sess->ui);
 	}
 
 	/* Draw grow icon (clipped to avoid scroll bar track lines) */
@@ -844,7 +1024,18 @@ handle_update(EventRecord *event)
 static void
 handle_activate(EventRecord *event)
 {
-	/* TODO: handle window activation/deactivation */
+	WindowPtr win;
+	Session *sess;
+
+	win = (WindowPtr)event->message;
+	sess = session_from_window(win);
+
+	if (event->modifiers & activeFlag) {
+		if (sess) {
+			active_session = sess;
+			update_menus();
+		}
+	}
 }
 
 static Boolean
@@ -887,13 +1078,27 @@ handle_menu(long menu_id)
 			do_bookmarks();
 			break;
 		case FILE_MENU_QUIT_ID:
-			if (conn.state == CONN_STATE_CONNECTED) {
-				ParamText("\pDisconnect and quit?",
+			if (session_any_connected()) {
+				ParamText(
+				    "\pDisconnect all sessions "
+				    "and quit?",
 				    "\p", "\p", "\p");
 				if (CautionAlert(128, 0L) != 1)
 					break;
 			}
-			do_disconnect();
+			/* Destroy all sessions */
+			{
+				short si;
+				Session *sess;
+
+				for (si = MAX_SESSIONS - 1; si >= 0;
+				    si--) {
+					sess = session_get(si);
+					if (sess)
+						session_destroy(sess);
+				}
+			}
+			active_session = 0L;
 			running = false;
 			break;
 		}
@@ -911,36 +1116,43 @@ handle_menu(long menu_id)
 		}
 		break;
 	case CTRL_MENU_ID:
-		if (conn.state == CONN_STATE_CONNECTED) {
+		if (active_session &&
+		    active_session->conn.state == CONN_STATE_CONNECTED) {
 			char ctrl_byte;
 
 			switch (item) {
 			case CTRL_MENU_CTRLC:
 				ctrl_byte = 0x03;
-				conn_send(&conn, &ctrl_byte, 1);
+				conn_send(&active_session->conn,
+				    &ctrl_byte, 1);
 				break;
 			case CTRL_MENU_CTRLD:
 				ctrl_byte = 0x04;
-				conn_send(&conn, &ctrl_byte, 1);
+				conn_send(&active_session->conn,
+				    &ctrl_byte, 1);
 				break;
 			case CTRL_MENU_CTRLZ:
 				ctrl_byte = 0x1A;
-				conn_send(&conn, &ctrl_byte, 1);
+				conn_send(&active_session->conn,
+				    &ctrl_byte, 1);
 				break;
 			case CTRL_MENU_ESC:
 				ctrl_byte = 0x1B;
-				conn_send(&conn, &ctrl_byte, 1);
+				conn_send(&active_session->conn,
+				    &ctrl_byte, 1);
 				break;
 			case CTRL_MENU_CTRLL:
 				ctrl_byte = 0x0C;
-				conn_send(&conn, &ctrl_byte, 1);
+				conn_send(&active_session->conn,
+				    &ctrl_byte, 1);
 				break;
 			case CTRL_MENU_BREAK: {
 				char brk_seq[2];
 
 				brk_seq[0] = (char)0xFF;  /* IAC */
 				brk_seq[1] = (char)0xF3;  /* BRK */
-				conn_send(&conn, brk_seq, 2);
+				conn_send(&active_session->conn,
+				    brk_seq, 2);
 				break;
 			}
 			}
@@ -970,10 +1182,14 @@ handle_menu(long menu_id)
 		case PREFS_VT220_ID:
 		case PREFS_VT100_ID:
 			prefs.terminal_type = item - PREFS_XTERM_ID;
-			telnet.preferred_ttype = prefs.terminal_type;
+			if (active_session)
+				active_session->telnet.preferred_ttype =
+				    prefs.terminal_type;
 			prefs_save(&prefs);
 			update_prefs_menu();
-			if (conn.state == CONN_STATE_CONNECTED) {
+			if (active_session &&
+			    active_session->conn.state ==
+			    CONN_STATE_CONNECTED) {
 				ParamText(
 				    "\pTerminal type change takes "
 				    "effect on next connection.",
@@ -987,15 +1203,36 @@ handle_menu(long menu_id)
 			prefs_save(&prefs);
 			update_prefs_menu();
 			{
+				short si;
+				Session *sess;
 				GrafPtr save;
-				short i;
 
 				GetPort(&save);
-				SetPort(term_window);
-				for (i = 0; i < terminal.active_rows;
-				    i++)
-					terminal.dirty[i] = 1;
-				InvalRect(&term_window->portRect);
+				for (si = 0; si < MAX_SESSIONS; si++) {
+					sess = session_get(si);
+					if (!sess)
+						continue;
+					SetPort(sess->window);
+					if (prefs.dark_mode)
+						PaintRect(
+						    &sess->window->
+						    portRect);
+					else
+						EraseRect(
+						    &sess->window->
+						    portRect);
+					{
+						short ri;
+
+						for (ri = 0;
+						    ri < sess->terminal.
+						    active_rows; ri++)
+							sess->terminal.
+							    dirty[ri] = 1;
+					}
+					InvalRect(
+					    &sess->window->portRect);
+				}
 				SetPort(save);
 			}
 			break;
@@ -1003,6 +1240,52 @@ handle_menu(long menu_id)
 			do_dns_server_dialog();
 			break;
 		}
+		break;
+	case WINDOW_MENU_ID:
+		switch (item) {
+		case WIN_MENU_CLOSE:
+		{
+			if (active_session) {
+				if (active_session->conn.state ==
+				    CONN_STATE_CONNECTED) {
+					ParamText(
+					    "\pDisconnect and close "
+					    "window?",
+					    "\p", "\p", "\p");
+					if (CautionAlert(128, 0L) != 1)
+						break;
+				}
+				term_ui_load_state(&active_session->ui);
+				session_destroy(active_session);
+				active_session =
+				    session_from_window(
+				    FrontWindow());
+				if (session_count() == 0)
+					running = false;
+			}
+			break;
+		}
+		default:
+		{
+			/* Window list item */
+			short win_idx = item - WIN_MENU_FIRST_WIN;
+			short count = 0, si;
+
+			for (si = 0; si < MAX_SESSIONS; si++) {
+				Session *ws = session_get(si);
+				if (!ws)
+					continue;
+				if (count == win_idx) {
+					SelectWindow(ws->window);
+					active_session = ws;
+					break;
+				}
+				count++;
+			}
+			break;
+		}
+		}
+		update_menus();
 		break;
 	default:
 		handled = false;
@@ -1030,37 +1313,110 @@ do_about(void)
 static void
 do_connect(void)
 {
-	/* Pre-fill from saved prefs */
-	if (!conn.host[0] && prefs.host[0]) {
-		strncpy(conn.host, prefs.host, sizeof(conn.host) - 1);
-		conn.host[sizeof(conn.host) - 1] = '\0';
-		conn.port = prefs.port;
-	}
-	if (!conn.username[0] && prefs.username[0]) {
-		strncpy(conn.username, prefs.username,
-		    sizeof(conn.username) - 1);
-		conn.username[sizeof(conn.username) - 1] = '\0';
+	Session *s = active_session;
+
+	/* Create session if none exists */
+	if (!s) {
+		s = session_new();
+		if (!s) {
+			ParamText("\pOut of memory", "\p", "\p", "\p");
+			Alert(128, 0L);
+			return;
+		}
+		SetPort(s->window);
+		term_ui_set_font(s->window, prefs.font_id, prefs.font_size);
+		term_ui_init(s->window, &s->terminal);
+		s->conn.dns_server = ip2long(prefs.dns_server);
+		if (prefs.dark_mode)
+			PaintRect(&s->window->portRect);
+		active_session = s;
 	}
 
-	if (conn_open_dialog(&conn)) {
-		telnet_init(&telnet);
-		telnet.preferred_ttype = prefs.terminal_type;
-		terminal_reset(&terminal);
+	/* If active session is already connected, create a new one */
+	if (s->conn.state == CONN_STATE_CONNECTED) {
+		s = session_new();
+		if (!s) {
+			ParamText("\pMaximum sessions reached",
+			    "\p", "\p", "\p");
+			Alert(128, 0L);
+			update_menus();
+			return;
+		}
+		SetPort(s->window);
+		term_ui_set_font(s->window, prefs.font_id, prefs.font_size);
+		term_ui_init(s->window, &s->terminal);
+		s->conn.dns_server = ip2long(prefs.dns_server);
+		if (prefs.dark_mode)
+			PaintRect(&s->window->portRect);
+		SelectWindow(s->window);
+		active_session = s;
+	}
+
+	/* Pre-fill from saved prefs */
+	if (!s->conn.host[0] && prefs.host[0]) {
+		strncpy(s->conn.host, prefs.host,
+		    sizeof(s->conn.host) - 1);
+		s->conn.host[sizeof(s->conn.host) - 1] = '\0';
+		s->conn.port = prefs.port;
+	}
+	if (!s->conn.username[0] && prefs.username[0]) {
+		strncpy(s->conn.username, prefs.username,
+		    sizeof(s->conn.username) - 1);
+		s->conn.username[sizeof(s->conn.username) - 1] = '\0';
+	}
+
+	s->telnet.preferred_ttype = prefs.terminal_type;
+
+	if (conn_open_dialog(&s->conn)) {
+		telnet_init(&s->telnet);
+		s->telnet.preferred_ttype = prefs.terminal_type;
+		s->telnet.cols = s->terminal.active_cols;
+		s->telnet.rows = s->terminal.active_rows;
+		terminal_reset(&s->terminal);
 
 		/* Save last-used host/port/username */
-		strncpy(prefs.host, conn.host, sizeof(prefs.host) - 1);
+		strncpy(prefs.host, s->conn.host,
+		    sizeof(prefs.host) - 1);
 		prefs.host[sizeof(prefs.host) - 1] = '\0';
-		prefs.port = conn.port;
-		strncpy(prefs.username, conn.username,
+		prefs.port = s->conn.port;
+		strncpy(prefs.username, s->conn.username,
 		    sizeof(prefs.username) - 1);
 		prefs.username[sizeof(prefs.username) - 1] = '\0';
 		prefs_save(&prefs);
 
 		/* Auto-send username after connect */
-		if (conn.username[0]) {
-			conn_send(&conn, conn.username,
-			    strlen(conn.username));
-			conn_send(&conn, "\r", 1);
+		if (s->conn.username[0]) {
+			conn_send(&s->conn, s->conn.username,
+			    strlen(s->conn.username));
+			conn_send(&s->conn, "\r", 1);
+		}
+
+		/* Update window title */
+		{
+			char tmp[270];
+			Str255 title;
+			short tlen, ti;
+
+			tlen = sprintf(tmp, "Flynn - %s", s->conn.host);
+			if (tlen > 254) tlen = 254;
+			title[0] = tlen;
+			for (ti = 0; ti < tlen; ti++)
+				title[ti + 1] = tmp[ti];
+			SetWTitle(s->window, title);
+		}
+	} else if (s->conn.state == CONN_STATE_IDLE &&
+	    session_count() > 1) {
+		/* User cancelled on a fresh session — if it was just
+		 * created (never connected, no host set), destroy it */
+		if (!s->conn.host[0]) {
+			if (s == active_session)
+				active_session = 0L;
+			session_destroy(s);
+			if (!active_session) {
+				WindowPtr front = FrontWindow();
+				active_session =
+				    session_from_window(front);
+			}
 		}
 	}
 	update_menus();
@@ -1070,22 +1426,80 @@ static void
 do_connect_bookmark(short index)
 {
 	Bookmark *bm;
+	Session *s = active_session;
 
 	if (index < 0 || index >= prefs.bookmark_count)
 		return;
-	if (conn.state != CONN_STATE_IDLE)
+
+	/* Create session if none exists */
+	if (!s) {
+		s = session_new();
+		if (!s) {
+			ParamText("\pOut of memory", "\p", "\p", "\p");
+			Alert(128, 0L);
+			return;
+		}
+		SetPort(s->window);
+		term_ui_set_font(s->window, prefs.font_id, prefs.font_size);
+		term_ui_init(s->window, &s->terminal);
+		s->conn.dns_server = ip2long(prefs.dns_server);
+		if (prefs.dark_mode)
+			PaintRect(&s->window->portRect);
+		active_session = s;
+	}
+
+	/* If active session is already connected, create a new one */
+	if (s->conn.state == CONN_STATE_CONNECTED) {
+		s = session_new();
+		if (!s) {
+			ParamText("\pMaximum sessions reached",
+			    "\p", "\p", "\p");
+			Alert(128, 0L);
+			update_menus();
+			return;
+		}
+		SetPort(s->window);
+		term_ui_set_font(s->window, prefs.font_id, prefs.font_size);
+		term_ui_init(s->window, &s->terminal);
+		s->conn.dns_server = ip2long(prefs.dns_server);
+		if (prefs.dark_mode)
+			PaintRect(&s->window->portRect);
+		SelectWindow(s->window);
+		active_session = s;
+	}
+
+	if (s->conn.state != CONN_STATE_IDLE) {
+		update_menus();
 		return;
+	}
 
 	bm = &prefs.bookmarks[index];
-	if (conn_connect(&conn, bm->host, bm->port)) {
-		telnet_init(&telnet);
-		telnet.preferred_ttype = prefs.terminal_type;
-		terminal_reset(&terminal);
+	if (conn_connect(&s->conn, bm->host, bm->port)) {
+		telnet_init(&s->telnet);
+		s->telnet.preferred_ttype = prefs.terminal_type;
+		s->telnet.cols = s->terminal.active_cols;
+		s->telnet.rows = s->terminal.active_rows;
+		terminal_reset(&s->terminal);
 
-		strncpy(prefs.host, conn.host, sizeof(prefs.host) - 1);
+		strncpy(prefs.host, s->conn.host,
+		    sizeof(prefs.host) - 1);
 		prefs.host[sizeof(prefs.host) - 1] = '\0';
-		prefs.port = conn.port;
+		prefs.port = s->conn.port;
 		prefs_save(&prefs);
+
+		/* Update window title */
+		{
+			char tmp[270];
+			Str255 title;
+			short tlen, ti;
+
+			tlen = sprintf(tmp, "Flynn - %s", s->conn.host);
+			if (tlen > 254) tlen = 254;
+			title[0] = tlen;
+			for (ti = 0; ti < tlen; ti++)
+				title[ti + 1] = tmp[ti];
+			SetWTitle(s->window, title);
+		}
 	}
 	update_menus();
 }
@@ -1366,25 +1780,31 @@ do_bookmarks(void)
 static void
 do_disconnect(void)
 {
-	conn_close(&conn);
-	terminal_reset(&terminal);
-	telnet_init(&telnet);
-	telnet.preferred_ttype = prefs.terminal_type;
-	SetWTitle(term_window, "\pFlynn");
+	Session *s = active_session;
+	short i;
+
+	if (!s || s->conn.state != CONN_STATE_CONNECTED)
+		return;
+
+	conn_close(&s->conn);
+	terminal_reset(&s->terminal);
+	telnet_init(&s->telnet);
+	s->telnet.preferred_ttype = prefs.terminal_type;
+	s->key_send_len = 0;
+	SetWTitle(s->window, "\pFlynn");
 
 	{
 		GrafPtr save;
-		short i;
 
 		GetPort(&save);
-		SetPort(term_window);
+		SetPort(s->window);
 		if (prefs.dark_mode)
-			PaintRect(&term_window->portRect);
+			PaintRect(&s->window->portRect);
 		else
-			EraseRect(&term_window->portRect);
-		for (i = 0; i < terminal.active_rows; i++)
-			terminal.dirty[i] = 1;
-		term_ui_draw(term_window, &terminal);
+			EraseRect(&s->window->portRect);
+		for (i = 0; i < s->terminal.active_rows; i++)
+			s->terminal.dirty[i] = 1;
+		term_ui_draw(s->window, &s->terminal);
 		SetPort(save);
 	}
 
@@ -1394,33 +1814,44 @@ do_disconnect(void)
 static void
 do_font_change(short font_id, short font_size)
 {
+	short si;
+	Session *sess;
 	short win_w, win_h;
 
 	if (font_id == prefs.font_id && font_size == prefs.font_size)
 		return;
 
-	term_ui_set_font(term_window, font_id, font_size);
-
-	/* Compute window size for default grid */
-	win_w = LEFT_MARGIN * 2 + TERM_DEFAULT_COLS * g_cell_width;
-	win_h = TOP_MARGIN * 2 + TERM_DEFAULT_ROWS * g_cell_height;
-	if (win_w > MAX_WIN_WIDTH)
-		win_w = MAX_WIN_WIDTH;
-	if (win_h > MAX_WIN_HEIGHT)
-		win_h = MAX_WIN_HEIGHT;
-
-	do_window_resize(win_w, win_h);
-
-	/* Save preference */
+	/* Save preference first — term_ui_set_font uses global metrics */
 	prefs.font_id = font_id;
 	prefs.font_size = font_size;
 	prefs_save(&prefs);
+
+	/* Apply to all sessions */
+	for (si = 0; si < MAX_SESSIONS; si++) {
+		sess = session_get(si);
+		if (!sess)
+			continue;
+
+		term_ui_set_font(sess->window, font_id, font_size);
+
+		/* Compute window size for default grid */
+		win_w = LEFT_MARGIN * 2 +
+		    TERM_DEFAULT_COLS * g_cell_width;
+		win_h = TOP_MARGIN * 2 +
+		    TERM_DEFAULT_ROWS * g_cell_height;
+		if (win_w > MAX_WIN_WIDTH)
+			win_w = MAX_WIN_WIDTH;
+		if (win_h > MAX_WIN_HEIGHT)
+			win_h = MAX_WIN_HEIGHT;
+
+		do_window_resize(sess, win_w, win_h);
+	}
 
 	update_prefs_menu();
 }
 
 static void
-do_window_resize(short width, short height)
+do_window_resize(Session *s, short width, short height)
 {
 	short new_cols, new_rows;
 	GrafPtr save;
@@ -1440,43 +1871,44 @@ do_window_resize(short width, short height)
 	if (new_rows < MIN_WIN_ROWS)
 		new_rows = MIN_WIN_ROWS;
 
-	terminal.active_cols = new_cols;
-	terminal.active_rows = new_rows;
-	terminal.scroll_bottom = new_rows - 1;
-	terminal.scroll_top = 0;
-	if (terminal.cur_col >= new_cols)
-		terminal.cur_col = new_cols - 1;
-	if (terminal.cur_row >= new_rows)
-		terminal.cur_row = new_rows - 1;
+	s->terminal.active_cols = new_cols;
+	s->terminal.active_rows = new_rows;
+	s->terminal.scroll_bottom = new_rows - 1;
+	s->terminal.scroll_top = 0;
+	if (s->terminal.cur_col >= new_cols)
+		s->terminal.cur_col = new_cols - 1;
+	if (s->terminal.cur_row >= new_rows)
+		s->terminal.cur_row = new_rows - 1;
 
 	/* Snap window to grid boundaries */
-	SizeWindow(term_window,
+	SizeWindow(s->window,
 	    LEFT_MARGIN * 2 + new_cols * g_cell_width,
 	    TOP_MARGIN * 2 + new_rows * g_cell_height, true);
 
 	/* Clear and redraw */
 	GetPort(&save);
-	SetPort(term_window);
+	SetPort(s->window);
 	if (prefs.dark_mode)
-		PaintRect(&term_window->portRect);
+		PaintRect(&s->window->portRect);
 	else
-		EraseRect(&term_window->portRect);
+		EraseRect(&s->window->portRect);
 	for (i = 0; i < new_rows; i++)
-		terminal.dirty[i] = 1;
-	term_ui_draw(term_window, &terminal);
+		s->terminal.dirty[i] = 1;
+	term_ui_draw(s->window, &s->terminal);
 	SetPort(save);
 
 	/* Send NAWS if connected */
-	if (conn.state == CONN_STATE_CONNECTED) {
+	if (s->conn.state == CONN_STATE_CONNECTED) {
 		unsigned char naws_buf[32];
 		short naws_len = 0;
 
-		telnet.cols = new_cols;
-		telnet.rows = new_rows;
-		telnet_send_naws(&telnet, naws_buf, &naws_len,
+		s->telnet.cols = new_cols;
+		s->telnet.rows = new_rows;
+		telnet_send_naws(&s->telnet, naws_buf, &naws_len,
 		    new_cols, new_rows);
 		if (naws_len > 0)
-			conn_send(&conn, (char *)naws_buf, naws_len);
+			conn_send(&s->conn, (char *)naws_buf,
+			    naws_len);
 	}
 }
 
@@ -1569,8 +2001,19 @@ do_dns_server_dialog(void)
 
 	strncpy(prefs.dns_server, ip_cstr, sizeof(prefs.dns_server) - 1);
 	prefs.dns_server[sizeof(prefs.dns_server) - 1] = '\0';
-	conn.dns_server = ip;
 	prefs_save(&prefs);
+
+	/* Update DNS server for all sessions */
+	{
+		short si;
+		Session *sess;
+
+		for (si = 0; si < MAX_SESSIONS; si++) {
+			sess = session_get(si);
+			if (sess)
+				sess->conn.dns_server = ip;
+		}
+	}
 }
 
 static void
@@ -1580,8 +2023,13 @@ do_copy(void)
 	char *buf;
 	short row, col, len, last_nonspace;
 	TermCell *cell;
+	Session *s = active_session;
 
-	buf_size = (long)terminal.active_rows * (terminal.active_cols + 1);
+	if (!s)
+		return;
+
+	buf_size = (long)s->terminal.active_rows *
+	    (s->terminal.active_cols + 1);
 	buf = (char *)NewPtr(buf_size);
 	if (!buf)
 		return;
@@ -1599,13 +2047,13 @@ do_copy(void)
 				c_end = ec;
 			} else if (row == sr) {
 				c_start = sc;
-				c_end = terminal.active_cols - 1;
+				c_end = s->terminal.active_cols - 1;
 			} else if (row == er) {
 				c_start = 0;
 				c_end = ec;
 			} else {
 				c_start = 0;
-				c_end = terminal.active_cols - 1;
+				c_end = s->terminal.active_cols - 1;
 			}
 
 			last_nonspace = -1;
@@ -1614,7 +2062,7 @@ do_copy(void)
 				const GlyphInfo *gi;
 
 				cell = terminal_get_display_cell(
-				    &terminal, row, col);
+				    &s->terminal, row, col);
 				if ((cell->attr & ATTR_GLYPH) &&
 				    cell->ch == GLYPH_WIDE_SPACER) {
 					buf[len + (col - c_start)] = ' ';
@@ -1638,14 +2086,15 @@ do_copy(void)
 		}
 	} else {
 		len = 0;
-		for (row = 0; row < terminal.active_rows; row++) {
+		for (row = 0; row < s->terminal.active_rows; row++) {
 			last_nonspace = -1;
-			for (col = 0; col < terminal.active_cols; col++) {
+			for (col = 0; col < s->terminal.active_cols;
+			    col++) {
 				char cc;
 				const GlyphInfo *gi;
 
 				cell = terminal_get_display_cell(
-				    &terminal, row, col);
+				    &s->terminal, row, col);
 				if ((cell->attr & ATTR_GLYPH) &&
 				    cell->ch == GLYPH_WIDE_SPACER) {
 					buf[len + col] = ' ';
@@ -1664,7 +2113,7 @@ do_copy(void)
 					last_nonspace = col;
 			}
 			len += last_nonspace + 1;
-			if (row < terminal.active_rows - 1)
+			if (row < s->terminal.active_rows - 1)
 				buf[len++] = '\r';
 		}
 	}
@@ -1679,8 +2128,9 @@ do_paste(void)
 {
 	Handle h;
 	long offset, len;
+	Session *s = active_session;
 
-	if (conn.state != CONN_STATE_CONNECTED)
+	if (!s || s->conn.state != CONN_STATE_CONNECTED)
 		return;
 
 	h = NewHandle(0);
@@ -1695,8 +2145,8 @@ do_paste(void)
 		HLock(h);
 		p = *h;
 
-		if (terminal.bracketed_paste)
-			conn_send(&conn, "\033[200~", 6);
+		if (s->terminal.bracketed_paste)
+			conn_send(&s->conn, "\033[200~", 6);
 
 		sent = 0;
 		while (sent < len) {
@@ -1705,12 +2155,12 @@ do_paste(void)
 			chunk = len - sent;
 			if (chunk > 256)
 				chunk = 256;
-			conn_send(&conn, p + sent, chunk);
+			conn_send(&s->conn, p + sent, chunk);
 			sent += chunk;
 		}
 
-		if (terminal.bracketed_paste)
-			conn_send(&conn, "\033[201~", 6);
+		if (s->terminal.bracketed_paste)
+			conn_send(&s->conn, "\033[201~", 6);
 
 		HUnlock(h);
 	}
@@ -1718,29 +2168,31 @@ do_paste(void)
 }
 
 static short
-pixel_to_row(short v)
+pixel_to_row(Session *s, short v)
 {
 	short r;
 
 	r = (v - TOP_MARGIN) / g_cell_height;
 	if (r < 0) r = 0;
-	if (r >= terminal.active_rows) r = terminal.active_rows - 1;
+	if (r >= s->terminal.active_rows)
+		r = s->terminal.active_rows - 1;
 	return r;
 }
 
 static short
-pixel_to_col(short h)
+pixel_to_col(Session *s, short h)
 {
 	short c;
 
 	c = (h - LEFT_MARGIN) / g_cell_width;
 	if (c < 0) c = 0;
-	if (c >= terminal.active_cols) c = terminal.active_cols - 1;
+	if (c >= s->terminal.active_cols)
+		c = s->terminal.active_cols - 1;
 	return c;
 }
 
 static void
-handle_content_click(EventRecord *event)
+handle_content_click(Session *s, EventRecord *event)
 {
 	Point local_pt;
 	short row, col;
@@ -1748,46 +2200,46 @@ handle_content_click(EventRecord *event)
 	short i;
 
 	GetPort(&save);
-	SetPort(term_window);
+	SetPort(s->window);
 
 	local_pt = event->where;
 	GlobalToLocal(&local_pt);
-	row = pixel_to_row(local_pt.v);
-	col = pixel_to_col(local_pt.h);
+	row = pixel_to_row(s, local_pt.v);
+	col = pixel_to_col(s, local_pt.h);
 
 	/* Clear any previous selection first */
 	if (term_ui_sel_active()) {
-		term_ui_sel_dirty_all(&terminal);
+		term_ui_sel_dirty_all(&s->terminal);
 		term_ui_sel_clear();
 	}
 
 	if (term_ui_sel_check_double_click(event->when, row, col)) {
 		/* Double-click: word selection */
 		term_ui_sel_start_word(row, col,
-		    terminal.scroll_offset, &terminal);
+		    s->terminal.scroll_offset, &s->terminal);
 	} else if (event->modifiers & shiftKey) {
 		/* Shift-click: extend from cursor to click */
-		term_ui_sel_start(terminal.cur_row,
-		    terminal.cur_col, terminal.scroll_offset);
-		term_ui_sel_extend(row, col, &terminal);
+		term_ui_sel_start(s->terminal.cur_row,
+		    s->terminal.cur_col, s->terminal.scroll_offset);
+		term_ui_sel_extend(row, col, &s->terminal);
 	} else {
 		/* New selection */
 		term_ui_sel_start(row, col,
-		    terminal.scroll_offset);
+		    s->terminal.scroll_offset);
 	}
 
-	track_selection_drag();
+	track_selection_drag(s);
 
 	/* Redraw all rows to show final selection state */
-	for (i = 0; i < terminal.active_rows; i++)
-		terminal.dirty[i] = 1;
-	term_ui_draw(term_window, &terminal);
+	for (i = 0; i < s->terminal.active_rows; i++)
+		s->terminal.dirty[i] = 1;
+	term_ui_draw(s->window, &s->terminal);
 
 	SetPort(save);
 }
 
 static void
-track_selection_drag(void)
+track_selection_drag(Session *s)
 {
 	Point pt;
 	short row, col, prev_row, prev_col;
@@ -1798,17 +2250,17 @@ track_selection_drag(void)
 
 	while (StillDown()) {
 		GetMouse(&pt);
-		row = pixel_to_row(pt.v);
-		col = pixel_to_col(pt.h);
+		row = pixel_to_row(s, pt.v);
+		col = pixel_to_col(s, pt.h);
 
 		if (row == prev_row && col == prev_col)
 			continue;
 
 		old_extent_row = row;  /* will be used after extend */
-		term_ui_sel_dirty_rows(&terminal, prev_row < 0 ?
+		term_ui_sel_dirty_rows(&s->terminal, prev_row < 0 ?
 		    row : prev_row, row);
-		term_ui_sel_extend(row, col, &terminal);
-		term_ui_draw(term_window, &terminal);
+		term_ui_sel_extend(row, col, &s->terminal);
+		term_ui_draw(s->window, &s->terminal);
 
 		prev_row = row;
 		prev_col = col;

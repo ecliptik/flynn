@@ -1,7 +1,7 @@
 # TODO
 
 ## Future (v2.0)
-- [ ] Color support (System 7 / color Macs)
+- [x] ~Color support (System 7 / color Macs)~ — removed from scope
 - [ ] Expanded emoji and glyph coverage
-- [ ] ANSI-BBS emulation with CP437 character set
-- [ ] Multiple simultaneous sessions in separate windows
+- [x] ~ANSI-BBS emulation with CP437 character set~ — removed from scope
+- [x] Multiple simultaneous sessions in separate windows

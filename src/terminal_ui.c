@@ -1723,3 +1723,31 @@ term_ui_sel_dirty_all(Terminal *term)
 	for (r = sr; r <= er; r++)
 		term->dirty[r] = 1;
 }
+
+/*
+ * term_ui_save_state - save cursor blink and selection state to UIState
+ */
+void
+term_ui_save_state(UIState *dst)
+{
+	dst->cursor_last_tick = cursor_last_tick;
+	dst->cursor_visible = cursor_visible;
+	dst->cursor_prev_row = cursor_prev_row;
+	dst->cursor_prev_col = cursor_prev_col;
+	dst->cursor_initialized = cursor_initialized;
+	dst->sel = sel;
+}
+
+/*
+ * term_ui_load_state - restore cursor blink and selection state from UIState
+ */
+void
+term_ui_load_state(UIState *src)
+{
+	cursor_last_tick = src->cursor_last_tick;
+	cursor_visible = src->cursor_visible;
+	cursor_prev_row = src->cursor_prev_row;
+	cursor_prev_col = src->cursor_prev_col;
+	cursor_initialized = src->cursor_initialized;
+	sel = src->sel;
+}

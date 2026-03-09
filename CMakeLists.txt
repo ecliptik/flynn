@@ -3,6 +3,7 @@ project(Flynn VERSION 1.1.1)
 
 add_application(Flynn
     src/main.c
+    src/session.c
     src/connection.c
     src/telnet.c
     src/terminal.c

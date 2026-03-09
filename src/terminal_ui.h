@@ -92,4 +92,18 @@ void  term_ui_sel_dirty_all(Terminal *term);
 /* Dark mode */
 void term_ui_set_dark_mode(short enabled);
 
+/* Per-session UI state for save/restore */
+typedef struct {
+	unsigned long	cursor_last_tick;
+	short		cursor_visible;
+	short		cursor_prev_row;
+	short		cursor_prev_col;
+	short		cursor_initialized;
+	Selection	sel;
+} UIState;
+
+/* Save/load per-session UI state (cursor blink, selection) */
+void term_ui_save_state(UIState *dst);
+void term_ui_load_state(UIState *src);
+
 #endif /* TERMINAL_UI_H */

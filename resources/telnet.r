@@ -7,7 +7,7 @@
 #include "Processes.r"
 
 resource 'MBAR' (128) {
-	{ 128, 129, 130, 131, 132 }
+	{ 128, 129, 130, 133, 131, 132 }
 };
 
 resource 'MENU' (128, "Apple") {
@@ -17,11 +17,11 @@ resource 'MENU' (128, "Apple") {
 	}
 };
 
-resource 'MENU' (129, "Session") {
-	129, textMenuProc, allEnabled, enabled, "Session",
+resource 'MENU' (129, "File") {
+	129, textMenuProc, allEnabled, enabled, "File",
 	{
-		"Connect\311", noIcon, "N", noMark, plain;
-		"Disconnect", noIcon, noKey, noMark, plain;
+		"New Session\311", noIcon, "N", noMark, plain;
+		"Close Session", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Bookmarks\311", noIcon, "B", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
@@ -62,6 +62,14 @@ resource 'MENU' (131, "Preferences") {
 		"-", noIcon, noKey, noMark, plain;
 		"Misc", noIcon, noKey, noMark, plain;
 		"  Dark Mode", noIcon, noKey, noMark, plain
+	}
+};
+
+resource 'MENU' (133, "Window") {
+	133, textMenuProc, allEnabled, enabled, "Window",
+	{
+		"Close Window", noIcon, "W", noMark, plain;
+		"-", noIcon, noKey, noMark, plain
 	}
 };
 
