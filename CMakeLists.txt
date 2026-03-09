@@ -9,6 +9,7 @@ add_application(Flynn
     src/terminal_ui.c
     src/tcp.c
     src/dns.c
+    src/glyphs.c
     src/dnr.c
     src/sysutil.c
     src/settings.c

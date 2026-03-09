@@ -25,6 +25,7 @@
 #include "terminal.h"
 #include "terminal_ui.h"
 #include "settings.h"
+#include "glyphs.h"
 
 /* Globals */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
@@ -1594,10 +1595,26 @@ do_copy(void)
 
 			last_nonspace = -1;
 			for (col = c_start; col <= c_end; col++) {
+				char cc;
+				const GlyphInfo *gi;
+
 				cell = terminal_get_display_cell(
 				    &terminal, row, col);
-				buf[len + (col - c_start)] = cell->ch;
-				if (cell->ch != ' ')
+				if ((cell->attr & ATTR_GLYPH) &&
+				    cell->ch == GLYPH_WIDE_SPACER) {
+					buf[len + (col - c_start)] = ' ';
+					continue;
+				}
+				if (cell->attr & ATTR_GLYPH) {
+					gi = glyph_get_info(cell->ch);
+					cc = gi ? gi->copy_char : '?';
+				} else if (cell->attr & ATTR_BRAILLE) {
+					cc = '.';
+				} else {
+					cc = cell->ch;
+				}
+				buf[len + (col - c_start)] = cc;
+				if (cc != ' ')
 					last_nonspace = col - c_start;
 			}
 			len += last_nonspace + 1;
@@ -1609,10 +1626,26 @@ do_copy(void)
 		for (row = 0; row < terminal.active_rows; row++) {
 			last_nonspace = -1;
 			for (col = 0; col < terminal.active_cols; col++) {
+				char cc;
+				const GlyphInfo *gi;
+
 				cell = terminal_get_display_cell(
 				    &terminal, row, col);
-				buf[len + col] = cell->ch;
-				if (cell->ch != ' ')
+				if ((cell->attr & ATTR_GLYPH) &&
+				    cell->ch == GLYPH_WIDE_SPACER) {
+					buf[len + col] = ' ';
+					continue;
+				}
+				if (cell->attr & ATTR_GLYPH) {
+					gi = glyph_get_info(cell->ch);
+					cc = gi ? gi->copy_char : '?';
+				} else if (cell->attr & ATTR_BRAILLE) {
+					cc = '.';
+				} else {
+					cc = cell->ch;
+				}
+				buf[len + col] = cc;
+				if (cc != ' ')
 					last_nonspace = col;
 			}
 			len += last_nonspace + 1;

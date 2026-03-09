@@ -31,7 +31,7 @@
 #define TERM_SCROLLBACK_LINES	(TERM_DEFAULT_ROWS * 4)
 
 /* Maximum CSI parameters per sequence */
-#define TERM_MAX_PARAMS		8
+#define TERM_MAX_PARAMS		16
 
 /* Character attributes (packed into unsigned char) */
 #define ATTR_NORMAL		0x00
@@ -39,6 +39,8 @@
 #define ATTR_UNDERLINE		0x02
 #define ATTR_INVERSE		0x04
 #define ATTR_DEC_GRAPHICS	0x08
+#define ATTR_GLYPH		0x10	/* ch is a glyph index */
+#define ATTR_BRAILLE		0x20	/* ch is braille dot pattern */
 
 /* Parser states */
 #define PARSE_NORMAL		0
@@ -49,6 +51,7 @@
 #define PARSE_OSC		5	/* got ESC] */
 #define PARSE_OSC_ESC		6	/* got ESC inside OSC, looking for \ */
 #define PARSE_DCS		7	/* got ESC P, consume until ST */
+#define PARSE_DCS_ESC		8	/* got ESC inside DCS, looking for \ */
 
 /* A single terminal cell */
 typedef struct {

@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "terminal.h"
+#include "glyphs.h"
 
 /* Forward declarations for internal functions */
 static void term_clear_region(Terminal *term, short r1, short c1,
@@ -28,6 +29,8 @@ static void term_scroll_up(Terminal *term, short top, short bottom,
 static void term_scroll_down(Terminal *term, short top, short bottom,
     short count);
 static void term_put_char(Terminal *term, unsigned char ch);
+static void term_put_glyph(Terminal *term, unsigned char glyph_id,
+    unsigned char attr_flag);
 static void term_newline(Terminal *term);
 static void term_carriage_return(Terminal *term);
 static void term_process_esc(Terminal *term, unsigned char ch);
@@ -153,6 +156,7 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 		case PARSE_NORMAL:
 			if (ch == 0x1B) {
 				/* ESC */
+				term->utf8_expect = 0;
 				term->parse_state = PARSE_ESC;
 			} else if (ch == '\r') {
 				term_carriage_return(term);
@@ -225,8 +229,11 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				/* ST (8-bit C1) - string terminator */
 			} else if (ch >= 0x80 && ch <= 0x9F) {
 				/* Other C1 codes: ignore */
-			} else if (ch >= 0xC0 && term->utf8_expect == 0) {
-				/* Start of multi-byte UTF-8 sequence */
+			} else if (ch >= 0xC0) {
+				/* UTF-8 start byte: begin new sequence.
+				 * If mid-sequence, abandon incomplete
+				 * one and start fresh (error recovery). */
+				term->utf8_expect = 0;
 				if (ch < 0xE0) {
 					term->utf8_expect = 2;
 				} else if (ch < 0xF0) {
@@ -239,8 +246,7 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					term->utf8_len = 1;
 				}
 			} else if (ch >= 0xA0) {
-				/* Stray byte 0xA0-0xBF or 0xC0+ without
-				 * UTF-8 start: display as Mac Roman */
+				/* Stray continuation without start */
 				term->utf8_expect = 0;
 				term_put_char(term, '?');
 			} else if (ch >= 0x20) {
@@ -267,10 +273,19 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 		case PARSE_DCS:
 			/* Consume DCS payload until ST (ESC \) */
 			if (ch == 0x1B)
-				term->parse_state = PARSE_OSC_ESC;
+				term->parse_state = PARSE_DCS_ESC;
 			/* BEL or 8-bit ST terminates DCS */
 			else if (ch == 0x07 || ch == 0x9C)
 				term->parse_state = PARSE_NORMAL;
+			break;
+
+		case PARSE_DCS_ESC:
+			/* ESC inside DCS: only \ terminates (ST) */
+			if (ch == '\\')
+				term->parse_state = PARSE_NORMAL;
+			else
+				/* Not ST — stay in DCS, consume byte */
+				term->parse_state = PARSE_DCS;
 			break;
 		}
 	}
@@ -592,6 +607,87 @@ term_put_char(Terminal *term, unsigned char ch)
 }
 
 /*
+ * term_put_glyph - place a glyph cell (no charset translation)
+ *
+ * Like term_put_char but writes ch and attr directly.  Used for
+ * ATTR_GLYPH and ATTR_BRAILLE cells.  For wide glyphs, places the
+ * glyph in the first cell and GLYPH_WIDE_SPACER in the second.
+ */
+static void
+term_put_glyph(Terminal *term, unsigned char glyph_id,
+    unsigned char attr_flag)
+{
+	unsigned char attr;
+	short wide;
+	short c;
+
+	wide = (attr_flag == ATTR_GLYPH) ? glyph_is_wide(glyph_id) : 0;
+
+	/* Wide glyph at last column: place space and wrap first */
+	if (wide && term->cur_col >= term->active_cols - 1) {
+		/* Fill current cell with space */
+		term->screen[term->cur_row][term->cur_col].ch = ' ';
+		term->screen[term->cur_row][term->cur_col].attr = ATTR_NORMAL;
+		term_dirty_row(term, term->cur_row);
+
+		if (term->autowrap) {
+			term_carriage_return(term);
+			term_newline(term);
+		} else {
+			return;		/* can't fit, discard */
+		}
+	}
+
+	/* Handle wrap_pending from previous character */
+	if (term->wrap_pending) {
+		if (term->autowrap) {
+			term->wrap_pending = 0;
+			term_carriage_return(term);
+			term_newline(term);
+
+			/* Re-check: wide glyph might not fit after wrap */
+			if (wide && term->cur_col >= term->active_cols - 1)
+				return;
+		} else {
+			term->wrap_pending = 0;
+			term->cur_col = term->active_cols - 1;
+		}
+	}
+
+	attr = term->cur_attr | attr_flag;
+
+	/* Insert mode: shift right */
+	if (term->insert_mode) {
+		short shift = wide ? 2 : 1;
+
+		for (c = term->active_cols - 1;
+		    c > term->cur_col + shift - 1; c--) {
+			term->screen[term->cur_row][c] =
+			    term->screen[term->cur_row][c - shift];
+		}
+	}
+
+	/* Place primary glyph cell */
+	term->screen[term->cur_row][term->cur_col].ch = glyph_id;
+	term->screen[term->cur_row][term->cur_col].attr = attr;
+	term_dirty_row(term, term->cur_row);
+
+	if (wide) {
+		/* Place wide spacer in second cell */
+		term->cur_col++;
+		term->screen[term->cur_row][term->cur_col].ch =
+		    GLYPH_WIDE_SPACER;
+		term->screen[term->cur_row][term->cur_col].attr = attr;
+	}
+
+	if (term->cur_col < term->active_cols - 1) {
+		term->cur_col++;
+	} else {
+		term->wrap_pending = 1;
+	}
+}
+
+/*
  * term_newline - move cursor down one line, scrolling if at bottom
  *                of scroll region
  */
@@ -758,20 +854,28 @@ term_process_csi(Terminal *term, unsigned char ch)
 			term->params[0] = ch - '0';
 			term->parse_state = PARSE_CSI_PARAM;
 		} else if (term->parse_state == PARSE_CSI_PARAM) {
-			if (term->num_params > 0) {
+			if (term->num_params > 0 &&
+			    term->num_params <= TERM_MAX_PARAMS) {
 				short idx = term->num_params - 1;
 				if (term->params[idx] < 3000)
 					term->params[idx] =
 					    term->params[idx] * 10 +
 					    (ch - '0');
 			}
+			/* else: overflow params silently dropped */
 		}
 		/* Digits after intermediate are invalid; ignore */
 		return;
 	}
 
-	if (ch == ';') {
-		/* Parameter separator */
+	if (ch == ';' || ch == ':') {
+		/*
+		 * Parameter separator.  Semicolons separate parameters;
+		 * colons separate sub-parameters (SGR 38:2:R:G:B,
+		 * SGR 4:3, etc.).  We treat both the same way --
+		 * slightly wrong for sub-params but prevents aborting
+		 * on modern color/underline sequences.
+		 */
 		if (term->parse_state == PARSE_CSI) {
 			/* Implicit first param = 0 */
 			term->num_params = 1;
@@ -785,7 +889,7 @@ term_process_csi(Terminal *term, unsigned char ch)
 		return;
 	}
 
-	if (ch == '?' || ch == '>') {
+	if (ch == '?' || ch == '>' || ch == '<' || ch == '=') {
 		/* Private mode introducer (? for DECSET, > for secondary DA) */
 		term->intermediate = ch;
 		return;
@@ -1007,7 +1111,8 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			short i;
 			for (i = 0; i < term->num_params; i++) {
 				if (term->params[i] == 38 ||
-				    term->params[i] == 48) {
+				    term->params[i] == 48 ||
+				    term->params[i] == 58) {
 					/* Extended color: skip sub-params */
 					if (i + 1 < term->num_params &&
 					    term->params[i + 1] == 5) {
@@ -1621,8 +1726,12 @@ unicode_symbol_to_macroman(unsigned short cp)
 	case 0x03C0: return 0xB9;	/* pi */
 	case 0x2206: return 0xC6;	/* delta */
 	case 0x221A: return 0xC3;	/* square root */
+	case 0x2219: return 0xE1;	/* bullet operator -> middle dot */
 	case 0x221E: return 0xB0;	/* infinity */
 	case 0x2248: return 0xC5;	/* almost equal */
+	case 0x22C5: return 0xE1;	/* dot operator -> middle dot */
+	case 0x0387: return 0xE1;	/* greek ano teleia -> middle dot */
+	case 0x2027: return 0xE1;	/* hyphenation point -> middle dot */
 	default:     return 0;
 	}
 }
@@ -1635,16 +1744,44 @@ term_put_unicode(Terminal *term, long cp)
 {
 	unsigned char ch;
 
-	/* Emoji modifier/ZWJ absorption */
+	/* Invisible/formatting Unicode: silently absorb */
+	if (cp == 0x00AD ||			/* soft hyphen */
+	    (cp >= 0x200B && cp <= 0x200F) ||	/* ZWSP,ZWNJ,ZWJ,LRM,RLM */
+	    (cp >= 0x2028 && cp <= 0x202E) ||	/* line/para sep, bidi */
+	    (cp >= 0x2060 && cp <= 0x2069) ||	/* word joiner, bidi iso */
+	    (cp >= 0xFE00 && cp <= 0xFE0F) ||	/* variation selectors */
+	    cp == 0xFEFF ||			/* BOM / ZWNBSP */
+	    (cp >= 0xE0001 && cp <= 0xE007F))	/* tag characters */
+		return;
+
+	/* Emoji modifier absorption (skin tones, keycaps) */
 	if (term->last_was_emoji) {
-		if (cp == 0x200D ||			/* ZWJ */
-		    (cp >= 0x1F3FB && cp <= 0x1F3FF) ||	/* skin tones */
-		    cp == 0xFE0E || cp == 0xFE0F ||	/* variation sel */
-		    (cp >= 0xE0020 && cp <= 0xE007F) ||	/* tag sequences */
+		if ((cp >= 0x1F3FB && cp <= 0x1F3FF) ||	/* skin tones */
 		    cp == 0x20E3) {			/* enclosing keycap */
 			return;		/* absorb silently */
 		}
 		term->last_was_emoji = 0;
+	}
+
+	/* Braille patterns: U+2800-U+28FF */
+	if (cp >= 0x2800 && cp <= 0x28FF) {
+		term_put_glyph(term, (unsigned char)(cp & 0xFF),
+		    ATTR_BRAILLE);
+		return;
+	}
+
+	/* Custom glyph lookup (symbols and emoji) */
+	{
+		short glyph_id;
+
+		glyph_id = glyph_lookup(cp);
+		if (glyph_id >= 0) {
+			term_put_glyph(term, (unsigned char)glyph_id,
+			    ATTR_GLYPH);
+			if (cp >= 0x1F000 || glyph_id >= 0x40)
+				term->last_was_emoji = 1;
+			return;
+		}
 	}
 
 	/* Latin-1 Supplement: direct Mac Roman mapping */
@@ -1689,9 +1826,17 @@ term_put_unicode(Terminal *term, long cp)
 		}
 	}
 
+	/* Unicode spaces -> regular ASCII space */
+	if ((cp >= 0x2000 && cp <= 0x200A) ||	/* en/em/thin/hair space */
+	    cp == 0x205F ||			/* medium math space */
+	    cp == 0x3000) {			/* ideographic space */
+		term_put_char(term, ' ');
+		return;
+	}
+
 	/* Common Unicode symbols -> Mac Roman */
 	if ((cp >= 0x2000 && cp <= 0x22FF) || cp == 0x03C0 ||
-	    cp == 0x20AC) {
+	    cp == 0x20AC || cp == 0x0387) {
 		ch = unicode_symbol_to_macroman((unsigned short)cp);
 		if (ch) {
 			term_put_char(term, ch);

@@ -27,6 +27,7 @@
 #include <ToolUtils.h>
 #include <OSUtils.h>
 #include "terminal_ui.h"
+#include "glyphs.h"
 
 /* Cursor state */
 static unsigned long	cursor_last_tick;
@@ -45,7 +46,6 @@ static short		g_cell_baseline = CELL_HEIGHT - 2;
 static short		g_font_id = 4;
 static short		g_font_size = 9;
 static short		g_dark_mode = 0;
-static short		g_font_proportional = 0;
 
 /* Row pixel helpers */
 static short row_top(short row)    { return TOP_MARGIN + row * g_cell_height; }
@@ -55,6 +55,12 @@ static short col_right(short col)  { return LEFT_MARGIN + (col + 1) * g_cell_wid
 
 static void draw_row(Terminal *term, short row);
 static void draw_line_char(unsigned char ch, short x, short y,
+	    unsigned char attr);
+static void draw_braille(unsigned char pattern, short x, short y,
+	    unsigned char attr);
+static void draw_glyph_prim(unsigned char glyph_id, short x, short y,
+	    unsigned char attr);
+static void draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	    unsigned char attr);
 static void draw_cursor(Terminal *term, short on);
 static void sel_normalize(short *sr, short *sc, short *er, short *ec);
@@ -109,10 +115,6 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 	g_cell_baseline = fi.ascent + fi.leading;
 	g_font_id = font_id;
 	g_font_size = font_size;
-
-	/* Detect proportional fonts: if 'i' is narrower than widMax,
-	 * the font is proportional and needs per-character drawing */
-	g_font_proportional = (CharWidth('i') != fi.widMax);
 
 	TextFace(0);
 	TextMode(srcOr);
@@ -240,6 +242,40 @@ draw_row(Terminal *term, short row)
 			continue;
 		}
 
+		/* Braille patterns: render dot grid */
+		if (run_attr & ATTR_BRAILLE) {
+			short i;
+
+			for (i = 0; i < run_len; i++)
+				draw_braille((unsigned char)buf[i],
+				    col_left(run_start + i),
+				    row_top(row), run_attr);
+			continue;
+		}
+
+		/* Custom glyphs: primitives and emoji */
+		if (run_attr & ATTR_GLYPH) {
+			short i;
+
+			for (i = 0; i < run_len; i++) {
+				unsigned char gid;
+
+				gid = (unsigned char)buf[i];
+				if (gid == GLYPH_WIDE_SPACER)
+					continue;	/* skip second cell */
+				if (gid < 0x40) {
+					draw_glyph_prim(gid,
+					    col_left(run_start + i),
+					    row_top(row), run_attr);
+				} else {
+					draw_glyph_bitmap(gid,
+					    col_left(run_start + i),
+					    row_top(row), run_attr);
+				}
+			}
+			continue;
+		}
+
 		/* Set text face for this run (cached to avoid redundant calls) */
 		{
 			short face = 0;
@@ -264,32 +300,38 @@ draw_row(Terminal *term, short row)
 			    row_bottom(row));
 			PaintRect(&inv_r);
 
-			/* Draw text in white (srcBic: clears bits where text is) */
+			/*
+			 * Draw text in white (srcBic: clears bits where
+			 * text is).  Always use per-character positioning
+			 * to avoid bold advance width drift.
+			 */
 			TextMode(srcBic);
-			if (g_font_proportional) {
+			{
 				short i;
 				for (i = 0; i < run_len; i++) {
 					MoveTo(col_left(run_start + i),
 					    baseline);
 					DrawChar(buf[i]);
 				}
-			} else {
-				MoveTo(col_left(run_start), baseline);
-				DrawText(buf, 0, run_len);
 			}
 			TextMode(srcOr);
 		} else {
-			/* Normal or bold/underline text */
-			if (g_font_proportional) {
+			/*
+			 * Normal or bold/underline text.
+			 * Always use per-character MoveTo+DrawChar to
+			 * ensure correct column positioning.  DrawText
+			 * uses the font's styled advance width, which
+			 * differs from g_cell_width for bold (QD bold
+			 * adds 1px per char), causing characters to
+			 * drift rightward and consume adjacent spaces.
+			 */
+			{
 				short i;
 				for (i = 0; i < run_len; i++) {
 					MoveTo(col_left(run_start + i),
 					    baseline);
 					DrawChar(buf[i]);
 				}
-			} else {
-				MoveTo(col_left(run_start), baseline);
-				DrawText(buf, 0, run_len);
 			}
 		}
 	}
@@ -463,19 +505,641 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 	default:
 		/* Unknown graphic: draw as regular text */
 		{
-			char c = ch;
 			short bl = y + g_cell_baseline;
 
-				if (attr & ATTR_INVERSE)
+			if (attr & ATTR_INVERSE)
 				TextMode(srcBic);
 			MoveTo(x, bl);
-			DrawText(&c, 0, 1);
+			DrawChar(ch);
 			if (attr & ATTR_INVERSE)
 				TextMode(srcOr);
 		}
 		break;
 	}
 
+	PenNormal();
+}
+
+/*
+ * draw_glyph_prim - render a primitive symbol using QuickDraw
+ *
+ * Draws arrows, checkmarks, shapes, card suits, etc. using
+ * QuickDraw primitives.  All coordinates scale with font cell size.
+ */
+static void
+draw_glyph_prim(unsigned char glyph_id, short x, short y,
+    unsigned char attr)
+{
+	short cx, cy, right, bottom;
+	short w4, h4;		/* quarter-cell offsets */
+	Rect cell_r, r;
+
+	cx = x + g_cell_width / 2;
+	cy = y + g_cell_height / 2;
+	right = x + g_cell_width - 1;
+	bottom = y + g_cell_height - 1;
+	w4 = g_cell_width / 4;
+	h4 = g_cell_height / 4;
+
+	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
+
+	/* Inverse: paint cell black, draw in white */
+	if (attr & ATTR_INVERSE) {
+		PaintRect(&cell_r);
+		PenMode(patBic);
+	}
+
+	/* Bold: thicker strokes */
+	if (attr & ATTR_BOLD)
+		PenSize(2, 1);
+	else
+		PenSize(1, 1);
+
+	switch (glyph_id) {
+	case GLYPH_ARROW_LEFT:
+		/* Horizontal shaft + left arrowhead */
+		MoveTo(x + 1, cy);
+		LineTo(right - 1, cy);
+		MoveTo(x + 1, cy);
+		LineTo(x + w4 + 1, cy - h4);
+		MoveTo(x + 1, cy);
+		LineTo(x + w4 + 1, cy + h4);
+		break;
+
+	case GLYPH_ARROW_UP:
+		/* Vertical shaft + up arrowhead */
+		PenSize(1, 1);
+		MoveTo(cx, y + 1);
+		LineTo(cx, bottom - 1);
+		MoveTo(cx, y + 1);
+		LineTo(cx - w4, y + h4 + 1);
+		MoveTo(cx, y + 1);
+		LineTo(cx + w4, y + h4 + 1);
+		break;
+
+	case GLYPH_ARROW_RIGHT:
+		/* Horizontal shaft + right arrowhead */
+		MoveTo(x + 1, cy);
+		LineTo(right - 1, cy);
+		MoveTo(right - 1, cy);
+		LineTo(right - w4 - 1, cy - h4);
+		MoveTo(right - 1, cy);
+		LineTo(right - w4 - 1, cy + h4);
+		break;
+
+	case GLYPH_ARROW_DOWN:
+		/* Vertical shaft + down arrowhead */
+		PenSize(1, 1);
+		MoveTo(cx, y + 1);
+		LineTo(cx, bottom - 1);
+		MoveTo(cx, bottom - 1);
+		LineTo(cx - w4, bottom - h4 - 1);
+		MoveTo(cx, bottom - 1);
+		LineTo(cx + w4, bottom - h4 - 1);
+		break;
+
+	case GLYPH_CHECK:
+		/* Checkmark: short left stroke + long right stroke */
+		MoveTo(x + 1, cy);
+		LineTo(cx - 1, cy + h4);
+		LineTo(right - 1, cy - h4 - 1);
+		break;
+
+	case GLYPH_CROSS:
+		/* X: two diagonal lines */
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, bottom - 2);
+		MoveTo(right - 1, y + 2);
+		LineTo(x + 1, bottom - 2);
+		break;
+
+	case GLYPH_STAR_FILLED:
+		/* Five points: draw as filled diamond + top spike */
+		SetRect(&r, cx - w4, cy - h4, cx + w4 + 1, cy + h4 + 1);
+		PaintRect(&r);
+		MoveTo(cx, y + 1);
+		LineTo(cx, cy - h4);
+		MoveTo(x + 1, cy);
+		LineTo(cx - w4, cy);
+		MoveTo(right - 1, cy);
+		LineTo(cx + w4, cy);
+		MoveTo(cx, bottom - 1);
+		LineTo(cx, cy + h4);
+		break;
+
+	case GLYPH_STAR_EMPTY:
+		/* Star outline: similar to filled but FrameRect */
+		SetRect(&r, cx - w4, cy - h4, cx + w4 + 1, cy + h4 + 1);
+		FrameRect(&r);
+		MoveTo(cx, y + 1);
+		LineTo(cx, cy - h4);
+		break;
+
+	case GLYPH_HEART:
+		/* Heart shape: two small circles + triangle below */
+		SetRect(&r, x + 1, cy - h4, cx, cy + 1);
+		PaintOval(&r);
+		SetRect(&r, cx - 1, cy - h4, right - 1, cy + 1);
+		PaintOval(&r);
+		/* Triangle bottom */
+		MoveTo(x + 1, cy);
+		LineTo(cx, bottom - 1);
+		LineTo(right - 1, cy);
+		break;
+
+	case GLYPH_CIRCLE_FILLED:
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		PaintOval(&r);
+		break;
+
+	case GLYPH_CIRCLE_EMPTY:
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		break;
+
+	case GLYPH_SQUARE_FILLED:
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_SQUARE_EMPTY:
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameRect(&r);
+		break;
+
+	case GLYPH_TRI_UP:
+		/* Triangle pointing up */
+		MoveTo(cx, y + 2);
+		LineTo(right - 1, bottom - 2);
+		LineTo(x + 1, bottom - 2);
+		LineTo(cx, y + 2);
+		break;
+
+	case GLYPH_TRI_RIGHT:
+		/* Triangle pointing right */
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, cy);
+		LineTo(x + 1, bottom - 2);
+		LineTo(x + 1, y + 2);
+		break;
+
+	case GLYPH_TRI_DOWN:
+		/* Triangle pointing down */
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, y + 2);
+		LineTo(cx, bottom - 2);
+		LineTo(x + 1, y + 2);
+		break;
+
+	case GLYPH_TRI_LEFT:
+		/* Triangle pointing left */
+		MoveTo(right - 1, y + 2);
+		LineTo(x + 1, cy);
+		LineTo(right - 1, bottom - 2);
+		LineTo(right - 1, y + 2);
+		break;
+
+	case GLYPH_MUSIC_NOTE:
+		/* Single note: stem + head */
+		PenSize(1, 1);
+		MoveTo(cx + 1, y + 2);
+		LineTo(cx + 1, bottom - 2);
+		SetRect(&r, cx - 1, bottom - 4, cx + 2, bottom - 1);
+		PaintOval(&r);
+		break;
+
+	case GLYPH_MUSIC_NOTES:
+		/* Double note: two stems + beam + heads */
+		PenSize(1, 1);
+		MoveTo(x + 2, y + 2);
+		LineTo(x + 2, bottom - 2);
+		MoveTo(right - 2, y + 2);
+		LineTo(right - 2, bottom - 2);
+		MoveTo(x + 2, y + 2);
+		LineTo(right - 2, y + 2);
+		SetRect(&r, x, bottom - 4, x + 3, bottom - 1);
+		PaintOval(&r);
+		SetRect(&r, right - 3, bottom - 4, right, bottom - 1);
+		PaintOval(&r);
+		break;
+
+	case GLYPH_SPADE:
+		/* Spade: inverted heart + stem */
+		SetRect(&r, x + 1, y + 2, cx, cy + 1);
+		PaintOval(&r);
+		SetRect(&r, cx - 1, y + 2, right - 1, cy + 1);
+		PaintOval(&r);
+		MoveTo(x + 1, cy);
+		LineTo(cx, y + 2);
+		LineTo(right - 1, cy);
+		PenSize(1, 1);
+		MoveTo(cx, cy);
+		LineTo(cx, bottom - 1);
+		break;
+
+	case GLYPH_CLUB:
+		/* Club: three circles + stem */
+		{
+			short cs = g_cell_width / 5;
+
+			if (cs < 1) cs = 1;
+			SetRect(&r, cx - cs, y + 2, cx + cs + 1,
+			    y + 2 + cs * 2 + 1);
+			PaintOval(&r);
+			SetRect(&r, x + 1, cy - cs, x + 1 + cs * 2 + 1,
+			    cy + cs + 1);
+			PaintOval(&r);
+			SetRect(&r, right - cs * 2 - 1, cy - cs, right,
+			    cy + cs + 1);
+			PaintOval(&r);
+			PenSize(1, 1);
+			MoveTo(cx, cy);
+			LineTo(cx, bottom - 1);
+		}
+		break;
+
+	case GLYPH_DIAMOND:
+		/* Diamond: four lines forming diamond shape */
+		MoveTo(cx, y + 2);
+		LineTo(right - 1, cy);
+		LineTo(cx, bottom - 2);
+		LineTo(x + 1, cy);
+		LineTo(cx, y + 2);
+		break;
+
+	case GLYPH_LOZENGE:
+		/* Lozenge: same as diamond, thinner */
+		PenSize(1, 1);
+		MoveTo(cx, y + 1);
+		LineTo(right - 1, cy);
+		LineTo(cx, bottom - 1);
+		LineTo(x + 1, cy);
+		LineTo(cx, y + 1);
+		break;
+
+	case GLYPH_ELLIPSIS_V:
+		/* Vertical ellipsis: three dots */
+		{
+			short ds = (g_cell_width > 4) ? 2 : 1;
+
+			SetRect(&r, cx - ds / 2, y + 2,
+			    cx + (ds + 1) / 2, y + 2 + ds);
+			PaintRect(&r);
+			SetRect(&r, cx - ds / 2, cy - ds / 2,
+			    cx + (ds + 1) / 2, cy + (ds + 1) / 2);
+			PaintRect(&r);
+			SetRect(&r, cx - ds / 2, bottom - 2 - ds,
+			    cx + (ds + 1) / 2, bottom - 2);
+			PaintRect(&r);
+		}
+		break;
+
+	case GLYPH_DASH_EM:
+		/* Em dash: wide horizontal line */
+		MoveTo(x, cy);
+		LineTo(right, cy);
+		break;
+
+	case GLYPH_BLOCK_FULL:
+		/* Full block: solid fill */
+		PaintRect(&cell_r);
+		break;
+
+	case GLYPH_BLOCK_UPPER:
+		/* Upper half block */
+		SetRect(&r, x, y, x + g_cell_width, cy);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_BLOCK_LOWER:
+		/* Lower half block */
+		SetRect(&r, x, cy, x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_BLOCK_LEFT:
+		/* Left half block */
+		SetRect(&r, x, y, cx, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_BLOCK_RIGHT:
+		/* Right half block */
+		SetRect(&r, cx, y, x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_QUAD_UL:
+		/* Quadrant upper left */
+		SetRect(&r, x, y, cx, cy);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_QUAD_UR:
+		/* Quadrant upper right */
+		SetRect(&r, cx, y, x + g_cell_width, cy);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_QUAD_LL:
+		/* Quadrant lower left */
+		SetRect(&r, x, cy, cx, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_QUAD_LR:
+		/* Quadrant lower right */
+		SetRect(&r, cx, cy, x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_QUAD_UL_UR_LL:
+		/* Three quadrants: UL + UR + LL (missing LR) */
+		SetRect(&r, x, y, x + g_cell_width, cy);
+		PaintRect(&r);
+		SetRect(&r, x, cy, cx, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_QUAD_UL_UR_LR:
+		/* Three quadrants: UL + UR + LR (missing LL) */
+		SetRect(&r, x, y, x + g_cell_width, cy);
+		PaintRect(&r);
+		SetRect(&r, cx, cy, x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_ASTERISK_TEARDROP:
+		/* 6-spoke asterisk */
+		PenSize(1, 1);
+		MoveTo(cx, y + 2);
+		LineTo(cx, bottom - 2);
+		MoveTo(x + 1, cy - h4);
+		LineTo(right - 1, cy + h4);
+		MoveTo(x + 1, cy + h4);
+		LineTo(right - 1, cy - h4);
+		break;
+
+	case GLYPH_ASTERISK_FOUR:
+		/* 4-spoke asterisk (+ rotated 45 degrees = X) */
+		PenSize(1, 1);
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, bottom - 2);
+		MoveTo(right - 1, y + 2);
+		LineTo(x + 1, bottom - 2);
+		break;
+
+	case GLYPH_ASTERISK_HEAVY:
+		/* Heavy 6-spoke asterisk */
+		PenSize(2, 1);
+		MoveTo(cx, y + 2);
+		LineTo(cx, bottom - 2);
+		MoveTo(x + 1, cy - h4);
+		LineTo(right - 1, cy + h4);
+		MoveTo(x + 1, cy + h4);
+		LineTo(right - 1, cy - h4);
+		break;
+
+	case GLYPH_ASTERISK_OP:
+		/* Small asterisk operator */
+		PenSize(1, 1);
+		MoveTo(cx, cy - h4);
+		LineTo(cx, cy + h4);
+		MoveTo(cx - w4, cy - h4 / 2);
+		LineTo(cx + w4, cy + h4 / 2);
+		MoveTo(cx - w4, cy + h4 / 2);
+		LineTo(cx + w4, cy - h4 / 2);
+		break;
+
+	case GLYPH_SQ_MED_FILLED:
+		/* Black medium square: slightly smaller than full */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_SQ_MED_EMPTY:
+		/* White medium square: slightly smaller than full */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameRect(&r);
+		break;
+
+	case GLYPH_PLAY:
+		/* Play symbol: right-pointing filled triangle */
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, cy);
+		LineTo(x + 1, bottom - 2);
+		LineTo(x + 1, y + 2);
+		break;
+
+	case GLYPH_ASTERISK_8:
+		/* Eight-spoked asterisk: 4 lines through center */
+		PenSize(1, 1);
+		MoveTo(cx, y + 2);
+		LineTo(cx, bottom - 2);
+		MoveTo(x + 1, cy);
+		LineTo(right - 1, cy);
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, bottom - 2);
+		MoveTo(right - 1, y + 2);
+		LineTo(x + 1, bottom - 2);
+		break;
+
+	case GLYPH_CHEVRON_RIGHT:
+		/* Heavy right-pointing chevron > */
+		if (attr & ATTR_BOLD)
+			PenSize(2, 1);
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, cy);
+		LineTo(x + 1, bottom - 2);
+		break;
+
+	case GLYPH_WARNING:
+		/* Warning triangle with ! inside */
+		PenSize(1, 1);
+		MoveTo(cx, y + 1);
+		LineTo(right - 1, bottom - 1);
+		LineTo(x + 1, bottom - 1);
+		LineTo(cx, y + 1);
+		/* Exclamation mark inside */
+		{
+			short ey = cy - 1;
+
+			MoveTo(cx, ey - 1);
+			LineTo(cx, ey + 1);
+			MoveTo(cx, ey + 3);
+			LineTo(cx, ey + 3);
+		}
+		break;
+
+	case GLYPH_CHECK_HEAVY:
+		/* Heavy checkmark: like CHECK but thicker */
+		PenSize(2, 1);
+		MoveTo(x + 1, cy);
+		LineTo(cx - 1, cy + h4);
+		LineTo(right - 1, cy - h4 - 1);
+		break;
+
+	case GLYPH_CROSS_HEAVY:
+		/* Heavy ballot X: like CROSS but thicker */
+		PenSize(2, 1);
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, bottom - 2);
+		MoveTo(right - 1, y + 2);
+		LineTo(x + 1, bottom - 2);
+		break;
+
+	case GLYPH_SQ_SM_FILLED:
+		/* Black small square: inset ~2px from cell edges */
+		SetRect(&r, x + 2, y + 3, right - 1, bottom - 2);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_SQ_SM_EMPTY:
+		/* White small square: inset ~2px from cell edges */
+		SetRect(&r, x + 2, y + 3, right - 1, bottom - 2);
+		FrameRect(&r);
+		break;
+
+	case GLYPH_DOT_MIDDLE:
+		/* Centered dot: small filled circle at cell center */
+		SetRect(&r, cx - 1, cy - 1, cx + 1, cy + 1);
+		PaintOval(&r);
+		break;
+
+	default:
+		/* Unknown primitive: draw ? */
+		{
+			short bl = y + g_cell_baseline;
+
+			if (attr & ATTR_INVERSE)
+				TextMode(srcBic);
+			MoveTo(x, bl);
+			DrawChar('?');
+			if (attr & ATTR_INVERSE)
+				TextMode(srcOr);
+		}
+		break;
+	}
+
+	PenNormal();
+}
+
+/*
+ * draw_glyph_bitmap - render a bitmap emoji using CopyBits
+ *
+ * Builds a BitMap on the stack from the GlyphBitmap data and blits
+ * it centered in the 2-cell-wide area.  Fixed 10x10 pixel size.
+ */
+static void
+draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
+    unsigned char attr)
+{
+	const GlyphBitmap *bm;
+	BitMap src_bits;
+	Rect src_r, dst_r, cell_r;
+	short dx, dy, cell2_w;
+
+	bm = glyph_get_bitmap(glyph_id);
+	if (!bm) {
+		/* No bitmap: draw ? as fallback */
+		draw_glyph_prim(glyph_id, x, y, attr);
+		return;
+	}
+
+	/* 2-cell wide area */
+	cell2_w = g_cell_width * 2;
+	SetRect(&cell_r, x, y, x + cell2_w, y + g_cell_height);
+
+	/* Inverse: paint 2-cell area black */
+	if (attr & ATTR_INVERSE)
+		PaintRect(&cell_r);
+
+	/* Build source BitMap from glyph data */
+	src_bits.baseAddr = (Ptr)bm->bits;
+	src_bits.rowBytes = bm->rowBytes;
+	SetRect(&src_bits.bounds, 0, 0, bm->width, bm->height);
+
+	/* Source rect: entire bitmap */
+	SetRect(&src_r, 0, 0, bm->width, bm->height);
+
+	/* Center bitmap in 2-cell area */
+	dx = x + (cell2_w - bm->width) / 2;
+	dy = y + (g_cell_height - bm->height) / 2;
+	SetRect(&dst_r, dx, dy, dx + bm->width, dy + bm->height);
+
+	/* Blit: srcOr for normal, srcBic for inverse (white on black) */
+	CopyBits(&src_bits, &qd.thePort->portBits,
+	    &src_r, &dst_r,
+	    (attr & ATTR_INVERSE) ? srcBic : srcOr, NULL);
+}
+
+/*
+ * draw_braille - render a Braille pattern (U+2800-U+28FF)
+ *
+ * Standard Braille bit layout in a 2x4 dot grid:
+ *   bit 0 = top-left       bit 3 = top-right
+ *   bit 1 = mid-left       bit 4 = mid-right
+ *   bit 2 = low-left       bit 5 = low-right
+ *   bit 6 = bottom-left    bit 7 = bottom-right
+ *
+ * Dot size scales with cell dimensions.
+ */
+static void
+draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
+{
+	Rect cell_r, dot_r;
+	short dot_w, dot_h, gap_x, gap_y;
+	short dx, dy;
+	short col_idx, row_idx;
+	/* Bit positions: [row][col] */
+	static const unsigned char bit_pos[4][2] = {
+		{ 0, 3 }, { 1, 4 }, { 2, 5 }, { 6, 7 }
+	};
+
+	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
+
+	/* Inverse: paint cell black, draw dots in white */
+	if (attr & ATTR_INVERSE) {
+		PaintRect(&cell_r);
+		PenMode(patBic);
+	}
+
+	/* Compute dot dimensions (scale with font) */
+	dot_w = g_cell_width / 4;
+	dot_h = g_cell_height / 6;
+	if (dot_w < 1) dot_w = 1;
+	if (dot_h < 1) dot_h = 1;
+
+	/* Bold: slightly larger dots */
+	if (attr & ATTR_BOLD) {
+		if (dot_w < g_cell_width / 3)
+			dot_w++;
+		if (dot_h < g_cell_height / 5)
+			dot_h++;
+	}
+
+	/* Spacing between dot centers */
+	gap_x = g_cell_width / 2;
+	gap_y = g_cell_height / 4;
+
+	/* Draw dots */
+	for (row_idx = 0; row_idx < 4; row_idx++) {
+		for (col_idx = 0; col_idx < 2; col_idx++) {
+			if (!(pattern & (1 << bit_pos[row_idx][col_idx])))
+				continue;
+
+			dx = x + (g_cell_width / 4) + col_idx * gap_x
+			    - dot_w / 2;
+			dy = y + (g_cell_height / 8) + row_idx * gap_y
+			    - dot_h / 2;
+
+			SetRect(&dot_r, dx, dy, dx + dot_w, dy + dot_h);
+			PaintRect(&dot_r);
+		}
+	}
+
+	if (attr & ATTR_INVERSE)
+		PenMode(patCopy);
 	PenNormal();
 }
 
