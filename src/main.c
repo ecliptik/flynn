@@ -163,6 +163,7 @@ init_menus(void)
 	}
 
 	SetMenuBar(mbar);
+	DisposeHandle(mbar);
 
 	apple_menu = GetMenuHandle(APPLE_MENU_ID);
 	if (apple_menu)
@@ -285,7 +286,7 @@ main_event_loop(void)
 	short prev_state;
 
 	while (running) {
-		wait_ticks = 1L;
+		wait_ticks = (conn.state == CONN_STATE_CONNECTED) ? 1L : 30L;
 		WaitNextEvent(everyEvent, &event, wait_ticks, 0L);
 
 		switch (event.what) {
@@ -326,8 +327,8 @@ main_event_loop(void)
 			}
 
 			if (conn.read_len > 0) {
-				unsigned char out_buf[TCP_READ_BUFSIZ];
-				unsigned char send_buf[TCP_READ_BUFSIZ];
+				static unsigned char out_buf[TCP_READ_BUFSIZ];
+				static unsigned char send_buf[TCP_READ_BUFSIZ];
 				short out_len = 0, send_len = 0;
 
 				telnet_process(&telnet,
@@ -372,6 +373,7 @@ main_event_loop(void)
 							    "Flynn - %s",
 							    terminal.
 							    window_title);
+							if (tl > 254) tl = 254;
 							pt[0] = tl;
 							for (ti = 0;
 							    ti < tl; ti++)
@@ -429,6 +431,10 @@ main_event_loop(void)
 		}
 	}
 
+	if (grow_clip_rgn)
+		DisposeRgn(grow_clip_rgn);
+	if (term_window)
+		DisposeWindow(term_window);
 	ExitToShell();
 }
 
@@ -792,6 +798,7 @@ handle_update(EventRecord *event)
 			    terminal.window_title);
 		else
 			len = sprintf(title, "Flynn - %s", conn.host);
+		if (len > 254) len = 254;
 		ptitle[0] = len;
 		for (i = 0; i < len; i++)
 			ptitle[i + 1] = title[i];
@@ -1025,11 +1032,15 @@ do_connect(void)
 {
 	/* Pre-fill from saved prefs */
 	if (!conn.host[0] && prefs.host[0]) {
-		strcpy(conn.host, prefs.host);
+		strncpy(conn.host, prefs.host, sizeof(conn.host) - 1);
+		conn.host[sizeof(conn.host) - 1] = '\0';
 		conn.port = prefs.port;
 	}
-	if (!conn.username[0] && prefs.username[0])
-		strcpy(conn.username, prefs.username);
+	if (!conn.username[0] && prefs.username[0]) {
+		strncpy(conn.username, prefs.username,
+		    sizeof(conn.username) - 1);
+		conn.username[sizeof(conn.username) - 1] = '\0';
+	}
 
 	if (conn_open_dialog(&conn)) {
 		telnet_init(&telnet);
@@ -1037,9 +1048,12 @@ do_connect(void)
 		terminal_reset(&terminal);
 
 		/* Save last-used host/port/username */
-		strcpy(prefs.host, conn.host);
+		strncpy(prefs.host, conn.host, sizeof(prefs.host) - 1);
+		prefs.host[sizeof(prefs.host) - 1] = '\0';
 		prefs.port = conn.port;
-		strcpy(prefs.username, conn.username);
+		strncpy(prefs.username, conn.username,
+		    sizeof(prefs.username) - 1);
+		prefs.username[sizeof(prefs.username) - 1] = '\0';
 		prefs_save(&prefs);
 
 		/* Auto-send username after connect */
@@ -1068,7 +1082,8 @@ do_connect_bookmark(short index)
 		telnet.preferred_ttype = prefs.terminal_type;
 		terminal_reset(&terminal);
 
-		strcpy(prefs.host, conn.host);
+		strncpy(prefs.host, conn.host, sizeof(prefs.host) - 1);
+		prefs.host[sizeof(prefs.host) - 1] = '\0';
 		prefs.port = conn.port;
 		prefs_save(&prefs);
 	}
