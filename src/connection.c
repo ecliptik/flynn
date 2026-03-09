@@ -282,6 +282,10 @@ conn_connect(Connection *conn, const char *host, short port)
 	return true;
 }
 
+/* Idle polling skip counter — reduces _TCPStatus calls when no data available.
+ * File-scope so conn_close() can reset it on disconnect. */
+static short conn_idle_skip = 0;
+
 void
 conn_idle(Connection *conn)
 {
@@ -292,8 +296,14 @@ conn_idle(Connection *conn)
 	if (conn->state != CONN_STATE_CONNECTED)
 		return;
 
+	if (conn_idle_skip > 0) {
+		conn_idle_skip--;
+		return;  /* skip this poll */
+	}
+
 	err = _TCPStatus(&conn->pb, conn->stream, &status, 0L, 0L, false);
 	if (err != noErr) {
+		conn_idle_skip = 0;
 		conn_close(conn);
 		return;
 	}
@@ -301,12 +311,16 @@ conn_idle(Connection *conn)
 	/* Check if connection was closed by remote */
 	if (status.connectionState == 14) {
 		/* TIME_WAIT - remote closed */
+		conn_idle_skip = 0;
 		conn_close(conn);
 		return;
 	}
 
-	if (status.amtUnreadData == 0)
+	if (status.amtUnreadData == 0) {
+		conn_idle_skip = 2;  /* skip next 2 idle calls (~33ms at 60Hz) */
 		return;
+	}
+	conn_idle_skip = 0;  /* reset when data is available */
 
 	/* Read available data */
 	len = status.amtUnreadData;
@@ -328,6 +342,8 @@ conn_close(Connection *conn)
 {
 	if (conn->state == CONN_STATE_IDLE)
 		return;
+
+	conn_idle_skip = 0;  /* reset polling skip on disconnect */
 
 	conn->state = CONN_STATE_CLOSING;
 
@@ -365,6 +381,9 @@ void
 conn_status_str(Connection *conn, char *buf, short buflen)
 {
 	char ip_str[16];
+
+	if (buflen <= 0)
+		return;
 
 	switch (conn->state) {
 	case CONN_STATE_IDLE:

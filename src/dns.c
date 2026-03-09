@@ -207,7 +207,11 @@ dns_resolve(const char *hostname, ip_addr *ip, ip_addr dns_server)
 	OSErr err;
 	short result, retry;
 
-	txn_id = (unsigned short)(TickCount() & 0xFFFF);
+	{
+		unsigned long secs;
+		ReadDateTime(&secs);
+		txn_id = (unsigned short)((TickCount() ^ secs ^ (unsigned long)&txn_id) & 0xFFFF);
+	}
 
 	query_len = dns_build_query(hostname, query, sizeof(query), txn_id);
 	if (query_len == 0)
@@ -250,6 +254,15 @@ dns_resolve(const char *hostname, ip_addr *ip, ip_addr dns_server)
 		if (err != noErr) {
 			result = DNS_ERR_NETWORK;
 			break;
+		}
+
+		/* Validate response came from expected DNS server */
+		if (pb.csParam.receive.remoteHost != dns_server ||
+		    pb.csParam.receive.remotePort != DNS_PORT) {
+			/* Response from unexpected source, ignore */
+			_UDPBfrReturn(&pb, stream, pb.csParam.receive.rcvBuff,
+			    0L, 0L, false);
+			continue;
 		}
 
 		/* Parse the response */

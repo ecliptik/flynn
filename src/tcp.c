@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <OSUtils.h>
 #include "tcp.h"
 
 #define RCV_BUFFER_SIZE 1024
@@ -366,10 +367,10 @@ _TCPStatus(TCPiopb *pb, StreamPtr stream, struct TCPStatusPB *status,
 {
 	OSErr osErr;
 
+	memset(pb, 0, sizeof(*pb));
+
 	pb->ioCompletion = ioCompletion;
 	pb->ioResult = 1;
-	pb->ioNamePtr = 0;
-	pb->ioVRefNum = 0;
 	pb->ioCRefNum = gIPPDriverRefNum;
 	pb->csCode = TCPStatus;
 	pb->tcpStream = stream;
@@ -625,16 +626,23 @@ SOCKS5TCPActiveOpen(TCPiopb *pb, StreamPtr stream, ip_addr socks_ip,
 	err = _TCPSend(pb, stream, wds, nil, nil, false);
 	if (err)
 		goto fail;
-	
-	for (;;) {
-		err = _TCPStatus(pb, stream, &status_pb, nil, nil, false);
-		if (err != noErr)
-			goto fail;
-		
-		if (status_pb.amtUnreadData >= 2)
-			break;
+
+	{
+		unsigned long deadline = TickCount() + 1800;  /* 30 second timeout */
+		for (;;) {
+			if (TickCount() > deadline) {
+				err = -1;  /* timeout */
+				goto fail;
+			}
+			err = _TCPStatus(pb, stream, &status_pb, nil, nil, false);
+			if (err != noErr)
+				goto fail;
+
+			if (status_pb.amtUnreadData >= 2)
+				break;
+		}
 	}
-	
+
 	len = 2;
 	err = _TCPRcv(pb, stream, (Ptr)&data, &len, nil, nil, false);
 	if (err != noErr)
@@ -662,13 +670,20 @@ SOCKS5TCPActiveOpen(TCPiopb *pb, StreamPtr stream, ip_addr socks_ip,
 	if (err)
 		goto fail;
 
-	for (;;) {
-		err = _TCPStatus(pb, stream, &status_pb, nil, nil, false);
-		if (err != noErr)
-			goto fail;
-		
-		if (status_pb.amtUnreadData >= 7)
-			break;
+	{
+		unsigned long deadline = TickCount() + 1800;  /* 30 second timeout */
+		for (;;) {
+			if (TickCount() > deadline) {
+				err = -1;  /* timeout */
+				goto fail;
+			}
+			err = _TCPStatus(pb, stream, &status_pb, nil, nil, false);
+			if (err != noErr)
+				goto fail;
+
+			if (status_pb.amtUnreadData >= 7)
+				break;
+		}
 	}
 	
 	len = status_pb.amtUnreadData;

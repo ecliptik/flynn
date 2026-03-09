@@ -31,6 +31,7 @@
  */
 
 #include <string.h>
+#include <Memory.h>
 #include "telnet.h"
 
 /* Maximum send buffer size (must match caller's buffer) */
@@ -355,23 +356,41 @@ telnet_process(TelnetState *ts, unsigned char *in, short inlen,
 {
 	short n;
 	unsigned char c;
+	short run_start = -1;  /* P5: start of current normal-byte run, or -1 */
 
 	for (n = 0; n < inlen; n++) {
 		c = in[n];
 
 		switch (ts->state) {
 		case TELNET_STATE_NORMAL:
-			if (c == IAC)
+			if (c == IAC) {
+				/* Flush any pending run of normal bytes */
+				if (run_start >= 0) {
+					short run_len = n - run_start;
+					/* S2: out buffer bounded by input length */
+					if (*outlen + run_len > inlen)
+						run_len = inlen - *outlen;
+					if (run_len > 0) {
+						BlockMoveData(in + run_start, out + *outlen, run_len);
+						*outlen += run_len;
+					}
+					run_start = -1;
+				}
 				ts->state = TELNET_STATE_IAC;
-			else
-				out[(*outlen)++] = c;
+			} else {
+				/* Start or continue a run of normal bytes */
+				if (run_start < 0)
+					run_start = n;
+			}
 			break;
 
 		case TELNET_STATE_IAC:
 			switch (c) {
 			case IAC:
 				/* Escaped 0xFF -- pass through as data */
-				out[(*outlen)++] = c;
+				/* S2: out buffer bounded by input length */
+				if (*outlen < inlen)
+					out[(*outlen)++] = c;
 				ts->state = TELNET_STATE_NORMAL;
 				break;
 			case NOP:
@@ -474,6 +493,18 @@ telnet_process(TelnetState *ts, unsigned char *in, short inlen,
 				n--;
 			}
 			break;
+		}
+	}
+
+	/* P5: Flush any remaining run of normal bytes after the loop */
+	if (run_start >= 0) {
+		short run_len = inlen - run_start;
+		/* S2: out buffer bounded by input length */
+		if (*outlen + run_len > inlen)
+			run_len = inlen - *outlen;
+		if (run_len > 0) {
+			BlockMoveData(in + run_start, out + *outlen, run_len);
+			*outlen += run_len;
 		}
 	}
 }
