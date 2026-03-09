@@ -7,7 +7,7 @@
 #include "Processes.r"
 
 resource 'MBAR' (128) {
-	{ 128, 129, 130, 131, 133, 132 }
+	{ 128, 129, 130, 131, 132, 133 }
 };
 
 resource 'MENU' (128, "Apple") {
@@ -43,8 +43,8 @@ resource 'MENU' (130, "Edit") {
 	}
 };
 
-resource 'MENU' (131, "Preferences") {
-	131, textMenuProc, allEnabled, enabled, "Preferences",
+resource 'MENU' (131, "Options") {
+	131, textMenuProc, allEnabled, enabled, "Options",
 	{
 		"Fonts", noIcon, noKey, noMark, plain;
 		"  Monaco 9", noIcon, noKey, noMark, plain;

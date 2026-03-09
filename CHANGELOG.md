@@ -15,6 +15,9 @@ All notable changes to this project will be documented in this file.
 - Live session bookmark indices fixed on bookmark deletion (invalidate or shift)
 
 ### Changed
+- Preferences menu renamed to Options (shorter, period-appropriate)
+- Menu bar order: File, Edit, Options, Control, Window (Window moved to end
+  per Mac Human Interface Guidelines)
 - Control menu: Ctrl keys grouped alphabetically (C, D, L, Z), then Break and
   Escape below a separator, also alphabetical
 - Send Escape now shows Cmd+. keyboard shortcut in the Control menu
