@@ -40,12 +40,28 @@ static const GlyphMapping glyph_map[] = {
 	{ 0x2217, GLYPH_ASTERISK_OP },
 	{ 0x22EE, GLYPH_ELLIPSIS_V },
 	{ 0x23F5, GLYPH_PLAY },
+	/* Box drawing - light lines */
+	{ 0x2500, GLYPH_BOX_H },
+	{ 0x2502, GLYPH_BOX_V },
+	{ 0x250C, GLYPH_BOX_DR },
+	{ 0x2510, GLYPH_BOX_DL },
+	{ 0x2514, GLYPH_BOX_UR },
+	{ 0x2518, GLYPH_BOX_UL },
+	{ 0x251C, GLYPH_BOX_VR },
+	{ 0x2524, GLYPH_BOX_VL },
+	{ 0x252C, GLYPH_BOX_DH },
+	{ 0x2534, GLYPH_BOX_UH },
+	{ 0x253C, GLYPH_BOX_VH },
 	/* Block elements */
 	{ 0x2580, GLYPH_BLOCK_UPPER },
 	{ 0x2584, GLYPH_BLOCK_LOWER },
 	{ 0x2588, GLYPH_BLOCK_FULL },
 	{ 0x258C, GLYPH_BLOCK_LEFT },
 	{ 0x2590, GLYPH_BLOCK_RIGHT },
+	/* Shade characters */
+	{ 0x2591, GLYPH_SHADE_LIGHT },
+	{ 0x2592, GLYPH_SHADE_MEDIUM },
+	{ 0x2593, GLYPH_SHADE_DARK },
 	/* Quadrants */
 	{ 0x2596, GLYPH_QUAD_LL },
 	{ 0x2597, GLYPH_QUAD_LR },
@@ -170,25 +186,41 @@ static const GlyphInfo prim_info[] = {
 	/* 0x30 SQ_SM_FILLED */  { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
 	/* 0x31 SQ_SM_EMPTY */   { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
 	/* 0x32 DOT_MIDDLE */    { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
+	/* Box drawing */
+	/* 0x33 BOX_H */           { GLYPH_CAT_PRIMITIVE, 0, '-', 0 },
+	/* 0x34 BOX_V */           { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0x35 BOX_DR */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x36 BOX_DL */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x37 BOX_UR */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x38 BOX_UL */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x39 BOX_VR */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x3A BOX_VL */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x3B BOX_DH */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x3C BOX_UH */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x3D BOX_VH */          { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* Shades */
+	/* 0x3E SHADE_LIGHT */     { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
+	/* 0x3F SHADE_MEDIUM */    { GLYPH_CAT_PRIMITIVE, 0, ':', 0 },
+	/* 0x40 SHADE_DARK */      { GLYPH_CAT_PRIMITIVE, 0, '#', 0 },
 };
 
 /* Emoji glyphs: wide (2-cell), drawn with CopyBits */
 static const GlyphInfo emoji_info[] = {
-	/* 0x40 GRIN */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, ':', 0 },
-	/* 0x41 HEART */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, '<', 0 },
-	/* 0x42 THUMBSUP */      { GLYPH_CAT_EMOJI, GLYPH_WIDE, '+', 0 },
-	/* 0x43 FIRE */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
-	/* 0x44 STAR */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
-	/* 0x45 CHECK */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'Y', 0 },
-	/* 0x46 CROSSMARK */     { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'X', 0 },
-	/* 0x47 ROCKET */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '^', 0 },
-	/* 0x48 FOLDER */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'F', 0 },
-	/* 0x49 BULB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '!', 0 },
-	/* 0x4A GLOBE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'O', 0 },
-	/* 0x4B WRENCH */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '/', 0 },
-	/* 0x4C PACKAGE */       { GLYPH_CAT_EMOJI, GLYPH_WIDE, '#', 0 },
-	/* 0x4D SNAKE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'S', 0 },
-	/* 0x4E CRAB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'V', 0 },
+	/* 0x60 GRIN */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, ':', 0 },
+	/* 0x61 HEART */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, '<', 0 },
+	/* 0x62 THUMBSUP */      { GLYPH_CAT_EMOJI, GLYPH_WIDE, '+', 0 },
+	/* 0x63 FIRE */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
+	/* 0x64 STAR */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
+	/* 0x65 CHECK */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'Y', 0 },
+	/* 0x66 CROSSMARK */     { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'X', 0 },
+	/* 0x67 ROCKET */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '^', 0 },
+	/* 0x68 FOLDER */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'F', 0 },
+	/* 0x69 BULB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '!', 0 },
+	/* 0x6A GLOBE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'O', 0 },
+	/* 0x6B WRENCH */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '/', 0 },
+	/* 0x6C PACKAGE */       { GLYPH_CAT_EMOJI, GLYPH_WIDE, '#', 0 },
+	/* 0x6D SNAKE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'S', 0 },
+	/* 0x6E CRAB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'V', 0 },
 };
 
 /* ----------------------------------------------------------------
@@ -411,23 +443,23 @@ static const unsigned char bmp_crab[] = {
 	0x00, 0x00,
 };
 
-/* Bitmap table: indexed by (glyph_id - 0x40) */
+/* Bitmap table: indexed by (glyph_id - GLYPH_EMOJI_BASE) */
 static const GlyphBitmap emoji_bitmaps[] = {
-	{ 10, 10, 2, bmp_grin },	/* 0x40 */
-	{ 10, 10, 2, bmp_heart },	/* 0x41 */
-	{ 10, 10, 2, bmp_thumbsup },	/* 0x42 */
-	{ 10, 10, 2, bmp_fire },	/* 0x43 */
-	{ 10, 10, 2, bmp_star },	/* 0x44 */
-	{ 10, 10, 2, bmp_check },	/* 0x45 */
-	{ 10, 10, 2, bmp_crossmark },	/* 0x46 */
-	{ 10, 10, 2, bmp_rocket },	/* 0x47 */
-	{ 10, 10, 2, bmp_folder },	/* 0x48 */
-	{ 10, 10, 2, bmp_bulb },	/* 0x49 */
-	{ 10, 10, 2, bmp_globe },	/* 0x4A */
-	{ 10, 10, 2, bmp_wrench },	/* 0x4B */
-	{ 10, 10, 2, bmp_package },	/* 0x4C */
-	{ 10, 10, 2, bmp_snake },	/* 0x4D */
-	{ 10, 10, 2, bmp_crab },	/* 0x4E */
+	{ 10, 10, 2, bmp_grin },	/* 0x60 */
+	{ 10, 10, 2, bmp_heart },	/* 0x61 */
+	{ 10, 10, 2, bmp_thumbsup },	/* 0x62 */
+	{ 10, 10, 2, bmp_fire },	/* 0x63 */
+	{ 10, 10, 2, bmp_star },	/* 0x64 */
+	{ 10, 10, 2, bmp_check },	/* 0x65 */
+	{ 10, 10, 2, bmp_crossmark },	/* 0x66 */
+	{ 10, 10, 2, bmp_rocket },	/* 0x67 */
+	{ 10, 10, 2, bmp_folder },	/* 0x68 */
+	{ 10, 10, 2, bmp_bulb },	/* 0x69 */
+	{ 10, 10, 2, bmp_globe },	/* 0x6A */
+	{ 10, 10, 2, bmp_wrench },	/* 0x6B */
+	{ 10, 10, 2, bmp_package },	/* 0x6C */
+	{ 10, 10, 2, bmp_snake },	/* 0x6D */
+	{ 10, 10, 2, bmp_crab },	/* 0x6E */
 };
 
 /* ----------------------------------------------------------------
@@ -437,7 +469,7 @@ static const GlyphBitmap emoji_bitmaps[] = {
 /*
  * glyph_lookup - binary search for codepoint in glyph_map
  *
- * Returns glyph index (0x00-0x5F) or -1 if not found.
+ * Returns glyph index (0x00-0x7F) or -1 if not found.
  * Caller handles braille (U+2800-U+28FF) separately.
  */
 short
@@ -471,8 +503,8 @@ glyph_get_info(unsigned char glyph_id)
 {
 	if (glyph_id < GLYPH_PRIM_COUNT)
 		return &prim_info[glyph_id];
-	if (glyph_id >= 0x40 && glyph_id < 0x40 + GLYPH_EMOJI_COUNT)
-		return &emoji_info[glyph_id - 0x40];
+	if (glyph_id >= GLYPH_EMOJI_BASE && glyph_id < GLYPH_EMOJI_BASE + GLYPH_EMOJI_COUNT)
+		return &emoji_info[glyph_id - GLYPH_EMOJI_BASE];
 	return (const GlyphInfo *)0;
 }
 
@@ -498,7 +530,7 @@ glyph_is_wide(unsigned char glyph_id)
 const GlyphBitmap *
 glyph_get_bitmap(unsigned char glyph_id)
 {
-	if (glyph_id >= 0x40 && glyph_id < 0x40 + GLYPH_EMOJI_COUNT)
-		return &emoji_bitmaps[glyph_id - 0x40];
+	if (glyph_id >= GLYPH_EMOJI_BASE && glyph_id < GLYPH_EMOJI_BASE + GLYPH_EMOJI_COUNT)
+		return &emoji_bitmaps[glyph_id - GLYPH_EMOJI_BASE];
 	return (const GlyphBitmap *)0;
 }

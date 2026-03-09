@@ -263,7 +263,7 @@ draw_row(Terminal *term, short row)
 				gid = (unsigned char)buf[i];
 				if (gid == GLYPH_WIDE_SPACER)
 					continue;	/* skip second cell */
-				if (gid < 0x40) {
+				if (gid < GLYPH_EMOJI_BASE) {
 					draw_glyph_prim(gid,
 					    col_left(run_start + i),
 					    row_top(row), run_attr);
@@ -1004,6 +1004,122 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 		/* Centered dot: small filled circle at cell center */
 		SetRect(&r, cx - 1, cy - 1, cx + 1, cy + 1);
 		PaintOval(&r);
+		break;
+
+	case GLYPH_BOX_H:
+		/* Light horizontal: edge to edge at vertical center */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(x + g_cell_width, cy);
+		break;
+
+	case GLYPH_BOX_V:
+		/* Light vertical: edge to edge at horizontal center */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_DR:
+		/* Down-right corner: center to right, center to bottom */
+		PenSize(1, 1);
+		MoveTo(cx, cy);
+		LineTo(x + g_cell_width, cy);
+		MoveTo(cx, cy);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_DL:
+		/* Down-left corner: left to center, center to bottom */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(cx, cy);
+		MoveTo(cx, cy);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_UR:
+		/* Up-right corner: center to right, top to center */
+		PenSize(1, 1);
+		MoveTo(cx, cy);
+		LineTo(x + g_cell_width, cy);
+		MoveTo(cx, y);
+		LineTo(cx, cy);
+		break;
+
+	case GLYPH_BOX_UL:
+		/* Up-left corner: left to center, top to center */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(cx, cy);
+		MoveTo(cx, y);
+		LineTo(cx, cy);
+		break;
+
+	case GLYPH_BOX_VR:
+		/* Vert + right tee: full vertical, center to right */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, y + g_cell_height);
+		MoveTo(cx, cy);
+		LineTo(x + g_cell_width, cy);
+		break;
+
+	case GLYPH_BOX_VL:
+		/* Vert + left tee: full vertical, left to center */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, y + g_cell_height);
+		MoveTo(x, cy);
+		LineTo(cx, cy);
+		break;
+
+	case GLYPH_BOX_DH:
+		/* Down + horizontal tee: full horizontal, center to bottom */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(x + g_cell_width, cy);
+		MoveTo(cx, cy);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_UH:
+		/* Up + horizontal tee: full horizontal, top to center */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(x + g_cell_width, cy);
+		MoveTo(cx, y);
+		LineTo(cx, cy);
+		break;
+
+	case GLYPH_BOX_VH:
+		/* Cross: full horizontal + full vertical */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(x + g_cell_width, cy);
+		MoveTo(cx, y);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_SHADE_LIGHT:
+		/* Light shade ~25% fill */
+		if (attr & ATTR_INVERSE)
+			FillRect(&cell_r, &qd.dkGray);
+		else
+			FillRect(&cell_r, &qd.ltGray);
+		break;
+
+	case GLYPH_SHADE_MEDIUM:
+		/* Medium shade ~50% fill */
+		FillRect(&cell_r, &qd.gray);
+		break;
+
+	case GLYPH_SHADE_DARK:
+		/* Dark shade ~75% fill */
+		if (attr & ATTR_INVERSE)
+			FillRect(&cell_r, &qd.ltGray);
+		else
+			FillRect(&cell_r, &qd.dkGray);
 		break;
 
 	default:

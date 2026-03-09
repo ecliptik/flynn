@@ -13,17 +13,36 @@ if [ ! -f "$TOOLCHAIN" ]; then
     exit 1
 fi
 
-mkdir -p "$BUILD_DIR"
-cd "$BUILD_DIR"
-cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
-make "$@"
-
 # Read version from CMakeLists.txt
 VERSION=$(grep -oP 'project\(Flynn VERSION \K[0-9]+\.[0-9]+\.[0-9]+' "$SCRIPT_DIR/CMakeLists.txt")
 if [ -z "$VERSION" ]; then
     echo "Warning: Could not read version from CMakeLists.txt, using 'unknown'"
     VERSION="unknown"
 fi
+
+# Compute display version: append short SHA for non-tagged builds
+SHORT_SHA=$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo "")
+GIT_TAG=$(git -C "$SCRIPT_DIR" tag --points-at HEAD 2>/dev/null | grep -x "v${VERSION}" || true)
+if [ -n "$SHORT_SHA" ] && [ -z "$GIT_TAG" ]; then
+    VERSION_DISPLAY="${VERSION}-${SHORT_SHA}"
+else
+    VERSION_DISPLAY="${VERSION}"
+fi
+
+# Stamp version into resource file for About dialog before building
+REZ_FILE="$SCRIPT_DIR/resources/telnet.r"
+REZ_BACKUP="$BUILD_DIR/.telnet.r.bak"
+mkdir -p "$BUILD_DIR"
+cp "$REZ_FILE" "$REZ_BACKUP"
+sed -i "s/\"Version ${VERSION}\"/\"Version ${VERSION_DISPLAY}\"/" "$REZ_FILE"
+
+# Build (restore .r file on exit, even if build fails)
+cleanup() { cp "$REZ_BACKUP" "$REZ_FILE" 2>/dev/null; rm -f "$REZ_BACKUP"; }
+trap cleanup EXIT
+
+cd "$BUILD_DIR"
+cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
+make "$@"
 
 # Fix creator code in MacBinary header (Retro68 sets '????' instead of 'FLYN')
 printf 'FLYN' | dd of="$BUILD_DIR/Flynn.bin" bs=1 seek=69 count=4 conv=notrunc 2>/dev/null
@@ -36,11 +55,11 @@ else
     echo "Note: Install macutils for BinHex output: sudo apt install macutils"
 fi
 
-# Convert About Flynn line endings to Mac CR format
+# Convert About Flynn line endings to Mac CR format, stamping display version
 ABOUT_SRC="$SCRIPT_DIR/docs/About Flynn"
 ABOUT_OUT="$BUILD_DIR/About Flynn"
 if [ -f "$ABOUT_SRC" ]; then
-    tr '\n' '\r' < "$ABOUT_SRC" > "$ABOUT_OUT"
+    sed "s/Version ${VERSION}/Version ${VERSION_DISPLAY}/" "$ABOUT_SRC" | tr '\n' '\r' > "$ABOUT_OUT"
 fi
 
 # Post-process 800K floppy image: set creator code and add About Flynn
@@ -54,14 +73,14 @@ if [ -f "$BUILD_DIR/Flynn.dsk" ]; then
     humount
 fi
 
-# Create versioned copies
-cp "$BUILD_DIR/Flynn.bin" "$BUILD_DIR/Flynn-${VERSION}.bin"
-cp "$BUILD_DIR/Flynn.dsk" "$BUILD_DIR/Flynn-${VERSION}.dsk"
-[ -f "$BUILD_DIR/Flynn.hqx" ] && cp "$BUILD_DIR/Flynn.hqx" "$BUILD_DIR/Flynn-${VERSION}.hqx"
+# Create versioned copies (use display version with SHA for non-tagged builds)
+cp "$BUILD_DIR/Flynn.bin" "$BUILD_DIR/Flynn-${VERSION_DISPLAY}.bin"
+cp "$BUILD_DIR/Flynn.dsk" "$BUILD_DIR/Flynn-${VERSION_DISPLAY}.dsk"
+[ -f "$BUILD_DIR/Flynn.hqx" ] && cp "$BUILD_DIR/Flynn.hqx" "$BUILD_DIR/Flynn-${VERSION_DISPLAY}.hqx"
 
 echo ""
-echo "Build complete (v${VERSION}):"
-ls -la "$BUILD_DIR"/Flynn-${VERSION}.* 2>/dev/null
+echo "Build complete (v${VERSION_DISPLAY}):"
+ls -la "$BUILD_DIR"/Flynn-${VERSION_DISPLAY}.* 2>/dev/null
 [ -f "$ABOUT_OUT" ] && echo "  About Flynn included in disk image"
 
 echo ""

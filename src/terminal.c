@@ -1778,7 +1778,7 @@ term_put_unicode(Terminal *term, long cp)
 		if (glyph_id >= 0) {
 			term_put_glyph(term, (unsigned char)glyph_id,
 			    ATTR_GLYPH);
-			if (cp >= 0x1F000 || glyph_id >= 0x40)
+			if (cp >= 0x1F000 || glyph_id >= GLYPH_EMOJI_BASE)
 				term->last_was_emoji = 1;
 			return;
 		}
