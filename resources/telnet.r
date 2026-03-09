@@ -282,51 +282,51 @@ resource 'DITL' (132, "Edit Bookmark") {
 		Button { enabled, "Cancel" };
 
 		/* 3: Name label */
-		{15, 15, 31, 75},
+		{15, 15, 31, 90},
 		StaticText { disabled, "Name:" };
 
 		/* 4: Name field */
-		{15, 80, 31, 315},
+		{15, 95, 31, 315},
 		EditText { enabled, "" };
 
 		/* 5: Host label */
-		{45, 15, 61, 75},
+		{45, 15, 61, 90},
 		StaticText { disabled, "Host:" };
 
 		/* 6: Host field */
-		{45, 80, 61, 315},
+		{45, 95, 61, 315},
 		EditText { enabled, "" };
 
 		/* 7: Port label */
-		{75, 15, 91, 75},
+		{75, 15, 91, 90},
 		StaticText { disabled, "Port:" };
 
 		/* 8: Port field */
-		{75, 80, 91, 150},
+		{75, 95, 91, 165},
 		EditText { enabled, "23" };
 
 		/* 9: Username label */
-		{105, 15, 121, 85},
+		{105, 15, 121, 90},
 		StaticText { disabled, "Username:" };
 
 		/* 10: Username field */
-		{105, 90, 121, 250},
+		{105, 95, 121, 255},
 		EditText { enabled, "" };
 
 		/* 11: Terminal label */
-		{140, 15, 156, 85},
+		{140, 15, 156, 90},
 		StaticText { disabled, "Terminal:" };
 
 		/* 12: Terminal type button */
-		{140, 90, 160, 200},
+		{138, 95, 158, 205},
 		Button { enabled, "Default" };
 
 		/* 13: Font label */
-		{170, 15, 186, 85},
+		{170, 15, 186, 90},
 		StaticText { disabled, "Font:" };
 
 		/* 14: Font button */
-		{170, 90, 190, 200},
+		{168, 95, 188, 205},
 		Button { enabled, "Default" };
 	}
 };
