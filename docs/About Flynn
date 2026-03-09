@@ -82,10 +82,13 @@ Features
     (vi, nano, less, tmux)
   - 96-line scrollback buffer
   - Mouse text selection with copy and paste
-  - Session bookmarks for one-click connections
+  - Session bookmarks with per-bookmark username,
+    terminal type, and font settings
+  - Recent bookmarks in File menu for quick access
   - Resizable window (drag the grow box to resize)
   - Six font choices: Monaco 9, Monaco 12, Courier
     10, Chicago 12, Geneva 9, Geneva 10
+  - Per-session font and terminal type overrides
   - Terminal type selection: xterm, VT220, VT100
   - Dark mode (white text on black background)
   - Custom DNS server configuration
@@ -93,7 +96,7 @@ Features
   - Control menu for sending Ctrl-C, Ctrl-D, Ctrl-Z,
     Escape, Ctrl-L, and Break without a Ctrl key
   - Multiple simultaneous sessions (up to 4 windows)
-  - Window menu with Close Window and window list
+  - Window menu with session list
   - Keystroke buffering for reliable fast typing
   - Application cursor keys and keypad mode
   - Bracketed paste mode
@@ -218,8 +221,10 @@ buffer, connection state, cursor, and text selection.
   - If connected, you will be asked to confirm.
   - Flynn quits when the last session window closes.
 
-Font changes and dark mode apply to all open
-session windows simultaneously.
+Font and terminal type changes from the Preferences
+menu apply only to the active session window. Dark
+mode applies to all windows. The Preferences menu
+checkmarks update to reflect the active session.
 
 
 Session Bookmarks
@@ -233,13 +238,24 @@ servers you connect to frequently.
      or press Command-B.
   2. Click the "Add" button.
   3. Enter a name, hostname, and port (default 23).
-  4. Click OK.
+  4. Optionally set a username, terminal type,
+     and font for this bookmark.
+  5. Click OK.
+
+  Per-Bookmark Settings:
+  Each bookmark can override the global defaults
+  for username, terminal type, and font. When set
+  to "Default," the global preference is used.
+  These overrides apply only to the session opened
+  from that bookmark, not to other windows.
 
   Connecting via Bookmark:
-  - Your bookmarks appear at the bottom of the
-    File menu. Simply choose one to connect.
-  - You can also select a bookmark in the manager
-    and click "Connect."
+  - Your 5 most recently used bookmarks appear in
+    the File menu under Bookmarks for quick access.
+  - You can also open the Bookmark Manager and
+    click "Connect."
+  - In the Connect dialog, click "Bookmarks" to
+    select a bookmark from a popup menu.
 
   Editing or Deleting:
   - Select a bookmark in the list, then click
