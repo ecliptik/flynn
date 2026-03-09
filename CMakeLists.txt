@@ -22,21 +22,18 @@ target_include_directories(Flynn PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Target 68000 CPU (Mac Plus compatible)
-set_target_properties(Flynn PROPERTIES
-    COMPILE_FLAGS "-m68000"
+# Target 68000 CPU (Mac Plus compatible) and optimize for size
+# -m68000: explicit 68000 targeting (documents intent, implicit in toolchain)
+# -Os: optimize for size (critical for 68000's 16-bit bus, no cache)
+# -ffunction-sections/-fdata-sections: enable dead code/data elimination
+target_compile_options(Flynn PRIVATE
+    -m68000
+    -Os
+    -ffunction-sections
+    -fdata-sections
 )
 
-# Optimize for size
+# Link-time dead code/data elimination via --gc-sections
 set_target_properties(Flynn PROPERTIES
-    COMPILE_OPTIONS -ffunction-sections
+    LINK_FLAGS "-Wl,-gc-sections"
 )
-if(CMAKE_SYSTEM_NAME MATCHES Retro68)
-    set_target_properties(Flynn PROPERTIES
-        LINK_FLAGS "-Wl,-gc-sections"
-    )
-else()
-    set_target_properties(Flynn PROPERTIES
-        LINK_FLAGS "-Wl,-gc-sections"
-    )
-endif()

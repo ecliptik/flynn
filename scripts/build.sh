@@ -45,7 +45,7 @@ cleanup() { cp "$REZ_BACKUP" "$REZ_FILE" 2>/dev/null; rm -f "$REZ_BACKUP"; }
 trap cleanup EXIT
 
 cd "$BUILD_DIR"
-cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
+cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=MinSizeRel
 make "$@"
 
 # Fix creator code in MacBinary header (Retro68 sets '????' instead of 'FLYN')
