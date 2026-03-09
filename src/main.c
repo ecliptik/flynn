@@ -1369,6 +1369,15 @@ static short g_bm_selected = -1;  /* bookmark index selected from popup */
 static pascal Boolean
 connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 {
+	/* Return/Enter key maps to Connect button */
+	if (evt->what == keyDown) {
+		char key = evt->message & charCodeMask;
+		if (key == '\r' || key == '\n' || key == 0x03) {
+			*item = 1;  /* Connect button */
+			return true;
+		}
+	}
+
 	if (evt->what == mouseDown && g_bm_popup) {
 		Point pt;
 		short item_type;
