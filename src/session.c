@@ -38,6 +38,7 @@ session_new(void)
 
 	memset(s, 0, sizeof(Session));
 	s->id = slot;
+	s->bookmark_index = -1;
 
 	/* Initialize components */
 	terminal_init(&s->terminal);

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.2] - 2026-03-09
+
+### Added
+- File > Save as Bookmark (Cmd+S): save current session's connection and settings
+  as a new bookmark, pre-filled from the active session (host, port, username,
+  font, terminal type)
+- Auto-save bookmark settings: when a session launched from a bookmark has its
+  font or terminal type changed via Preferences, those changes are automatically
+  saved back to the originating bookmark
+- Bookmark index tracking per session (bookmark_index field in Session struct)
+- Live session bookmark indices fixed on bookmark deletion (invalidate or shift)
+
 ## [1.5.1] - 2026-03-09
 
 ### Added
