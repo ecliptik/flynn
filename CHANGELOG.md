@@ -18,6 +18,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Menu bar order: File, Edit, Preferences, Window, Control (was Edit before Preferences)
+- File > Close Session (Cmd+W) now disconnects, destroys session, and closes window
+  (replaces old disconnect-only behavior and Window > Close Window)
+- Window menu is now just the dynamic session list (no Close Window item)
+- Closing last session keeps Flynn running (use Quit to exit)
 - Per-session UI state properly saved/loaded on all window switch paths
 
 ## [1.5.0] - 2026-03-09
