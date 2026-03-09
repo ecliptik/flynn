@@ -1588,8 +1588,7 @@ do_connect(void)
 					title[ti + 1] = tmp[ti];
 				SetWTitle(s->window, title);
 			}
-		} else if (s->conn.state == CONN_STATE_IDLE &&
-		    !s->conn.host[0]) {
+		} else if (s->conn.state == CONN_STATE_IDLE) {
 			/* User cancelled — destroy fresh session */
 			if (s == active_session)
 				active_session = 0L;
