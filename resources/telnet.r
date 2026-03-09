@@ -79,10 +79,11 @@ resource 'MENU' (132, "Control") {
 	{
 		"Send Ctrl-C", noIcon, noKey, noMark, plain;
 		"Send Ctrl-D", noIcon, noKey, noMark, plain;
-		"Send Ctrl-Z", noIcon, noKey, noMark, plain;
-		"Send Escape", noIcon, noKey, noMark, plain;
 		"Send Ctrl-L", noIcon, noKey, noMark, plain;
-		"Send Break", noIcon, noKey, noMark, plain
+		"Send Ctrl-Z", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Send Break", noIcon, noKey, noMark, plain;
+		"Send Escape", noIcon, ".", noMark, plain
 	}
 };
 

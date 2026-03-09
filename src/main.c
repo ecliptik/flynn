@@ -293,7 +293,7 @@ update_menus(void)
 	if (ctrl_menu) {
 		short ci;
 
-		for (ci = CTRL_MENU_CTRLC; ci <= CTRL_MENU_BREAK; ci++) {
+		for (ci = CTRL_MENU_CTRLC; ci <= CTRL_MENU_ESC; ci++) {
 			if (connected)
 				EnableItem(ctrl_menu, ci);
 			else
@@ -1214,18 +1214,13 @@ handle_menu(long menu_id)
 				conn_send(&active_session->conn,
 				    &ctrl_byte, 1);
 				break;
-			case CTRL_MENU_CTRLZ:
-				ctrl_byte = 0x1A;
-				conn_send(&active_session->conn,
-				    &ctrl_byte, 1);
-				break;
-			case CTRL_MENU_ESC:
-				ctrl_byte = 0x1B;
-				conn_send(&active_session->conn,
-				    &ctrl_byte, 1);
-				break;
 			case CTRL_MENU_CTRLL:
 				ctrl_byte = 0x0C;
+				conn_send(&active_session->conn,
+				    &ctrl_byte, 1);
+				break;
+			case CTRL_MENU_CTRLZ:
+				ctrl_byte = 0x1A;
 				conn_send(&active_session->conn,
 				    &ctrl_byte, 1);
 				break;
@@ -1238,6 +1233,11 @@ handle_menu(long menu_id)
 				    brk_seq, 2);
 				break;
 			}
+			case CTRL_MENU_ESC:
+				ctrl_byte = 0x1B;
+				conn_send(&active_session->conn,
+				    &ctrl_byte, 1);
+				break;
 			}
 		}
 		break;

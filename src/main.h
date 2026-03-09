@@ -67,10 +67,11 @@
 /* Control menu items */
 #define CTRL_MENU_CTRLC     1
 #define CTRL_MENU_CTRLD     2
-#define CTRL_MENU_CTRLZ     3
-#define CTRL_MENU_ESC       4
-#define CTRL_MENU_CTRLL     5
+#define CTRL_MENU_CTRLL     3
+#define CTRL_MENU_CTRLZ     4
+/* separator = 5 */
 #define CTRL_MENU_BREAK     6
+#define CTRL_MENU_ESC       7
 
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130

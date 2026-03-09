@@ -14,6 +14,11 @@ All notable changes to this project will be documented in this file.
 - Bookmark index tracking per session (bookmark_index field in Session struct)
 - Live session bookmark indices fixed on bookmark deletion (invalidate or shift)
 
+### Changed
+- Control menu: Ctrl keys grouped alphabetically (C, D, L, Z), then Break and
+  Escape below a separator, also alphabetical
+- Send Escape now shows Cmd+. keyboard shortcut in the Control menu
+
 ## [1.5.1] - 2026-03-09
 
 ### Added
