@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.1] - 2026-03-09
+
+### Added
+- Edit > Select All (Cmd+A) to select entire terminal screen for copying
+
+### Fixed
+- Copy always grayed out in Edit menu — update_menus() was not called before
+  MenuSelect()/MenuKey(), which are blocking calls that render with stale state
+- Cross-session copy/paste: selection state destroyed by idle loop cycling
+  load/save through all sessions without saving active session first
+- Selection auto-cleared within 17ms by incoming terminal data, making copy
+  nearly impossible on active connections
+- Copy with no selection copied entire screen — now requires active selection
+
+### Changed
+- Menu bar order: File, Edit, Preferences, Window, Control (was Edit before Preferences)
+- Per-session UI state properly saved/loaded on all window switch paths
+
 ## [1.5.0] - 2026-03-09
 
 ### Added
