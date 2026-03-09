@@ -1362,9 +1362,14 @@ do_about(void)
 	DisposeDialog(dlg);
 }
 
+/* Forward declaration for button title helper */
+static void bme_set_btn_title(DialogPtr dlg, short item,
+    const char *text);
+
 /* Bookmark popup menu, shared with dialog filter */
 static MenuHandle g_bm_popup;
 static short g_bm_selected = -1;  /* bookmark index selected from popup */
+static short g_connect_ttype;     /* terminal type selected in connect dialog */
 
 static pascal Boolean
 connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
@@ -1455,6 +1460,23 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 				}
 				SetDialogItemText(item_h, pstr);
 
+				/* Fill terminal type from bookmark */
+				if (bm->terminal_type >= 0)
+					g_connect_ttype =
+					    bm->terminal_type;
+				else
+					g_connect_ttype =
+					    prefs.terminal_type;
+				{
+					char btn_text[32];
+					ttype_to_str(
+					    g_connect_ttype,
+					    btn_text);
+					bme_set_btn_title(dlg,
+					    DLOG_TTYPE_BTN,
+					    btn_text);
+				}
+
 				SelectDialogItemText(dlg,
 				    DLOG_HOST_FIELD, 0, 32767);
 			}
@@ -1529,7 +1551,7 @@ do_connect(void)
 		s->conn.username[sizeof(s->conn.username) - 1] = '\0';
 	}
 
-	s->telnet.preferred_ttype = prefs.terminal_type;
+	g_connect_ttype = prefs.terminal_type;
 
 	/* Show connect dialog with bookmark support */
 	{
@@ -1613,6 +1635,14 @@ do_connect(void)
 			InsertMenu(g_bm_popup, -1);
 		}
 
+		/* Set terminal type button text */
+		{
+			char btn_text[32];
+			ttype_to_str(g_connect_ttype, btn_text);
+			bme_set_btn_title(dlg, DLOG_TTYPE_BTN,
+			    btn_text);
+		}
+
 		ShowWindow(dlg);
 
 		for (;;) {
@@ -1623,6 +1653,19 @@ do_connect(void)
 			if (item_hit == DLOG_CANCEL ||
 			    item_hit == DLOG_OK)
 				break;
+
+			/* Cycle terminal type */
+			if (item_hit == DLOG_TTYPE_BTN) {
+				char btn_text[32];
+				if (g_connect_ttype >= 3)
+					g_connect_ttype = 0;
+				else
+					g_connect_ttype++;
+				ttype_to_str(g_connect_ttype,
+				    btn_text);
+				bme_set_btn_title(dlg,
+				    DLOG_TTYPE_BTN, btn_text);
+			}
 		}
 
 		if (g_bm_popup) {
@@ -1716,15 +1759,9 @@ do_connect(void)
 
 			telnet_init(&s->telnet);
 
-			/* Apply bookmark terminal type,
-			 * fall back to global */
-			if (sel_bm &&
-			    sel_bm->terminal_type >= 0)
-				s->telnet.preferred_ttype =
-				    sel_bm->terminal_type;
-			else
-				s->telnet.preferred_ttype =
-				    prefs.terminal_type;
+			/* Apply terminal type from dialog */
+			s->telnet.preferred_ttype =
+			    g_connect_ttype;
 
 			s->telnet.cols = s->terminal.active_cols;
 			s->telnet.rows = s->terminal.active_rows;

@@ -33,6 +33,8 @@
 #define DLOG_USER_LABEL  8
 #define DLOG_USER_FIELD  9
 #define DLOG_BOOKMARKS   10
+#define DLOG_TTYPE_LABEL 11
+#define DLOG_TTYPE_BTN   12
 
 /* Default port */
 #define DEFAULT_PORT     23

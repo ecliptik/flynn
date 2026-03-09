@@ -87,7 +87,7 @@ resource 'MENU' (132, "Control") {
 
 /* Connection dialog */
 resource 'DLOG' (129, "Connect") {
-	{60, 80, 220, 420},
+	{60, 80, 250, 420},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -99,42 +99,53 @@ resource 'DLOG' (129, "Connect") {
 
 resource 'DITL' (129, "Connect") {
 	{
-		/* OK button */
-		{125, 250, 145, 320},
+		/* 1: OK/Connect button */
+		{155, 250, 175, 320},
 		Button { enabled, "Connect" };
 
-		/* Cancel button */
-		{125, 165, 145, 235},
+		/* 2: Cancel button */
+		{155, 165, 175, 235},
 		Button { enabled, "Cancel" };
 
-		/* Host label + field */
+		/* 3: Host label */
 		{15, 15, 31, 85},
 		StaticText { disabled, "Host:" };
 
+		/* 4: Host field */
 		{15, 90, 31, 325},
 		EditText { enabled, "" };
 
-		/* Port label + field */
+		/* 5: Port label */
 		{45, 15, 61, 85},
 		StaticText { disabled, "Port:" };
 
+		/* 6: Port field */
 		{45, 90, 61, 160},
 		EditText { enabled, "23" };
 
-		/* Info text (unused, kept for DITL item ordering) */
+		/* 7: Info text (unused, kept for DITL item ordering) */
 		{0, 0, 0, 0},
 		StaticText { disabled, "" };
 
-		/* Username label + field */
+		/* 8: Username label */
 		{75, 15, 91, 85},
 		StaticText { disabled, "Username:" };
 
+		/* 9: Username field */
 		{75, 90, 91, 235},
 		EditText { enabled, "" };
 
-		/* Bookmarks button */
-		{125, 15, 145, 145},
+		/* 10: Bookmarks button */
+		{155, 15, 175, 145},
 		Button { enabled, "Bookmarks\311" };
+
+		/* 11: Terminal label */
+		{105, 15, 121, 85},
+		StaticText { disabled, "Terminal:" };
+
+		/* 12: Terminal type button */
+		{103, 90, 123, 235},
+		Button { enabled, "xterm" };
 	}
 };
 
