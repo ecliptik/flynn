@@ -28,6 +28,9 @@
 #include "settings.h"
 #include "glyphs.h"
 
+/* Number of static items in File menu (before dynamic recent bookmarks) */
+#define FILE_MENU_STATIC_ITEMS  4
+
 /* Globals */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
 static MenuHandle window_menu;
@@ -83,6 +86,8 @@ static void init_menus(void);
 static void update_menus(void);
 static void update_window_menu(void);
 static void update_prefs_menu(void);
+static void rebuild_file_menu(void);
+static void add_recent_bookmark(short index);
 static void main_event_loop(void);
 static Boolean handle_menu(long menu_id);
 static void handle_mouse_down(EventRecord *event);
@@ -178,6 +183,7 @@ main(void)
 		SetPort(save_port);
 	}
 
+	rebuild_file_menu();
 	update_menus();
 	update_prefs_menu();
 
@@ -1115,29 +1121,51 @@ handle_menu(long menu_id)
 		case FILE_MENU_BOOKMARKS_ID:
 			do_bookmarks();
 			break;
-		case FILE_MENU_QUIT_ID:
-			if (session_any_connected()) {
-				ParamText(
-				    "\pDisconnect all sessions "
-				    "and quit?",
-				    "\p", "\p", "\p");
-				if (CautionAlert(128, 0L) != 1)
-					break;
-			}
-			/* Destroy all sessions */
-			{
-				short si;
-				Session *sess;
+		default:
+			/* Quit is always last item */
+			if (item == CountMItems(file_menu)) {
+				if (session_any_connected()) {
+					ParamText(
+					    "\pDisconnect all "
+					    "sessions and quit?",
+					    "\p", "\p", "\p");
+					if (CautionAlert(128, 0L)
+					    != 1)
+						break;
+				}
+				{
+					short si;
+					Session *sess;
 
-				for (si = MAX_SESSIONS - 1; si >= 0;
-				    si--) {
-					sess = session_get(si);
-					if (sess)
-						session_destroy(sess);
+					for (si = MAX_SESSIONS - 1;
+					    si >= 0; si--) {
+						sess =
+						    session_get(si);
+						if (sess)
+						    session_destroy(
+						    sess);
+					}
+				}
+				active_session = 0L;
+				running = false;
+			} else if (item > FILE_MENU_STATIC_ITEMS
+			    && prefs.recent_count > 0) {
+				/* Recent bookmark click */
+				short ri = item -
+				    FILE_MENU_STATIC_ITEMS - 1;
+
+				if (ri >= 0 &&
+				    ri < prefs.recent_count) {
+					short bm_idx =
+					    prefs.recent[ri];
+
+					if (bm_idx >= 0 &&
+					    bm_idx <
+					    prefs.bookmark_count)
+						do_connect_bookmark(
+						    bm_idx);
 				}
 			}
-			active_session = 0L;
-			running = false;
 			break;
 		}
 		break;
@@ -1700,6 +1728,11 @@ do_connect(void)
 			    '\0';
 			prefs_save(&prefs);
 
+			/* Track recently used bookmark */
+			if (g_bm_selected >= 0)
+				add_recent_bookmark(
+				    g_bm_selected);
+
 			/* Auto-send username after connect */
 			if (s->conn.username[0]) {
 				conn_send(&s->conn,
@@ -1833,7 +1866,7 @@ do_connect_bookmark(short index)
 		    sizeof(prefs.host) - 1);
 		prefs.host[sizeof(prefs.host) - 1] = '\0';
 		prefs.port = s->conn.port;
-		prefs_save(&prefs);
+		add_recent_bookmark(index);
 
 		/* Auto-send username from bookmark */
 		if (bm->username[0]) {
@@ -2215,20 +2248,35 @@ do_bookmarks(void)
 		}
 
 		if (item_hit == BM_DELETE) {
-			short j;
+			short j, ri, wi, del_idx;
 
 			if (bm_selection < 0 ||
 			    bm_selection >= prefs.bookmark_count) {
 				SysBeep(10);
 				continue;
 			}
-			for (j = bm_selection;
+			del_idx = bm_selection;
+			for (j = del_idx;
 			    j < prefs.bookmark_count - 1; j++)
 				prefs.bookmarks[j] =
 				    prefs.bookmarks[j + 1];
 			prefs.bookmark_count--;
 			if (bm_selection >= prefs.bookmark_count)
 				bm_selection = prefs.bookmark_count - 1;
+
+			/* Fix recent indices after delete */
+			wi = 0;
+			for (ri = 0; ri < prefs.recent_count;
+			    ri++) {
+				if (prefs.recent[ri] == del_idx)
+					continue; /* removed */
+				if (prefs.recent[ri] > del_idx)
+					prefs.recent[ri]--;
+				prefs.recent[wi++] =
+				    prefs.recent[ri];
+			}
+			prefs.recent_count = wi;
+
 			changed = true;
 			SetPort(dlg);
 			bm_list_draw((WindowPtr)dlg, BM_LIST);
@@ -2249,8 +2297,10 @@ do_bookmarks(void)
 	}
 
 	DisposeDialog(dlg);
-	if (changed)
+	if (changed) {
 		prefs_save(&prefs);
+		rebuild_file_menu();
+	}
 }
 
 static void
@@ -2396,6 +2446,94 @@ update_prefs_menu(void)
 	    ttype == 2);
 	CheckItem(prefs_menu, PREFS_DARK_ID,
 	    prefs.dark_mode != 0);
+}
+
+static void
+rebuild_file_menu(void)
+{
+	short count, i;
+	Str255 item_str;
+	short nlen, ni;
+	const char *name;
+
+	if (!file_menu)
+		return;
+
+	/* Remove all dynamic items (after Bookmarks...) */
+	count = CountMItems(file_menu);
+	while (count > FILE_MENU_STATIC_ITEMS) {
+		DeleteMenuItem(file_menu, count);
+		count--;
+	}
+
+	/* Add indented recent bookmarks under Bookmarks */
+	if (prefs.recent_count > 0) {
+		for (i = 0; i < prefs.recent_count; i++) {
+			short bm_idx = prefs.recent[i];
+
+			if (bm_idx < 0 ||
+			    bm_idx >= prefs.bookmark_count)
+				continue;
+
+			name = prefs.bookmarks[bm_idx].name;
+			nlen = strlen(name);
+			if (nlen > 252) nlen = 252;
+			/* Indent with 2 spaces */
+			item_str[0] = nlen + 2;
+			item_str[1] = ' ';
+			item_str[2] = ' ';
+			for (ni = 0; ni < nlen; ni++)
+				item_str[ni + 3] = name[ni];
+			AppendMenu(file_menu, "\p ");
+			SetMenuItemText(file_menu,
+			    CountMItems(file_menu), item_str);
+		}
+	}
+
+	/* Separator + Quit */
+	AppendMenu(file_menu, "\p(-");
+	AppendMenu(file_menu, "\pQuit/Q");
+}
+
+static void
+add_recent_bookmark(short index)
+{
+	short i, pos;
+
+	if (index < 0 || index >= prefs.bookmark_count)
+		return;
+
+	/* Check if already in recent list */
+	pos = -1;
+	for (i = 0; i < prefs.recent_count; i++) {
+		if (prefs.recent[i] == index) {
+			pos = i;
+			break;
+		}
+	}
+
+	if (pos == 0)
+		return;	/* Already at front */
+
+	/* Remove from current position if found */
+	if (pos > 0) {
+		for (i = pos; i > 0; i--)
+			prefs.recent[i] = prefs.recent[i - 1];
+	} else {
+		/* Not found — shift everything right */
+		short limit = prefs.recent_count;
+
+		if (limit >= MAX_RECENT)
+			limit = MAX_RECENT - 1;
+		for (i = limit; i > 0; i--)
+			prefs.recent[i] = prefs.recent[i - 1];
+		if (prefs.recent_count < MAX_RECENT)
+			prefs.recent_count++;
+	}
+
+	prefs.recent[0] = index;
+	prefs_save(&prefs);
+	rebuild_file_menu();
 }
 
 static void

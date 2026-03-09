@@ -23,9 +23,8 @@ resource 'MENU' (129, "File") {
 		"New Session\311", noIcon, "N", noMark, plain;
 		"Close Session", noIcon, "W", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Bookmarks\311", noIcon, "B", noMark, plain;
-		"-", noIcon, noKey, noMark, plain;
-		"Quit", noIcon, "Q", noMark, plain
+		"Bookmarks\311", noIcon, "B", noMark, plain
+		/* Recent bookmarks + separator + Quit added dynamically */
 	}
 };
 

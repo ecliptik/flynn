@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Edit > Select All (Cmd+A) to select entire terminal screen for copying
+- Per-bookmark settings: username, terminal type, and font saved per bookmark
+- Per-session font and terminal type: bookmark overrides apply only to that session
+- Preferences menu reflects the active session's font and terminal type
+- Recent bookmarks in File menu (up to 5 most recently used), indented under Bookmarks
+- Connect dialog cancel destroys the empty session window
 
 ### Fixed
 - Copy always grayed out in Edit menu — update_menus() was not called before

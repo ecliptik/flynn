@@ -125,6 +125,18 @@ prefs_load(FlynnPrefs *prefs)
 				prefs->bookmarks[i].font_size = 0;
 			}
 		}
+		/* fall through to v7→v8 migration */
+		prefs->version = 7;
+	}
+
+	if (prefs->version == 7) {
+		/* v7→v8 migration: add recent bookmarks */
+		prefs->recent_count = 0;
+		{
+			short i;
+			for (i = 0; i < MAX_RECENT; i++)
+				prefs->recent[i] = -1;
+		}
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

@@ -5,8 +5,9 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	7
+#define PREFS_VERSION	8
 #define MAX_BOOKMARKS	8
+#define MAX_RECENT	5
 
 typedef struct {
 	char		name[32];
@@ -30,6 +31,8 @@ typedef struct {
 	unsigned char	dark_mode;	/* 0=light, 1=dark */
 	char		dns_server[16];	/* IP address, default "1.1.1.1" */
 	char		username[64];	/* auto-login username, empty = disabled */
+	short		recent[MAX_RECENT];	/* recently used bookmark indices */
+	short		recent_count;
 } FlynnPrefs;
 
 /* Load preferences from "Flynn Prefs" file. Returns defaults if not found. */

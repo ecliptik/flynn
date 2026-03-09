@@ -19,13 +19,14 @@
 /* Apple menu items */
 #define APPLE_MENU_ABOUT_ID 1
 
-/* Session menu items */
+/* Session menu items (static base) */
 #define FILE_MENU_CONNECT_ID    1
 #define FILE_MENU_DISCONNECT_ID 2
 /* separator = 3 */
 #define FILE_MENU_BOOKMARKS_ID  4
 /* separator = 5 */
-#define FILE_MENU_QUIT_ID       6
+/* items 6..N are recent bookmarks (dynamic) */
+/* Quit is always last item — use CountMItems() */
 
 /* Edit menu items */
 #define EDIT_MENU_UNDO_ID   1
