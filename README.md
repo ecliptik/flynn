@@ -79,7 +79,7 @@ bash ../Retro68/build-toolchain.bash --no-ppc --no-carbon --prefix=$(pwd)/toolch
 Then build Flynn:
 
 ```bash
-./build.sh
+./scripts/build.sh
 ```
 
 ## Testing

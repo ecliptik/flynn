@@ -30,7 +30,7 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 - Cross-compile on Linux using [Retro68](https://github.com/autc04/Retro68) toolchain
 - Toolchain built from source, installed at `Retro68-build/toolchain/` (in-repo, gitignored)
 - Source cloned at `Retro68/` (in-repo, gitignored)
-- Build: `./build.sh` (configures + makes), or manually: `mkdir build && cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=../Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake && make`
+- Build: `./scripts/build.sh` (configures + makes), or manually: `mkdir build && cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=../Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake && make`
 - CMake flag: `-m68000` for Mac Plus compatibility
 - MacTCP.h is NOT in Retro68's Multiversal Interfaces — copied from wallops-146
 - Retro68 API quirks vs classic Toolbox: `qd.thePort` not `thePort`, `GetMenuHandle` not `GetMHandle`, `AppendResMenu` not `AddResMenu`, `LMGetApplLimit()` not `GetApplLimit`
@@ -40,6 +40,8 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 ### Emulator: Snow (Primary)
 
 [Snow](https://snowemu.com/) v1.3.1, a Rust-based classic Mac emulator with low-level hardware emulation. See `docs/TESTING.md` for complete guide.
+
+**IMPORTANT: Do NOT launch Snow, deploy to disk images, or run any automated testing unless the user explicitly asks. All testing and QA is done by the human driving the session. Only build and deploy when asked and ready to test.**
 
 - **Binary**: `tools/snow/snowemu` (local copy, gitignored)
 - **Workspace**: `diskimages/flynn.snoww` (Mac Plus, 1.5x scale)
@@ -53,7 +55,7 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 
 ### GUI Automation
 
-Snow can be fully automated via X11 for unattended testing. See `docs/SNOW-GUI-AUTOMATION.md` for the complete guide, but should only be automatically tested when the user specifies. 
+Snow can be fully automated via X11 for unattended testing. See `docs/SNOW-GUI-AUTOMATION.md` for the complete guide. **Only run automated GUI tests when the user explicitly requests it.**
 
 - **Window manager**: WindowMaker (`wmaker`) — KDE lacks `_NET_ACTIVE_WINDOW` support
 - **Click method**: `xdotool mousedown 1 && sleep 0.05 && xdotool mouseup 1` (NOT `xdotool click`)

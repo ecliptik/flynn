@@ -8,13 +8,13 @@
 #   - gh auth login (for GitHub)
 #
 # Usage:
-#   ./release.sh              # Release current version from CMakeLists.txt
-#   ./release.sh v0.9.0       # Release a specific tag
-#   ./release.sh --hierarchical # Release current + all prior unreleased tags
+#   ./scripts/release.sh              # Release current version from CMakeLists.txt
+#   ./scripts/release.sh v0.9.0       # Release a specific tag
+#   ./scripts/release.sh --hierarchical # Release current + all prior unreleased tags
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 FORGEJO_URL="${FORGEJO_URL:-https://forgejo.ecliptik.com}"
 FORGEJO_REPO="${FORGEJO_REPO:-ecliptik/flynn}"
 GITHUB_REPO="${GITHUB_REPO:-ecliptik/flynn}"
@@ -158,7 +158,7 @@ do_release() {
 
     if [ ! -f "$dsk" ] && [ ! -f "$hqx" ]; then
         echo "Warning: No artifacts found for $ver (looked for Flynn-${ver}.dsk/.hqx in build/)"
-        echo "  Run ./build.sh first, or artifacts will be skipped"
+        echo "  Run ./scripts/build.sh first, or artifacts will be skipped"
     fi
 
     local name="Flynn $tag"

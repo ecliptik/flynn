@@ -2,7 +2,7 @@
 # Build Flynn for classic Macintosh using Retro68 toolchain
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLCHAIN="$SCRIPT_DIR/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake"
 BUILD_DIR="$SCRIPT_DIR/build"
 

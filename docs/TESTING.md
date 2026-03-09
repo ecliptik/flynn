@@ -236,7 +236,7 @@ Build Flynn, deploy to the HDD image, and boot in Snow:
 
 ```bash
 # 1. Build
-./build.sh
+./scripts/build.sh
 
 # 2. Deploy to HDD image using hfsutils
 hmount diskimages/snow-sys608.img
@@ -252,7 +252,7 @@ Requires `hfsutils` (built from [Distrotech/hfsutils](https://github.com/Distrot
 
 ## Phase 5 Test Results (2026-03-05)
 
-Build: `./build.sh` — clean compile, Flynn.bin = 64KB.
+Build: `./scripts/build.sh` — clean compile, Flynn.bin = 64KB.
 
 ### Automated Test Script
 
@@ -336,7 +336,7 @@ Framebuffer: FB_LEFT=116, FB_TOP=158, SCALE=1.5.
 
 ## Phase 11-14 Test Results (2026-03-06)
 
-Build: `./build.sh` — clean compile. Tested in Snow v1.3.1, Mac Plus, System 6.0.8.
+Build: `./scripts/build.sh` — clean compile. Tested in Snow v1.3.1, Mac Plus, System 6.0.8.
 Test server: telnetd on Linux host, user/password auth.
 
 ### Reusable Test Script
