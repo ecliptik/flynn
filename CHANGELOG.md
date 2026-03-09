@@ -4,11 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [1.1.1] - 2026-03-09
 
+### Added
+- 11 box-drawing primitive glyphs (U+2500-U+253C): ─│┌┐└┘├┤┬┴┼, drawn with edge-to-edge QuickDraw LineTo for seamless tiling
+- 3 shade characters (U+2591-U+2593): ░▒▓, rendered with QuickDraw ltGray/gray/dkGray fill patterns
+- Glyph count: 51 → 65 primitives (15 emoji unchanged)
+
+### Fixed
+- MacBinary II CRC-16 recalculated after creator code patch, fixing "application is busy or damaged" deployment errors
+
 ### Changed
 - Move build.sh and release.sh into scripts/ directory
+- Dev builds use SHA-only naming (Flynn-d724f2b), tagged releases use version-only (Flynn-1.1.1)
+- Replace CRT-filtered screenshots with clean cropped captures
 - Clean up documentation: remove redundant DEVLOG, trim README, consolidate screenshots
 - Mark ROADMAP and AUDIT docs as historical
-- Update .gitignore to exclude *.bin and About_Flynn.txt
 
 ## [1.1.0] - 2026-03-08
 
