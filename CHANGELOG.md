@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-03-09
+
+### Changed
+- Move build.sh and release.sh into scripts/ directory
+- Clean up documentation: remove redundant DEVLOG, trim README, consolidate screenshots
+- Mark ROADMAP and AUDIT docs as historical
+- Update .gitignore to exclude *.bin and About_Flynn.txt
+
 ## [1.1.0] - 2026-03-08
 
 ### Added
