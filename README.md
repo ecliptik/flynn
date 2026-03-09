@@ -11,9 +11,9 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 | | |
 |:---:|:---:|
 | ![Flynn telnet session with neofetch](docs/screenshots/flynn-neofetch.png) | ![Flynn running tmux with split panes](docs/screenshots/flynn-tmux.png) |
-| **Telnet Session** — neofetch over telnet with VT220 emulation | **tmux Split Panes** — box-drawing characters rendered via QuickDraw |
+| **Telnet Session** | **tmux Split Panes** |
 | ![Flynn connect dialog](docs/screenshots/flynn-connect.png) | ![Claude Code running inside Flynn](docs/screenshots/flynn-claudecode.png) |
-| **Connect Dialog** — saved host, port, and username auto-login | **Claude Code via Flynn** — the AI that built Flynn, running inside it |
+| **Connect Dialog** | **Claude Code via Flynn** |
 
 ---
 
@@ -21,28 +21,28 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 
 Pre-built binaries are available on the [Releases](https://github.com/ecliptik/flynn/releases) page, [Macintosh Garden](https://macintoshgarden.org/apps/flynn), and [Macintosh Repository](https://www.macintoshrepository.org/87841-flynn):
 
-- **Flynn-x.y.z.dsk** — 800K floppy disk image with Flynn app and Read Me. Mount in an emulator or write to a real floppy.
-- **Flynn-x.y.z.hqx** — BinHex archive of the Flynn application only. Download via web/BBS and decode with BinHex 4.0 or StuffIt on your Mac.
+- **Flynn-x.y.z.dsk** — 800K floppy disk image
+- **Flynn-x.y.z.hqx** — BinHex archive
 
 No build toolchain required — just download and run.
 
 ## Features
 
-- **VT100/VT220/xterm terminal emulation** — runs vi, nano, tmux, mc, and other full-screen TUI apps over telnet
-- **Box-drawing characters** — DEC Special Graphics rendered natively via QuickDraw for clean tmux panes, mc panels, and dialog borders
-- **Unicode glyph rendering** — 51 QuickDraw-drawn symbols (arrows, shapes, blocks, suits), 15 monochrome bitmap emoji, and braille patterns (U+2800-U+28FF), plus Latin-1/Mac Roman mapping for accented characters and curly quotes
-- **Resizable window** — drag the grow box from 80x24 up to 132x50 cells, with NAWS negotiation
-- **6 fonts** — Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10, including proportional font rendering
-- **Session bookmarks** — save up to 8 hosts with one-click connect from the Session menu
-- **Username auto-login** — sends your username at the login prompt automatically
-- **Mouse text selection** — click-drag, double-click to select words, shift-click to extend, Cmd+C/V for copy/paste
-- **Scrollback** — 96 lines of history, navigate with Cmd+Up/Down
-- **Control menu** — send Ctrl-C, Ctrl-D, Ctrl-Z, Escape, Ctrl-L, and Break without a physical Ctrl key
-- **Keystroke buffering** — batches fast typing into single TCP sends, no character loss
-- **M0110 keyboard support** — Option key as Ctrl, Cmd+. as Escape, Cmd+1-0 for F-keys, designed for the original Mac Plus keyboard
-- **Dark mode** — inverted display option for late-night telnet sessions
-- **Settings persistence** — host, port, bookmarks, font, and preferences saved across launches
-- **4MB Mac Plus** — ~110KB on disk, ~60KB RAM footprint (~1.5% of 4MB). Runs on a Macintosh Plus with System 6.0.8 and MacTCP 2.1. Also compatible with System 7.5.5 and Open Transport
+- **VT100/VT220/xterm terminal emulation**
+- **Box-drawing characters**
+- **Unicode glyph rendering**
+- **Resizable window** (80x24 up to 132x50)
+- **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
+- **Session bookmarks**
+- **Username auto-login**
+- **Mouse text selection**
+- **Scrollback** (96 lines)
+- **Control menu**
+- **Keystroke buffering**
+- **M0110 keyboard support**
+- **Dark mode**
+- **Settings persistence**
+- **4MB Mac Plus** (~110KB on disk, ~60KB RAM)
 
 ## Keyboard Shortcuts
 
@@ -88,11 +88,11 @@ Uses [Snow](https://snowemu.com/) emulator (v1.3.1) with a Mac Plus ROM and Syst
 
 ## Acknowledgments
 
-- **[Claude Code](https://claude.ai/code)** — AI-assisted development by [Anthropic](https://www.anthropic.com/). Flynn was built entirely through agentic AI pair programming.
-- **[Retro68](https://github.com/autc04/Retro68)** by Wolfgang Thaller — the 68k Macintosh cross-compilation toolchain that makes building classic Mac applications on modern Linux possible.
-- **[Snow](https://snowemu.com/)** — a Rust-based classic Macintosh emulator with low-level hardware emulation, DaynaPORT SCSI/Link networking, and BlueSCSI Toolbox support. Used for all development testing.
-- **[wallops](https://github.com/jcs/wallops)** by joshua stein — IRC client for classic Macintosh. MacTCP wrapper (`tcp.c`/`tcp.h`), DNS resolution (`dnr.c`/`dnr.h`), utility functions (`util.c`/`util.h`), and `MacTCP.h` are used directly from this project. ISC license.
-- **[subtext](https://github.com/jcs/subtext)** by joshua stein — BBS server for classic Macintosh. The Telnet IAC protocol implementation (`telnet.c`/`telnet.h`) served as the reference for Flynn's client-side telnet engine. ISC license.
+- **[Claude Code](https://claude.ai/code)** by [Anthropic](https://www.anthropic.com/)
+- **[Retro68](https://github.com/autc04/Retro68)** by Wolfgang Thaller
+- **[Snow](https://snowemu.com/)** emulator
+- **[wallops](https://github.com/jcs/wallops)** by joshua stein — MacTCP wrapper (`tcp.c`/`tcp.h`), DNS resolution (`dnr.c`/`dnr.h`), utility functions (`util.c`/`util.h`), and `MacTCP.h` are used directly from this project. ISC license.
+- **[subtext](https://github.com/jcs/subtext)** by joshua stein — The Telnet IAC protocol implementation (`telnet.c`/`telnet.h`) served as the reference for Flynn's client-side telnet engine. ISC license.
 
 ## License
 
