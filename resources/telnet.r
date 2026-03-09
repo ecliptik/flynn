@@ -100,17 +100,17 @@ resource 'DITL' (129, "Connect") {
 		Button { enabled, "Cancel" };
 
 		/* Host label + field */
-		{15, 15, 31, 75},
-		StaticText { disabled, "Host or IP:" };
+		{15, 15, 31, 85},
+		StaticText { disabled, "Host:" };
 
-		{15, 80, 31, 325},
+		{15, 90, 31, 325},
 		EditText { enabled, "" };
 
 		/* Port label + field */
-		{45, 15, 61, 60},
+		{45, 15, 61, 85},
 		StaticText { disabled, "Port:" };
 
-		{45, 65, 61, 135},
+		{45, 90, 61, 160},
 		EditText { enabled, "23" };
 
 		/* Info text (unused, kept for DITL item ordering) */
