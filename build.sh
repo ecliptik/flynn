@@ -20,11 +20,15 @@ if [ -z "$VERSION" ]; then
     VERSION="unknown"
 fi
 
-# Compute display version: append short SHA for non-tagged builds
+# Compute display version:
+#   Tagged release (v1.1.0 on HEAD) → "1.1.0" / artifacts: Flynn-1.1.0.*
+#   Dev build (no tag)              → "d724f2b" / artifacts: Flynn-d724f2b.*
 SHORT_SHA=$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo "")
 GIT_TAG=$(git -C "$SCRIPT_DIR" tag --points-at HEAD 2>/dev/null | grep -x "v${VERSION}" || true)
-if [ -n "$SHORT_SHA" ] && [ -z "$GIT_TAG" ]; then
-    VERSION_DISPLAY="${VERSION}-${SHORT_SHA}"
+if [ -n "$GIT_TAG" ]; then
+    VERSION_DISPLAY="${VERSION}"
+elif [ -n "$SHORT_SHA" ]; then
+    VERSION_DISPLAY="${SHORT_SHA}"
 else
     VERSION_DISPLAY="${VERSION}"
 fi
@@ -45,7 +49,20 @@ cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN"
 make "$@"
 
 # Fix creator code in MacBinary header (Retro68 sets '????' instead of 'FLYN')
+# Then recalculate MacBinary II CRC-16 (XMODEM) over header bytes 0-123
 printf 'FLYN' | dd of="$BUILD_DIR/Flynn.bin" bs=1 seek=69 count=4 conv=notrunc 2>/dev/null
+python3 -c "
+import struct
+with open('$BUILD_DIR/Flynn.bin', 'r+b') as f:
+    hdr = bytearray(f.read(128))
+    crc = 0
+    for b in hdr[:124]:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021 if crc & 0x8000 else crc << 1) & 0xFFFF
+    f.seek(124)
+    f.write(struct.pack('>H', crc))
+"
 
 # Generate BinHex (.hqx) archive if macutils is available
 if command -v binhex >/dev/null 2>&1; then

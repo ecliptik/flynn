@@ -10,9 +10,9 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 
 | | |
 |:---:|:---:|
-| ![Flynn telnet session with neofetch](docs/screenshots/flynn-neofetch-crt.png) | ![Flynn running tmux with three split panes](docs/screenshots/flynn-tmux-crt.png) |
+| ![Flynn telnet session with neofetch](docs/screenshots/flynn-neofetch.png) | ![Flynn running tmux with split panes](docs/screenshots/flynn-tmux.png) |
 | **Telnet Session** — neofetch over telnet with VT220 emulation | **tmux Split Panes** — box-drawing characters rendered via QuickDraw |
-| ![Flynn connect dialog](docs/screenshots/flynn-connect-crt.png) | ![Claude Code running inside Flynn](docs/screenshots/flynn-claudecode-crt.png) |
+| ![Flynn connect dialog](docs/screenshots/flynn-connect.png) | ![Claude Code running inside Flynn](docs/screenshots/flynn-claudecode.png) |
 | **Connect Dialog** — saved host, port, and username auto-login | **Claude Code via Flynn** — the AI that built Flynn, running inside it |
 
 ---

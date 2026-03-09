@@ -53,7 +53,7 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 
 ### GUI Automation
 
-Snow can be fully automated via X11 for unattended testing. See `docs/SNOW-GUI-AUTOMATION.md` for the complete guide.
+Snow can be fully automated via X11 for unattended testing. See `docs/SNOW-GUI-AUTOMATION.md` for the complete guide, but should only be automatically tested when the user specifies. 
 
 - **Window manager**: WindowMaker (`wmaker`) — KDE lacks `_NET_ACTIVE_WINDOW` support
 - **Click method**: `xdotool mousedown 1 && sleep 0.05 && xdotool mouseup 1` (NOT `xdotool click`)
