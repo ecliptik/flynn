@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.1] - 2026-03-10
+
+### Fixed
+- Add icon family resources (icl4, icl8, ics#, ics4, ics8) for System 7
+  Finder compatibility — custom Flynn icon now displays correctly instead
+  of generic application icon
+
 ## [1.8.0] - 2026-03-10
 
 ### Added
