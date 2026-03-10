@@ -21,6 +21,14 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Remote disconnect preserves terminal screen content (was wiped by terminal_reset)
 - Window repaint after disconnect alert restores terminal content in all modes
+
+### Removed
+- Dead conn_open_dialog() from connection.c
+- 6 unused TCP wrapper functions from tcp.c (~256 lines)
+
+## [1.6.1] - 2026-03-10
+
+### Fixed
 - MacTCP.h: add forward declarations for struct GetAddrParamBlock,
   ICMPParamBlock, TCPiopb, and UDPiopb to eliminate "declared inside
   parameter list" compiler warnings
@@ -29,10 +37,6 @@ All notable changes to this project will be documented in this file.
   function pointers, eliminating all -Wincompatible-pointer-types warnings
 - MacTCP.h: convert from classic Mac CR to Unix LF line endings for
   consistent cross-platform source formatting
-
-### Removed
-- Dead conn_open_dialog() from connection.c
-- 6 unused TCP wrapper functions from tcp.c (~256 lines)
 
 ## [1.6.0] - 2026-03-10
 
