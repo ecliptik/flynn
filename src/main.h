@@ -127,4 +127,7 @@ typedef struct {
 
 #define NUM_FONT_PRESETS 6
 
+/* MultiFinder suspend state */
+extern Boolean g_suspended;
+
 #endif /* MAIN_H */

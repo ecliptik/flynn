@@ -109,6 +109,11 @@ Features
     outlines, Cmd+. cancel, tab field cycling)
   - All preferences saved across launches
   - System 7 Preferences folder support
+  - System 7 enhancements: modern save dialog,
+    Apple Events support, MultiFinder suspend/resume,
+    background disconnect notification, machine type
+    in About dialog (all conditional — System 6
+    behavior unchanged)
 
 
 Keyboard Shortcuts

@@ -12,10 +12,16 @@
 #define kOnSystemDisk	((short)0x8000)
 #endif
 
+/* _GestaltDispatch trap number (0xA0AD) — Retro68 uses _Gestalt */
+#ifndef _GestaltDispatch
+#define _GestaltDispatch _Gestalt
+#endif
+
 TrapType GetTrapType(unsigned long theTrap);
 bool TrapAvailable(unsigned long trap);
 void GetSystemFolder(short *vRefNumP, long *dirIDP);
 void GetSystemSubfolder(OSType folder, bool create, short *vRefNumP,
     long *dirIDP);
+void get_machine_name(char *buf, short buflen);
 
 #endif /* SYSUTIL_H */

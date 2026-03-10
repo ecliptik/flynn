@@ -25,6 +25,7 @@
 #include "glyphs.h"
 #include "dialogs.h"
 #include "macutil.h"
+#include "sysutil.h"
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -199,13 +200,26 @@ do_about(void)
 {
 	DialogPtr dlg;
 	short item;
+	char machine[32];
+	char running_on[48];
+	short item_type;
+	Handle item_h;
+	Rect item_rect;
+	Str255 pstr;
 
 	dlg = GetNewDialog(DLOG_ABOUT_ID, 0L, (WindowPtr)-1L);
 	if (!dlg)
 		return;
 
+	/* Set machine type in item 8 */
+	get_machine_name(machine, sizeof(machine));
+	sprintf(running_on, "Running on %s", machine);
+	c2pstr(pstr, running_on);
+	GetDialogItem(dlg, 4, &item_type, &item_h, &item_rect);
+	SetDialogItemText(item_h, pstr);
+
 	/* Register default button outline */
-	setup_default_button_outline(dlg, 10);
+	setup_default_button_outline(dlg, 7);
 
 	ModalDialog((ModalFilterUPP)std_dlg_filter, &item);
 	DisposeDialog(dlg);

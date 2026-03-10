@@ -158,7 +158,7 @@ resource 'DITL' (129, "Connect") {
 
 /* About dialog */
 resource 'DLOG' (130, "About Flynn") {
-	{80, 100, 315, 400},
+	{80, 100, 230, 400},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -170,44 +170,32 @@ resource 'DLOG' (130, "About Flynn") {
 
 resource 'DITL' (130, "About Flynn") {
 	{
-		/* OK button */
-		{195, 115, 215, 185},
+		/* 1: OK button */
+		{118, 115, 138, 185},
 		Button { enabled, "OK" };
 
-		/* Icon */
+		/* 2: Icon */
 		{10, 15, 42, 47},
 		Icon { disabled, 128 };
 
-		/* App name */
+		/* 3: App name + version */
 		{10, 55, 30, 280},
-		StaticText { disabled, "Flynn" };
+		StaticText { disabled, "Flynn 1.7.1" };
 
-		/* Version */
+		/* 4: Machine type (set at runtime) */
 		{33, 55, 49, 280},
-		StaticText { disabled, "Version 1.7.1" };
+		StaticText { disabled, "" };
 
-		/* Description */
+		/* 5: Copyright */
 		{62, 30, 78, 270},
-		StaticText { disabled, "A Telnet client for classic Macintosh" };
-
-		/* Copyright */
-		{84, 30, 100, 270},
 		StaticText { disabled, "\0xA9 2026 Micheal Waltz" };
 
-		/* Credits */
-		{106, 30, 122, 270},
-		StaticText { disabled, "Built with Claude Code + Retro68" };
-
-		/* Website */
-		{128, 30, 144, 270},
-		StaticText { disabled, "https://www.ecliptik.com" };
-
-		/* GitHub */
-		{148, 30, 164, 270},
+		/* 6: GitHub */
+		{84, 30, 100, 270},
 		StaticText { disabled, "https://github.com/ecliptik/flynn" };
 
-		/* 10: Default button outline (UserItem) */
-		{191, 111, 219, 189},
+		/* 7: Default button outline (UserItem) */
+		{118, 111, 146, 189},
 		UserItem { disabled };
 	}
 };

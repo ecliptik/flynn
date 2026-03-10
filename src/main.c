@@ -34,9 +34,14 @@
 
 /* Globals */
 Boolean running = true;
+Boolean g_suspended = false;
 FlynnPrefs prefs;
 static RgnHandle grow_clip_rgn = 0L;
 Session *active_session = 0L;
+
+/* Notification Manager */
+static NMRec nm_rec;
+static Boolean notification_posted = false;
 
 /* Shared buffers for telnet/terminal processing (static to avoid stack) */
 static unsigned char out_buf[TCP_READ_BUFSIZ];
@@ -44,6 +49,7 @@ static unsigned char send_buf[TCP_READ_BUFSIZ];
 
 /* Forward declarations */
 static void init_toolbox(void);
+static void init_apple_events(void);
 static void main_event_loop(void);
 static void handle_mouse_down(EventRecord *event);
 static void handle_update(EventRecord *event);
@@ -52,10 +58,66 @@ static void session_handle_disconnect(Session *sess);
 static void session_poll_data(Session *sess);
 static void session_update_title(Session *sess);
 
+/*
+ * Apple Events handlers for System 7 compatibility.
+ * Required by Finder to properly launch/quit the app.
+ */
+static pascal OSErr
+ae_open_app(const AppleEvent *evt, AppleEvent *reply, long refcon)
+{
+#pragma unused(evt, reply, refcon)
+	return noErr;
+}
+
+static pascal OSErr
+ae_quit_app(const AppleEvent *evt, AppleEvent *reply, long refcon)
+{
+#pragma unused(evt, reply, refcon)
+	running = false;
+	return noErr;
+}
+
+static pascal OSErr
+ae_open_doc(const AppleEvent *evt, AppleEvent *reply, long refcon)
+{
+#pragma unused(evt, reply, refcon)
+	return errAEEventNotHandled;
+}
+
+static pascal OSErr
+ae_print_doc(const AppleEvent *evt, AppleEvent *reply, long refcon)
+{
+#pragma unused(evt, reply, refcon)
+	return errAEEventNotHandled;
+}
+
+static void
+init_apple_events(void)
+{
+	long resp;
+
+	if (Gestalt(gestaltAppleEventsAttr, &resp) == noErr &&
+	    (resp & 1)) {
+		AEInstallEventHandler(kCoreEventClass,
+		    kAEOpenApplication,
+		    NewAEEventHandlerUPP(ae_open_app), 0L, false);
+		AEInstallEventHandler(kCoreEventClass,
+		    kAEQuitApplication,
+		    NewAEEventHandlerUPP(ae_quit_app), 0L, false);
+		AEInstallEventHandler(kCoreEventClass,
+		    kAEOpenDocuments,
+		    NewAEEventHandlerUPP(ae_open_doc), 0L, false);
+		AEInstallEventHandler(kCoreEventClass,
+		    kAEPrintDocuments,
+		    NewAEEventHandlerUPP(ae_print_doc), 0L, false);
+	}
+}
+
 int
 main(void)
 {
 	init_toolbox();
+	init_apple_events();
 	init_menus();
 
 	/* Load prefs and fast init before showing window */
@@ -135,8 +197,21 @@ session_handle_disconnect(Session *sess)
 
 	term_ui_save_state(&sess->ui);
 
-	/* Show alert only for active session */
-	if (sess == active_session) {
+	/* Show alert or notification depending on foreground/background */
+	if (g_suspended) {
+		/* Post notification to alert user in background */
+		if (!notification_posted) {
+			memset(&nm_rec, 0, sizeof(nm_rec));
+			nm_rec.qType = 8; /* nmType */
+			nm_rec.nmMark = 1;
+			nm_rec.nmSound = (Handle)-1;
+			nm_rec.nmIcon = 0L;
+			nm_rec.nmStr = 0L;
+			nm_rec.nmResp = (ProcPtr)-1;
+			NMInstall(&nm_rec);
+			notification_posted = true;
+		}
+	} else if (sess == active_session) {
 		ParamText(
 		    "\pConnection closed by remote host",
 		    "\p", "\p", "\p");
@@ -217,7 +292,10 @@ main_event_loop(void)
 	long wait_ticks;
 
 	while (running) {
-		wait_ticks = session_any_connected() ? 1L : 30L;
+		if (g_suspended)
+			wait_ticks = 60L;
+		else
+			wait_ticks = session_any_connected() ? 1L : 30L;
 		WaitNextEvent(everyEvent, &event, wait_ticks, 0L);
 
 		switch (event.what) {
@@ -255,8 +333,10 @@ main_event_loop(void)
 				if (sess->conn.read_len > 0)
 					session_poll_data(sess);
 
-				/* Cursor blink only for front session */
+				/* Cursor blink only for front session,
+				 * skip when suspended in background */
 				if (sess == active_session &&
+				    !g_suspended &&
 				    sess->conn.state ==
 				    CONN_STATE_CONNECTED) {
 					GrafPtr save;
@@ -304,9 +384,31 @@ main_event_loop(void)
 			handle_activate(&event);
 			break;
 		case app4Evt:
-			/* MultiFinder suspend/resume - handle later */
+			if (HiWord(event.message) & (1 << 8)) {
+				/* MultiFinder suspend/resume */
+				if (event.message & 1) {
+					/* Resume */
+					g_suspended = false;
+					if (notification_posted) {
+						NMRemove(&nm_rec);
+						notification_posted = false;
+					}
+				} else {
+					/* Suspend */
+					g_suspended = true;
+				}
+			}
+			break;
+		case kHighLevelEvent:
+			AEProcessAppleEvent(&event);
 			break;
 		}
+	}
+
+	/* Remove any pending notification */
+	if (notification_posted) {
+		NMRemove(&nm_rec);
+		notification_posted = false;
 	}
 
 	/* Clean up all sessions before quit */
