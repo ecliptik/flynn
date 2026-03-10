@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.1] - 2026-03-10
+
+### Changed
+- Version bump to 1.9.1 (docs and build metadata only)
+
 ## [1.9.0] - 2026-03-10
 
 ### Added
