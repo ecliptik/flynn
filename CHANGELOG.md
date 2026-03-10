@@ -2,7 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.6.0] - 2026-03-10
+
+### Added
+- Edit > Select All (Cmd+A) to select entire terminal screen for copying
+- Per-bookmark settings: username, terminal type, and font saved per bookmark
+- Per-session font and terminal type: bookmark overrides apply only to that
+  session; Options menu checkmarks reflect the active session
+- Recent bookmarks in File menu (up to 5 most recently used)
+- Save as Bookmark (Cmd+S): save current session as a bookmark, pre-filled
+  from the active connection (host, port, username, font, terminal type)
+- Auto-save bookmark settings: changing font or terminal type via Options
+  menu automatically updates the originating bookmark
+- Default button outlines on all dialogs per Apple HIG (3px FrameRoundRect)
+- Cmd+. (Cancel) keyboard shortcut in all dialogs per Apple HIG
+- Tab key cycles through edit fields in Connect and Edit Bookmark dialogs
+- Connection progress window with status updates (Resolving, Connecting) and
+  watch cursor during DNS/TCP operations
+- Scrollback position indicator on right edge of terminal (rail + thumb)
+- Session count header ("N of 4 Sessions") in Window menu
+- Bookmarks popup in Connect dialog (shows selected name, checkmark)
+- xterm-256color terminal type option
+- Custom Finder icon for "Flynn Preferences" file (ICN# 129, FREF/BNDL)
+- System 7 Preferences folder support: preferences stored in System Folder's
+  Preferences folder on System 7+ (unchanged on System 6)
 
 ### Changed
 - Startup optimization: Connect dialog appears in under 1 second (was 5-6s)
@@ -11,101 +34,40 @@ All notable changes to this project will be documented in this file.
   state updates after dialog
 - Connection status window shows "Connecting to..." for IP addresses instead
   of "Resolving..." (DNS resolution is skipped for direct IPs)
+- Options menu (renamed from Preferences; shorter, period-appropriate)
+- Menu bar order: File, Edit, Options, Control, Window (Window at end per HIG)
+- Control menu: Ctrl keys grouped alphabetically, then Break and Escape
+- File > Close Session (Cmd+W) disconnects, destroys session, and closes
+  window; closing last session keeps Flynn running (use Quit to exit)
+- Window menu is now just the dynamic session list
+- All error alerts use StopAlert, info alerts use NoteAlert per Apple HIG
+- DNS timeout reduced from 15s to 5s per attempt for faster failure feedback
+- Session windows cascade with 30px offset (was 20px)
+- Remote disconnect shows "(disconnected)" in window title bar
+- "Flynn Prefs" renamed to "Flynn Preferences" (matches Apple convention)
+- Preferences I/O uses directory-aware PBH*Sync calls for System 7 compat
 
 ### Fixed
 - MacTCP initialization failure now shows "MacTCP is not available" alert
   instead of silently failing
-
-## [1.6.1] - 2026-03-09
-
-### Added
-- Custom Finder icon for "Flynn Preferences" file: document page with terminal
-  prompt (>_) motif, via ICN# 129 + FREF/BNDL mapping for 'pref' file type
-- System 7 Preferences folder support: on System 7+, "Flynn Preferences" is
-  stored in the Preferences folder inside the System Folder (via FindFolder);
-  on System 6, it remains at the volume root (unchanged behavior)
-
-### Changed
-- "Flynn Prefs" renamed to "Flynn Preferences" (more formal, matches Apple
-  convention, still under 31-char HFS limit)
-- Preferences I/O uses directory-aware PBH*Sync calls (replaces FSOpen/Create/
-  FSDelete) for System 7 Preferences folder compatibility
-
-## [1.6.0] - 2026-03-09
-
-### Added
-- Default button outlines on all dialogs (Connect, About, Bookmarks, Edit
-  Bookmark, DNS Server, Alert) using UserItem draw procs with 3px
-  FrameRoundRect per Apple HIG
-- Cmd+. (Cancel) keyboard shortcut in all dialogs per Apple HIG
-- Tab key cycles through edit fields in Connect and Edit Bookmark dialogs
-- Connection progress window with status updates (Resolving host, Connecting,
-  Connected) and watch cursor during DNS/TCP operations
-- Scrollback position indicator on right edge of terminal (rail line + thumb)
-  visible when scrolled back, with dark mode support
-- Session count header ("N of 4 Sessions") in Window menu
-- Save as Bookmark (Cmd+S): auto-populates name (from window title
-  user@hostname), host, port, username, terminal type, and font from the
-  active session
-- Bookmarks popup in Connect dialog now matches Terminal Type popup style:
-  shows selected bookmark name on button, checkmark on current selection,
-  popup anchored at button top
-
-### Changed
-- All error alerts use StopAlert (stop icon), info alerts use NoteAlert
-  (note icon) per Apple HIG alert guidelines
-- DNS timeout reduced from 15s to 5s per attempt for faster failure feedback
-- Session windows cascade with 30px offset (was 20px)
-- Remote disconnect shows "(disconnected)" in window title bar
-- Bookmarks button in Connect dialog renamed from "Bookmarks..." to
-  "Bookmarks" (popup selector, not action button)
-
-## [1.5.2] - 2026-03-09
-
-### Added
-- File > Save as Bookmark (Cmd+S): save current session's connection and settings
-  as a new bookmark, pre-filled from the active session (host, port, username,
-  font, terminal type)
-- Auto-save bookmark settings: when a session launched from a bookmark has its
-  font or terminal type changed via Preferences, those changes are automatically
-  saved back to the originating bookmark
-- Bookmark index tracking per session (bookmark_index field in Session struct)
-- Live session bookmark indices fixed on bookmark deletion (invalidate or shift)
-
-### Changed
-- Preferences menu renamed to Options (shorter, period-appropriate)
-- Menu bar order: File, Edit, Options, Control, Window (Window moved to end
-  per Mac Human Interface Guidelines)
-- Control menu: Ctrl keys grouped alphabetically (C, D, L, Z), then Break and
-  Escape below a separator, also alphabetical
-- Send Escape now shows Cmd+. keyboard shortcut in the Control menu
-
-## [1.5.1] - 2026-03-09
-
-### Added
-- Edit > Select All (Cmd+A) to select entire terminal screen for copying
-- Per-bookmark settings: username, terminal type, and font saved per bookmark
-- Per-session font and terminal type: bookmark overrides apply only to that session
-- Preferences menu reflects the active session's font and terminal type
-- Recent bookmarks in File menu (up to 5 most recently used), indented under Bookmarks
-- Connect dialog cancel destroys the empty session window
-
-### Fixed
-- Copy always grayed out in Edit menu — update_menus() was not called before
-  MenuSelect()/MenuKey(), which are blocking calls that render with stale state
+- Copy always grayed out in Edit menu (update_menus timing with MenuSelect)
 - Cross-session copy/paste: selection state destroyed by idle loop cycling
-  load/save through all sessions without saving active session first
-- Selection auto-cleared within 17ms by incoming terminal data, making copy
-  nearly impossible on active connections
-- Copy with no selection copied entire screen — now requires active selection
+- Selection auto-cleared within 17ms by incoming data, making copy nearly
+  impossible on active connections
+- Per-session font corruption when opening sessions with different fonts
 
-### Changed
-- Menu bar order: File, Edit, Preferences, Window, Control (was Edit before Preferences)
-- File > Close Session (Cmd+W) now disconnects, destroys session, and closes window
-  (replaces old disconnect-only behavior and Window > Close Window)
-- Window menu is now just the dynamic session list (no Close Window item)
-- Closing last session keeps Flynn running (use Quit to exit)
-- Per-session UI state properly saved/loaded on all window switch paths
+### Security
+- Telnet: reject unknown options before array indexing (prevents opts[-1]
+  memory corruption from malicious servers)
+- Telnet: track and discard overflowed SB subnegotiations
+- Terminal: full UTF-8 validation (overlong, surrogates, invalid codepoints)
+- Terminal: CSI parameter signed overflow check, SGR skip bounds checks
+- Terminal: snprintf for DSR response, null-terminate OSC on all exit paths
+- DNS: cap record counts to 64, limit compression pointer hops to 128
+- Replace strcpy with strncpy+buflen in ttype/font string helpers
+- snprintf in long2ip() to prevent buffer overrun
+- Validate port range 1-65535 in connect dialog
+- Validate DNS server IP on preferences load
 
 ## [1.5.0] - 2026-03-09
 

@@ -68,6 +68,7 @@ Getting Started
 Features
 --------
 
+  - Sub-1-second startup to Connect dialog
   - Client-side Telnet protocol with full IAC
     negotiation (BINARY, ECHO, SGA, TTYPE, NAWS)
   - VT220 terminal emulation with xterm compatibility
@@ -80,16 +81,18 @@ Features
     drawn natively via QuickDraw primitives
   - Alternate screen buffer for full-screen apps
     (vi, nano, less, tmux)
-  - 96-line scrollback buffer
+  - 96-line scrollback buffer with position indicator
   - Mouse text selection with copy and paste
+  - Select All (Cmd+A) for full-screen copy
   - Session bookmarks with per-bookmark username,
     terminal type, and font settings
+  - Save as Bookmark (Cmd+S) from active session
   - Recent bookmarks in File menu for quick access
   - Resizable window (drag the grow box to resize)
   - Six font choices: Monaco 9, Monaco 12, Courier
     10, Chicago 12, Geneva 9, Geneva 10
   - Per-session font and terminal type overrides
-  - Terminal type selection: xterm, VT220, VT100
+  - Terminal type: xterm, VT220, VT100, xterm-256color
   - Dark mode (white text on black background)
   - Custom DNS server configuration
   - Username auto-login
@@ -97,10 +100,14 @@ Features
     Escape, Ctrl-L, and Break without a Ctrl key
   - Multiple simultaneous sessions (up to 4 windows)
   - Window menu with session list
+  - Connection progress window with status updates
   - Keystroke buffering for reliable fast typing
   - Application cursor keys and keypad mode
   - Bracketed paste mode
+  - Apple HIG compliant dialogs (default button
+    outlines, Cmd+. cancel, tab field cycling)
   - All preferences saved across launches
+  - System 7 Preferences folder support
 
 
 Keyboard Shortcuts
@@ -116,7 +123,8 @@ and USB keyboards.
   Command-W       Close active session window
   Command-S       Save as Bookmark
   Command-B       Open Bookmark Manager
-  Command-C       Copy (selection or full screen)
+  Command-A       Select All (entire terminal screen)
+  Command-C       Copy selected text
   Command-V       Paste clipboard to connection
   Command-Q       Quit Flynn
 
@@ -300,9 +308,9 @@ terminal type, networking, and display mode.
   Terminal Type
   ~~~~~~~~~~~~~
   Choose the terminal type reported to the server:
-  xterm (default), VT220, or VT100. This controls
-  which escape sequences the server sends. Changes
-  take effect on the next connection.
+  xterm (default), VT220, VT100, or xterm-256color.
+  This controls which escape sequences the server
+  sends. Changes take effect on the next connection.
 
   Networking
   ~~~~~~~~~~
