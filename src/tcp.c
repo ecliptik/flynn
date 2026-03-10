@@ -585,7 +585,7 @@ void
 long2ip(unsigned long num, char *ip)
 {
 	unsigned char *tmp = (unsigned char *)&num;
-	sprintf(ip, "%d.%d.%d.%d", tmp[0], tmp[1], tmp[2], tmp[3]);
+	snprintf(ip, 16, "%d.%d.%d.%d", tmp[0], tmp[1], tmp[2], tmp[3]);
 }
 
 #define SOCKS_VERSION_SOCKS5 0x5

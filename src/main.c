@@ -160,34 +160,39 @@ static FontPreset font_presets[] = {
 #define NUM_FONT_PRESETS 6
 
 static void
-ttype_to_str(short ttype, char *buf)
+ttype_to_str(short ttype, char *buf, short buflen)
 {
+	const char *str;
 	switch (ttype) {
-	case 0:  strcpy(buf, "xterm"); break;
-	case 1:  strcpy(buf, "VT220"); break;
-	case 2:  strcpy(buf, "VT100"); break;
-	case 3:  strcpy(buf, "xterm-256color"); break;
-	default: strcpy(buf, "Default"); break;
+	case 0:  str = "xterm"; break;
+	case 1:  str = "VT220"; break;
+	case 2:  str = "VT100"; break;
+	case 3:  str = "xterm-256color"; break;
+	default: str = "Default"; break;
 	}
+	strncpy(buf, str, buflen - 1);
+	buf[buflen - 1] = '\0';
 }
 
 static void
-font_to_str(short font_id, short font_size, char *buf)
+font_to_str(short font_id, short font_size, char *buf, short buflen)
 {
 	short i;
 
 	if (font_id == 0 && font_size == 0) {
-		strcpy(buf, "Default");
+		strncpy(buf, "Default", buflen - 1);
+		buf[buflen - 1] = '\0';
 		return;
 	}
 	for (i = 0; i < NUM_FONT_PRESETS; i++) {
 		if (font_presets[i].font_id == font_id &&
 		    font_presets[i].font_size == font_size) {
-			strcpy(buf, font_presets[i].name);
+			strncpy(buf, font_presets[i].name, buflen - 1);
+			buf[buflen - 1] = '\0';
 			return;
 		}
 	}
-	sprintf(buf, "Font %d/%d", font_id, font_size);
+	snprintf(buf, buflen, "Font %d/%d", font_id, font_size);
 }
 
 int
@@ -200,32 +205,14 @@ main(void)
 	prefs_load(&prefs);
 	term_ui_set_dark_mode(prefs.dark_mode);
 
-	/* Initialize font metrics without corrupting WMgr port.
-	 * We use a temporary offscreen port to measure font dimensions.
-	 * Never call term_ui_set_font() on the WMgr port — that
-	 * permanently changes the system font used for menus, title
-	 * bars, and dialogs from Chicago 12 to the terminal font. */
-	{
-		GrafPtr save_port;
-		GrafPort temp_port;
-
-		GetPort(&save_port);
-		OpenPort(&temp_port);
-		term_ui_set_font((WindowPtr)&temp_port,
-		    prefs.font_id, prefs.font_size);
-		ClosePort(&temp_port);
-		SetPort(save_port);
-	}
+	/* Launch directly into connect dialog (before heavy init).
+	 * Font metrics and session creation are deferred until user
+	 * clicks OK. MacTCP init is lazy (first conn_connect call). */
+	do_connect();
 
 	rebuild_file_menu();
 	update_menus();
 	update_prefs_menu();
-
-	/* MacTCP init before first connect */
-	conn_init();
-
-	/* Launch directly into connect dialog */
-	do_connect();
 
 	main_event_loop();
 	return 0;
@@ -1548,7 +1535,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 
 				g_connect_ttype = choice - 1;
 				ttype_to_str(g_connect_ttype,
-				    btn_text);
+				    btn_text, sizeof(btn_text));
 				bme_set_btn_title(dlg,
 				    DLOG_TTYPE_BTN, btn_text);
 			}
@@ -1665,7 +1652,8 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 						char btn_text[32];
 						ttype_to_str(
 						    g_connect_ttype,
-						    btn_text);
+						    btn_text,
+						    sizeof(btn_text));
 						bme_set_btn_title(
 						    dlg,
 						    DLOG_TTYPE_BTN,
@@ -1690,63 +1678,53 @@ static void
 do_connect(void)
 {
 	Session *s = active_session;
+	Boolean need_new_session = false;
+	char prefill_host[128];
+	short prefill_port;
+	char prefill_user[32];
 
-	/* Create session if none exists */
+	/* Determine if we need a new session, but defer creation
+	 * until after the user clicks OK in the dialog */
 	if (!s) {
-		s = session_new();
-		if (!s) {
-			ParamText("\pOut of memory", "\p", "\p", "\p");
-			StopAlert(128, 0L);
-			return;
-		}
-		SetPort(s->window);
-		s->font_id = prefs.font_id;
-		s->font_size = prefs.font_size;
-		term_ui_set_font(s->window, s->font_id, s->font_size);
-		session_save_font(s);
-		term_ui_init(s->window, &s->terminal);
-		term_ui_save_state(&s->ui);
-		s->conn.dns_server = ip2long(prefs.dns_server);
-		if (prefs.dark_mode)
-			PaintRect(&s->window->portRect);
-		active_session = s;
+		need_new_session = true;
+	} else if (s->conn.state == CONN_STATE_CONNECTED) {
+		need_new_session = true;
+		s = 0L;  /* will create after dialog */
 	}
 
-	/* If active session is already connected, create a new one */
-	if (s->conn.state == CONN_STATE_CONNECTED) {
-		s = session_new();
-		if (!s) {
-			ParamText("\pMaximum sessions reached",
-			    "\p", "\p", "\p");
-			StopAlert(128, 0L);
-			update_menus();
-			return;
+	/* Set up pre-fill values from prefs (no session yet) or
+	 * from existing disconnected session */
+	if (need_new_session) {
+		strncpy(prefill_host, prefs.host,
+		    sizeof(prefill_host) - 1);
+		prefill_host[sizeof(prefill_host) - 1] = '\0';
+		prefill_port = prefs.port;
+		strncpy(prefill_user, prefs.username,
+		    sizeof(prefill_user) - 1);
+		prefill_user[sizeof(prefill_user) - 1] = '\0';
+	} else {
+		/* Existing disconnected session — pre-fill from it
+		 * or fall back to prefs */
+		if (s->conn.host[0]) {
+			strncpy(prefill_host, s->conn.host,
+			    sizeof(prefill_host) - 1);
+			prefill_host[sizeof(prefill_host) - 1] = '\0';
+			prefill_port = s->conn.port;
+		} else {
+			strncpy(prefill_host, prefs.host,
+			    sizeof(prefill_host) - 1);
+			prefill_host[sizeof(prefill_host) - 1] = '\0';
+			prefill_port = prefs.port;
 		}
-		SetPort(s->window);
-		s->font_id = prefs.font_id;
-		s->font_size = prefs.font_size;
-		term_ui_set_font(s->window, s->font_id, s->font_size);
-		session_save_font(s);
-		term_ui_init(s->window, &s->terminal);
-		term_ui_save_state(&s->ui);
-		s->conn.dns_server = ip2long(prefs.dns_server);
-		if (prefs.dark_mode)
-			PaintRect(&s->window->portRect);
-		SelectWindow(s->window);
-		active_session = s;
-	}
-
-	/* Pre-fill from saved prefs */
-	if (!s->conn.host[0] && prefs.host[0]) {
-		strncpy(s->conn.host, prefs.host,
-		    sizeof(s->conn.host) - 1);
-		s->conn.host[sizeof(s->conn.host) - 1] = '\0';
-		s->conn.port = prefs.port;
-	}
-	if (!s->conn.username[0] && prefs.username[0]) {
-		strncpy(s->conn.username, prefs.username,
-		    sizeof(s->conn.username) - 1);
-		s->conn.username[sizeof(s->conn.username) - 1] = '\0';
+		if (s->conn.username[0]) {
+			strncpy(prefill_user, s->conn.username,
+			    sizeof(prefill_user) - 1);
+			prefill_user[sizeof(prefill_user) - 1] = '\0';
+		} else {
+			strncpy(prefill_user, prefs.username,
+			    sizeof(prefill_user) - 1);
+			prefill_user[sizeof(prefill_user) - 1] = '\0';
+		}
 	}
 
 	g_connect_ttype = prefs.terminal_type;
@@ -1762,6 +1740,13 @@ do_connect(void)
 		long port_num;
 		short i;
 		Boolean connected = false;
+		char dlg_host[128];
+		short dlg_port;
+		char dlg_user[32];
+
+		dlg_host[0] = '\0';
+		dlg_port = DEFAULT_PORT;
+		dlg_user[0] = '\0';
 
 		dlg = GetNewDialog(DLOG_CONNECT_ID, 0L,
 		    (WindowPtr)-1L);
@@ -1772,29 +1757,30 @@ do_connect(void)
 		}
 
 		/* Pre-fill host */
-		if (s->conn.host[0]) {
+		if (prefill_host[0]) {
 			GetDialogItem(dlg, DLOG_HOST_FIELD,
 			    &item_type, &item_h, &item_rect);
-			pstr[0] = strlen(s->conn.host);
+			pstr[0] = strlen(prefill_host);
 			for (i = 0; i < pstr[0]; i++)
-				pstr[i + 1] = s->conn.host[i];
+				pstr[i + 1] = prefill_host[i];
 			SetDialogItemText(item_h, pstr);
 		}
 		/* Pre-fill port */
-		if (s->conn.port > 0) {
+		if (prefill_port > 0) {
 			GetDialogItem(dlg, DLOG_PORT_FIELD,
 			    &item_type, &item_h, &item_rect);
-			sprintf((char *)&pstr[1], "%d", s->conn.port);
+			sprintf((char *)&pstr[1], "%d",
+			    prefill_port);
 			pstr[0] = strlen((char *)&pstr[1]);
 			SetDialogItemText(item_h, pstr);
 		}
 		/* Pre-fill username */
-		if (s->conn.username[0]) {
+		if (prefill_user[0]) {
 			GetDialogItem(dlg, DLOG_USER_FIELD,
 			    &item_type, &item_h, &item_rect);
-			pstr[0] = strlen(s->conn.username);
+			pstr[0] = strlen(prefill_user);
 			for (i = 0; i < pstr[0]; i++)
-				pstr[i + 1] = s->conn.username[i];
+				pstr[i + 1] = prefill_user[i];
 			SetDialogItemText(item_h, pstr);
 		}
 
@@ -1836,7 +1822,7 @@ do_connect(void)
 		/* Set terminal type button text */
 		{
 			char btn_text[32];
-			ttype_to_str(g_connect_ttype, btn_text);
+			ttype_to_str(g_connect_ttype, btn_text, sizeof(btn_text));
 			bme_set_btn_title(dlg, DLOG_TTYPE_BTN,
 			    btn_text);
 		}
@@ -1866,17 +1852,17 @@ do_connect(void)
 		}
 
 		if (item_hit == DLOG_OK) {
-			/* Extract host */
+			/* Extract host into local buffer */
 			GetDialogItem(dlg, DLOG_HOST_FIELD,
 			    &item_type, &item_h, &item_rect);
 			GetDialogItemText(item_h, pstr);
 			if (pstr[0] > 0) {
 				for (i = 0; i < pstr[0] &&
 				    i < (short)(sizeof(
-				    s->conn.host) - 1); i++)
-					s->conn.host[i] =
+				    dlg_host) - 1); i++)
+					dlg_host[i] =
 					    pstr[i + 1];
-				s->conn.host[i] = '\0';
+				dlg_host[i] = '\0';
 			}
 
 			/* Extract port */
@@ -1886,9 +1872,9 @@ do_connect(void)
 			if (pstr[0] > 0) {
 				pstr[pstr[0] + 1] = '\0';
 				StringToNum(pstr, &port_num);
-				s->conn.port = (short)port_num;
+				dlg_port = (short)port_num;
 			} else {
-				s->conn.port = DEFAULT_PORT;
+				dlg_port = DEFAULT_PORT;
 			}
 
 			/* Extract username */
@@ -1896,25 +1882,90 @@ do_connect(void)
 			    &item_type, &item_h, &item_rect);
 			GetDialogItemText(item_h, pstr);
 			if (pstr[0] > 0 && pstr[0] <
-			    (short)(sizeof(
-			    s->conn.username) - 1)) {
+			    (short)(sizeof(dlg_user) - 1)) {
 				for (i = 0; i < pstr[0]; i++)
-					s->conn.username[i] =
+					dlg_user[i] =
 					    pstr[i + 1];
-				s->conn.username[i] = '\0';
+				dlg_user[i] = '\0';
 			} else {
-				s->conn.username[0] = '\0';
+				dlg_user[0] = '\0';
 			}
 
 			DisposeDialog(dlg);
+
+			/* Now create session if needed (dialog is
+			 * dismissed, so user sees it fast) */
+			if (need_new_session) {
+				/* Ensure font metrics are set before
+				 * session_new() — it uses g_cell_width
+				 * and g_cell_height for window sizing */
+				if (g_cell_width == 0) {
+					GrafPtr save_port;
+					GrafPort temp_port;
+
+					GetPort(&save_port);
+					OpenPort(&temp_port);
+					term_ui_set_font(
+					    (WindowPtr)&temp_port,
+					    prefs.font_id,
+					    prefs.font_size);
+					ClosePort(&temp_port);
+					SetPort(save_port);
+				}
+
+				s = session_new();
+				if (!s) {
+					ParamText(
+					    "\pOut of memory",
+					    "\p", "\p", "\p");
+					StopAlert(128, 0L);
+					update_menus();
+					return;
+				}
+				SetPort(s->window);
+				s->font_id = prefs.font_id;
+				s->font_size = prefs.font_size;
+				term_ui_set_font(s->window,
+				    s->font_id, s->font_size);
+				session_save_font(s);
+				term_ui_init(s->window,
+				    &s->terminal);
+				term_ui_save_state(&s->ui);
+				s->conn.dns_server =
+				    ip2long(prefs.dns_server);
+				if (prefs.dark_mode)
+					PaintRect(
+					    &s->window->portRect);
+				if (active_session &&
+				    active_session->conn.state ==
+				    CONN_STATE_CONNECTED)
+					SelectWindow(s->window);
+				active_session = s;
+			}
+
+			/* Copy dialog values into session */
+			strncpy(s->conn.host, dlg_host,
+			    sizeof(s->conn.host) - 1);
+			s->conn.host[sizeof(s->conn.host) - 1] =
+			    '\0';
+			s->conn.port = dlg_port;
+			strncpy(s->conn.username, dlg_user,
+			    sizeof(s->conn.username) - 1);
+			s->conn.username[
+			    sizeof(s->conn.username) - 1] = '\0';
 
 			if (s->conn.host[0]) {
 				WindowPtr sw;
 				char smsg[80];
 
-				sprintf(smsg,
-				    "Resolving %.40s\311",
-				    s->conn.host);
+				if (ip2long(s->conn.host) != 0)
+					sprintf(smsg,
+					    "Connecting to %.40s\311",
+					    s->conn.host);
+				else
+					sprintf(smsg,
+					    "Resolving %.40s\311",
+					    s->conn.host);
 				sw = conn_status_show(smsg);
 				connected = conn_connect(
 				    &s->conn,
@@ -1924,6 +1975,10 @@ do_connect(void)
 			}
 		} else {
 			DisposeDialog(dlg);
+
+			/* Cancel: destroy session only if we just
+			 * created it (need_new_session was false
+			 * means we reused an existing one) */
 		}
 
 		if (connected) {
@@ -2007,8 +2062,10 @@ do_connect(void)
 					title[ti + 1] = tmp[ti];
 				SetWTitle(s->window, title);
 			}
-		} else if (s->conn.state == CONN_STATE_IDLE) {
-			/* User cancelled — destroy fresh session */
+		} else if (need_new_session && s &&
+		    s->conn.state == CONN_STATE_IDLE) {
+			/* Connect failed or no host — destroy the
+			 * freshly created session */
 			if (s == active_session)
 				active_session = 0L;
 			session_destroy(s);
@@ -2332,7 +2389,7 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 
 				g_bme_ttype = choice - 2;
 				ttype_to_str(g_bme_ttype,
-				    btn_text);
+				    btn_text, sizeof(btn_text));
 				bme_set_btn_title(dlg,
 				    BME_TTYPE_BTN, btn_text);
 			}
@@ -2412,7 +2469,8 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 					    [choice - 2].font_size;
 				}
 				font_to_str(g_bme_font_id,
-				    g_bme_font_size, btn_text);
+				    g_bme_font_size, btn_text,
+				    sizeof(btn_text));
 				bme_set_btn_title(dlg,
 				    BME_FONT_BTN, btn_text);
 			}
@@ -2483,11 +2541,12 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	}
 
 	/* Set terminal type button text */
-	ttype_to_str(g_bme_ttype, btn_text);
+	ttype_to_str(g_bme_ttype, btn_text, sizeof(btn_text));
 	bme_set_btn_title(dlg, BME_TTYPE_BTN, btn_text);
 
 	/* Set font button text */
-	font_to_str(g_bme_font_id, g_bme_font_size, btn_text);
+	font_to_str(g_bme_font_id, g_bme_font_size, btn_text,
+	    sizeof(btn_text));
 	bme_set_btn_title(dlg, BME_FONT_BTN, btn_text);
 
 	/* Register default button outline */

@@ -17,6 +17,7 @@
 #define DNS_RETRY_COUNT    2   /* send attempts */
 #define DNS_TIMEOUT        5   /* seconds per attempt */
 #define DNS_PORT          53
+#define MAX_DNS_RECORDS   64  /* cap qdcount/ancount from response */
 
 /* Header offsets */
 #define HDR_ID         0
@@ -105,13 +106,15 @@ dns_build_query(const char *hostname, unsigned char *pkt, short pktlen,
 static short
 dns_skip_name(const unsigned char *pkt, short pktlen, short offset)
 {
-	while (offset < pktlen) {
+	short hops = 0;
+	while (offset < pktlen && hops < 128) {
 		unsigned char label_len = pkt[offset];
 		if (label_len == 0)
 			return offset + 1;
 		if ((label_len & 0xC0) == 0xC0)
 			return offset + 2;  /* compression pointer */
 		offset += 1 + label_len;
+		hops++;
 	}
 	return -1;
 }
@@ -153,6 +156,12 @@ dns_parse_response(const unsigned char *pkt, short pktlen,
 
 	qdcount = (pkt[HDR_QDCOUNT] << 8) | pkt[HDR_QDCOUNT + 1];
 	ancount = (pkt[HDR_ANCOUNT] << 8) | pkt[HDR_ANCOUNT + 1];
+
+	/* Cap record counts to prevent excessive iteration on malformed packets */
+	if (qdcount > MAX_DNS_RECORDS)
+		qdcount = MAX_DNS_RECORDS;
+	if (ancount > MAX_DNS_RECORDS)
+		ancount = MAX_DNS_RECORDS;
 
 	if (ancount == 0)
 		return DNS_ERR_NXDOMAIN;

@@ -58,7 +58,7 @@ typedef struct {
 	ip_addr     dns_server;	/* DNS server to use for lookups */
 } Connection;
 
-/* Initialize connection subsystem (call once at startup) */
+/* Initialize connection subsystem (no-op, MacTCP lazily initialized on first connect) */
 OSErr conn_init(void);
 
 /* Show connect dialog and initiate connection */

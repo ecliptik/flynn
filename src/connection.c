@@ -90,10 +90,25 @@ conn_status_close(WindowPtr w)
 		DisposeWindow(w);
 }
 
+static Boolean tcp_initialized = false;
+
+static OSErr
+conn_ensure_tcp(void)
+{
+	OSErr err;
+	if (tcp_initialized)
+		return noErr;
+	err = _TCPInit();
+	if (err == noErr)
+		tcp_initialized = true;
+	return err;
+}
+
 OSErr
 conn_init(void)
 {
-	return _TCPInit();
+	/* No-op: MacTCP now lazily initialized on first connect */
+	return noErr;
 }
 
 Boolean
@@ -132,6 +147,7 @@ conn_open_dialog(Connection *conn)
 	}
 	if (conn->port > 0) {
 		GetDialogItem(dlg, DLOG_PORT_FIELD, &item_type, &item_h, &item_rect);
+		/* port_str is Str255 (256 bytes); max port "65535" = 5 chars + null = safe */
 		sprintf((char *)&port_str[1], "%d", conn->port);
 		port_str[0] = strlen((char *)&port_str[1]);
 		SetDialogItemText(item_h, port_str);
@@ -175,9 +191,15 @@ conn_open_dialog(Connection *conn)
 	GetDialogItemText(item_h, port_str);
 	if (port_str[0] > 0) {
 		/* Convert Pascal string to number */
-		port_str[port_str[0] + 1] = '\0';
+		short plen = port_str[0];
+		if (plen > 254)
+			plen = 254;
+		port_str[plen + 1] = '\0';
 		StringToNum(port_str, &port_num);
-		conn->port = (short)port_num;
+		if (port_num > 0 && port_num <= 65535)
+			conn->port = (short)port_num;
+		else
+			conn->port = DEFAULT_PORT;
 	} else {
 		conn->port = DEFAULT_PORT;
 	}
@@ -266,6 +288,16 @@ conn_connect(Connection *conn, const char *host, short port,
 		conn->host[sizeof(conn->host) - 1] = '\0';
 	}
 	conn->port = port;
+
+	/* Lazy MacTCP init on first connect */
+	{
+		OSErr tcp_err = conn_ensure_tcp();
+		if (tcp_err != noErr) {
+			ParamText("\pMacTCP is not available", "\p", "\p", "\p");
+			StopAlert(128, 0L);
+			return false;
+		}
+	}
 
 	/* Validate hostname before attempting resolution */
 	if (!conn_validate_host(conn->host)) {
@@ -405,7 +437,7 @@ conn_idle(Connection *conn)
 	}
 
 	if (status.amtUnreadData == 0) {
-		conn->idle_skip = 2;  /* skip next 2 idle calls (~33ms at 60Hz) */
+		conn->idle_skip = 1;  /* skip next idle call (~17ms at 60Hz) */
 		return;
 	}
 	conn->idle_skip = 0;  /* reset when data is available */

@@ -126,6 +126,7 @@ telnet_init(TelnetState *ts)
 {
 	memset(ts, 0, sizeof(TelnetState));
 	ts->state = TELNET_STATE_NORMAL;
+	ts->sb_overflow = 0;
 	ts->cols = 80;
 	ts->rows = 24;
 }
@@ -140,10 +141,16 @@ handle_will(TelnetState *ts, unsigned char opt, unsigned char *send,
 {
 	short idx;
 
+	idx = opt_index(opt);
+	if (idx < 0) {
+		/* Unsupported option -- reject */
+		send_iac(send, sendlen, DONT, opt);
+		return;
+	}
+
 	switch (opt) {
 	case OPT_ECHO:
 		/* Server will echo for us -- accept */
-		idx = opt_index(opt);
 		if (!(ts->opts[idx] & OPTFLAG_REMOTE)) {
 			send_iac(send, sendlen, DO, opt);
 			ts->opts[idx] |= OPTFLAG_REMOTE;
@@ -152,7 +159,6 @@ handle_will(TelnetState *ts, unsigned char opt, unsigned char *send,
 
 	case OPT_SGA:
 		/* Server will suppress go-ahead -- accept */
-		idx = opt_index(opt);
 		if (!(ts->opts[idx] & OPTFLAG_REMOTE)) {
 			send_iac(send, sendlen, DO, opt);
 			ts->opts[idx] |= OPTFLAG_REMOTE;
@@ -161,7 +167,6 @@ handle_will(TelnetState *ts, unsigned char opt, unsigned char *send,
 
 	case OPT_BINARY:
 		/* Server wants to send binary -- accept */
-		idx = opt_index(opt);
 		if (!(ts->opts[idx] & OPTFLAG_REMOTE)) {
 			send_iac(send, sendlen, DO, opt);
 			ts->opts[idx] |= OPTFLAG_REMOTE;
@@ -169,7 +174,7 @@ handle_will(TelnetState *ts, unsigned char opt, unsigned char *send,
 		break;
 
 	default:
-		/* Reject anything we don't understand */
+		/* Known option but not handled here -- reject */
 		send_iac(send, sendlen, DONT, opt);
 		break;
 	}
@@ -205,10 +210,16 @@ handle_do(TelnetState *ts, unsigned char opt, unsigned char *send,
 {
 	short idx;
 
+	idx = opt_index(opt);
+	if (idx < 0) {
+		/* Unsupported option -- reject */
+		send_iac(send, sendlen, WONT, opt);
+		return;
+	}
+
 	switch (opt) {
 	case OPT_TTYPE:
 		/* We will send terminal type */
-		idx = opt_index(opt);
 		if (!(ts->opts[idx] & OPTFLAG_LOCAL)) {
 			send_iac(send, sendlen, WILL, opt);
 			ts->opts[idx] |= OPTFLAG_LOCAL;
@@ -217,7 +228,6 @@ handle_do(TelnetState *ts, unsigned char opt, unsigned char *send,
 
 	case OPT_NAWS:
 		/* We will send window size */
-		idx = opt_index(opt);
 		if (!(ts->opts[idx] & OPTFLAG_LOCAL)) {
 			send_iac(send, sendlen, WILL, opt);
 			ts->opts[idx] |= OPTFLAG_LOCAL;
@@ -228,7 +238,6 @@ handle_do(TelnetState *ts, unsigned char opt, unsigned char *send,
 
 	case OPT_TSPEED:
 		/* We will send terminal speed */
-		idx = opt_index(opt);
 		if (!(ts->opts[idx] & OPTFLAG_LOCAL)) {
 			send_iac(send, sendlen, WILL, opt);
 			ts->opts[idx] |= OPTFLAG_LOCAL;
@@ -237,7 +246,6 @@ handle_do(TelnetState *ts, unsigned char opt, unsigned char *send,
 
 	case OPT_SGA:
 		/* We will suppress go-ahead */
-		idx = opt_index(opt);
 		if (!(ts->opts[idx] & OPTFLAG_LOCAL)) {
 			send_iac(send, sendlen, WILL, opt);
 			ts->opts[idx] |= OPTFLAG_LOCAL;
@@ -246,7 +254,6 @@ handle_do(TelnetState *ts, unsigned char opt, unsigned char *send,
 
 	case OPT_BINARY:
 		/* We can send binary */
-		idx = opt_index(opt);
 		if (!(ts->opts[idx] & OPTFLAG_LOCAL)) {
 			send_iac(send, sendlen, WILL, opt);
 			ts->opts[idx] |= OPTFLAG_LOCAL;
@@ -254,7 +261,7 @@ handle_do(TelnetState *ts, unsigned char opt, unsigned char *send,
 		break;
 
 	default:
-		/* Reject anything we don't support */
+		/* Known option but not handled here -- reject */
 		send_iac(send, sendlen, WONT, opt);
 		break;
 	}
@@ -293,6 +300,12 @@ handle_sb(TelnetState *ts, unsigned char *send, short *sendlen)
 
 	if (ts->sb_len < 2)
 		return;
+
+	if (ts->sb_overflow) {
+		ts->sb_overflow = 0;
+		ts->sb_len = 0;
+		return;
+	}
 
 	switch (ts->sb_buf[0]) {
 	case OPT_TTYPE:
@@ -466,6 +479,7 @@ telnet_process(TelnetState *ts, unsigned char *in, short inlen,
 			 */
 			ts->sb_buf[0] = c;
 			ts->sb_len = 1;
+			ts->sb_overflow = 0;
 			ts->state = TELNET_STATE_SB_DATA;
 			break;
 
@@ -475,7 +489,8 @@ telnet_process(TelnetState *ts, unsigned char *in, short inlen,
 			} else {
 				if (ts->sb_len < TELNET_SB_BUFSIZ)
 					ts->sb_buf[ts->sb_len++] = c;
-				/* else: overflow, keep consuming until SE */
+				else
+					ts->sb_overflow = 1;
 			}
 			break;
 

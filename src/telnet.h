@@ -50,6 +50,7 @@ typedef struct {
 	unsigned char	sb_buf[TELNET_SB_BUFSIZ]; /* subneg accumulator */
 	short		sb_len;			/* bytes in sb_buf */
 	unsigned char	sb_opt;			/* current SB option code */
+	unsigned char	sb_overflow;		/* SB buffer overflowed */
 	unsigned char	opts[TELOPT_COUNT];	/* per-option flags */
 	short		cols;			/* terminal columns */
 	short		rows;			/* terminal rows */

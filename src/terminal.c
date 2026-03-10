@@ -77,6 +77,8 @@ terminal_init(Terminal *term)
 	term->response_len = 0;
 	term->osc_len = 0;
 	term->osc_param = 0;
+	memset(term->osc_buf, 0, sizeof(term->osc_buf));
+	memset(term->response, 0, sizeof(term->response));
 	term->title_changed = 0;
 	term->window_title[0] = '\0';
 	term->utf8_len = 0;
@@ -388,8 +390,14 @@ terminal_get_display_cell(Terminal *term, short row, short col)
 	if (sb_row < 0) {
 		/* This row comes from scrollback */
 		sb_idx = term->sb_head + (term->sb_count + sb_row);
+		/* Safety: check for negative result before modulo */
+		if (sb_idx < 0)
+			sb_idx += TERM_SCROLLBACK_LINES;
 		if (sb_idx >= TERM_SCROLLBACK_LINES)
 			sb_idx -= TERM_SCROLLBACK_LINES;
+		/* Final bounds check */
+		if (sb_idx < 0 || sb_idx >= TERM_SCROLLBACK_LINES)
+			return &term->screen[0][0];
 		return &term->scrollback[sb_idx][col];
 	}
 
@@ -403,6 +411,7 @@ terminal_get_display_cell(Terminal *term, short row, short col)
 void
 terminal_scroll_back(Terminal *term, short lines)
 {
+	if (lines <= 0) return;  /* Reject negative/zero scroll */
 	term->scroll_offset += lines;
 	if (term->scroll_offset > term->sb_count)
 		term->scroll_offset = term->sb_count;
@@ -948,10 +957,12 @@ term_process_csi(Terminal *term, unsigned char ch)
 			if (term->num_params > 0 &&
 			    term->num_params <= TERM_MAX_PARAMS) {
 				short idx = term->num_params - 1;
-				if (term->params[idx] < 3000)
-					term->params[idx] =
-					    term->params[idx] * 10 +
+				if (term->params[idx] < 3000) {
+					short new_val = term->params[idx] * 10 +
 					    (ch - '0');
+					if (new_val >= 0)  /* signed overflow check */
+						term->params[idx] = new_val;
+				}
 			}
 			/* else: overflow params silently dropped */
 		}
@@ -1209,10 +1220,14 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 					    term->params[i + 1] == 5) {
 						/* 256-color: 38;5;N */
 						i += 2;
+						if (i >= term->num_params)
+							break;
 					} else if (i + 1 < term->num_params &&
 					    term->params[i + 1] == 2) {
 						/* Truecolor: 38;2;R;G;B */
 						i += 4;
+						if (i >= term->num_params)
+							break;
 					}
 					continue;
 				}
@@ -1495,9 +1510,12 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		p1 = (term->num_params >= 1) ? term->params[0] : 0;
 		if (p1 == 6) {
 			/* Cursor position report */
-			term->response_len = sprintf(term->response,
+			term->response_len = snprintf(term->response,
+			    sizeof(term->response),
 			    "\033[%d;%dR",
 			    term->cur_row + 1, term->cur_col + 1);
+			if (term->response_len >= (short)sizeof(term->response))
+				term->response_len = sizeof(term->response) - 1;
 		} else if (p1 == 5) {
 			/* Status report: OK */
 			memcpy(term->response, "\033[0n", 4);
@@ -1598,6 +1616,7 @@ term_process_osc(Terminal *term, unsigned char ch)
 			term_finish_osc(term);
 		}
 		/* Any other byte after ESC in OSC: abort */
+		term->osc_buf[term->osc_len] = '\0';
 		term->parse_state = PARSE_NORMAL;
 		return;
 	}
@@ -1636,6 +1655,7 @@ term_process_osc(Terminal *term, unsigned char ch)
 			return;
 		}
 		/* Unexpected byte in param area - discard */
+		term->osc_buf[term->osc_len] = '\0';
 		term->parse_state = PARSE_NORMAL;
 		return;
 	}
@@ -1737,20 +1757,33 @@ utf8_decode(unsigned char *buf, short len)
 
 	switch (len) {
 	case 2:
+		if ((buf[0] & 0xE0) != 0xC0 || (buf[1] & 0xC0) != 0x80)
+			return '?';
 		cp = ((long)(buf[0] & 0x1F) << 6) | (buf[1] & 0x3F);
+		if (cp < 0x80) return '?';  /* overlong */
 		break;
 	case 3:
+		if ((buf[0] & 0xF0) != 0xE0 || (buf[1] & 0xC0) != 0x80 ||
+		    (buf[2] & 0xC0) != 0x80)
+			return '?';
 		cp = ((long)(buf[0] & 0x0F) << 12) |
 		     ((long)(buf[1] & 0x3F) << 6) | (buf[2] & 0x3F);
+		if (cp < 0x800) return '?';  /* overlong */
+		if (cp >= 0xD800 && cp <= 0xDFFF) return '?';  /* surrogate */
 		break;
 	case 4:
+		if ((buf[0] & 0xF8) != 0xF0 || (buf[1] & 0xC0) != 0x80 ||
+		    (buf[2] & 0xC0) != 0x80 || (buf[3] & 0xC0) != 0x80)
+			return '?';
 		cp = ((long)(buf[0] & 0x07) << 18) |
 		     ((long)(buf[1] & 0x3F) << 12) |
 		     ((long)(buf[2] & 0x3F) << 6) | (buf[3] & 0x3F);
+		if (cp < 0x10000 || cp > 0x10FFFF) return '?';  /* overlong/invalid */
 		break;
 	default:
-		cp = 0xFFFD;	/* replacement character */
+		return '?';
 	}
+
 	return cp;
 }
 

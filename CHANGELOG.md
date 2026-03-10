@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Startup optimization: Connect dialog appears in under 1 second (was 5-6s)
+  by deferring MacTCP initialization to first connection attempt, deferring
+  session/window creation until user clicks Connect, and reordering menu
+  state updates after dialog
+- Connection status window shows "Connecting to..." for IP addresses instead
+  of "Resolving..." (DNS resolution is skipped for direct IPs)
+
+### Fixed
+- MacTCP initialization failure now shows "MacTCP is not available" alert
+  instead of silently failing
+
 ## [1.6.1] - 2026-03-09
 
 ### Added

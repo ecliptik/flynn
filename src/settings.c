@@ -102,6 +102,16 @@ prefs_load(FlynnPrefs *prefs)
 		}
 	}
 
+	/* Validate DNS server IP */
+	{
+		extern unsigned long ip2long(char *);
+		if (prefs->dns_server[0] == '\0' || ip2long(prefs->dns_server) == 0) {
+			strncpy(prefs->dns_server, "1.1.1.1",
+			    sizeof(prefs->dns_server) - 1);
+			prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
+		}
+	}
+
 	if (prefs->version == 1) {
 		/* v1→v2 migration: host/port already read, zero bookmark fields */
 		prefs->bookmark_count = 0;
