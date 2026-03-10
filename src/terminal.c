@@ -18,7 +18,9 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <Memory.h>
 #include "terminal.h"
+#include "color.h"
 #include "glyphs.h"
 
 /* Forward declarations for internal functions */
@@ -119,11 +121,42 @@ terminal_init(Terminal *term)
 	term->saved_row = 0;
 	term->saved_col = 0;
 	term->saved_attr = ATTR_NORMAL;
+	term->saved_fg = COLOR_DEFAULT;
+	term->saved_bg = COLOR_DEFAULT;
 	term->saved_g0_charset = 'B';
 	term->saved_g1_charset = 'B';
 	term->saved_gl_charset = 0;
 	term->saved_origin_mode = 0;
 	term->saved_autowrap = 1;
+
+	/* Color state */
+	term->cur_fg = COLOR_DEFAULT;
+	term->cur_bg = COLOR_DEFAULT;
+	term->alt_cur_fg = COLOR_DEFAULT;
+	term->alt_cur_bg = COLOR_DEFAULT;
+
+	/* Allocate screen color array on System 7 (first init only).
+	 * alt_color and sb_color are lazy-allocated on first use
+	 * to save ~38.5KB per session until needed. */
+	if (g_has_color_qd && !term->has_color) {
+		long sc_size = (long)TERM_ROWS * TERM_COLS * sizeof(CellColor);
+
+		term->screen_color = (CellColor *)NewPtr(sc_size);
+
+		if (term->screen_color) {
+			term->has_color = 1;
+		} else {
+			term->screen_color = 0L;
+			term->has_color = 0;
+		}
+		/* alt_color and sb_color start NULL, allocated on demand */
+	}
+
+	/* Fill screen color array with defaults */
+	if (term->has_color) {
+		memset(term->screen_color, COLOR_DEFAULT,
+		    (long)TERM_ROWS * TERM_COLS * sizeof(CellColor));
+	}
 
 	term->cursor_style = 0;
 
@@ -181,8 +214,22 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				if (!term->wrap_pending &&
 				    term->gl_charset == 0 &&
 				    term->g0_charset == 'B') {
+					unsigned char a = term->cur_attr;
+					if (term->cur_fg != COLOR_DEFAULT ||
+					    term->cur_bg != COLOR_DEFAULT)
+						a |= ATTR_HAS_COLOR;
 					term->screen[term->cur_row][term->cur_col].ch = ch;
-					term->screen[term->cur_row][term->cur_col].attr = term->cur_attr;
+					term->screen[term->cur_row][term->cur_col].attr = a;
+					if (term->has_color &&
+					    term->screen_color) {
+						CellColor *cc =
+						    &term->screen_color[
+						    term->cur_row *
+						    TERM_COLS +
+						    term->cur_col];
+						cc->fg = term->cur_fg;
+						cc->bg = term->cur_bg;
+					}
 					term->dirty[term->cur_row] = 1;
 					if (term->cur_col < term->active_cols - 1)
 						term->cur_col++;
@@ -351,18 +398,6 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 }
 
 /*
- * terminal_get_cell - return pointer to cell at (row, col)
- */
-TermCell *
-terminal_get_cell(Terminal *term, short row, short col)
-{
-	if (row < 0 || row >= TERM_ROWS || col < 0 || col >= TERM_COLS)
-		return &term->screen[0][0];
-
-	return &term->screen[row][col];
-}
-
-/*
  * terminal_get_display_cell - get cell for display, accounting for scroll offset
  *
  * When scroll_offset > 0, the top rows come from the scrollback buffer
@@ -404,6 +439,42 @@ terminal_get_display_cell(Terminal *term, short row, short col)
 
 	/* This row comes from the live screen */
 	return &term->screen[sb_row][col];
+}
+
+/*
+ * terminal_get_display_color - get color for display cell, accounting
+ * for scroll offset.  Returns NULL if color is not available.
+ */
+CellColor *
+terminal_get_display_color(Terminal *term, short row, short col)
+{
+	short sb_row, sb_idx;
+
+	if (!term->has_color || !term->screen_color)
+		return 0L;
+
+	if (col < 0 || col >= TERM_COLS || row < 0 || row >= TERM_ROWS)
+		return 0L;
+
+	if (term->scroll_offset == 0)
+		return &term->screen_color[row * TERM_COLS + col];
+
+	sb_row = row - term->scroll_offset;
+	if (sb_row < 0) {
+		/* From scrollback */
+		if (!term->sb_color)
+			return 0L;
+		sb_idx = term->sb_head + (term->sb_count + sb_row);
+		if (sb_idx < 0)
+			sb_idx += TERM_SCROLLBACK_LINES;
+		if (sb_idx >= TERM_SCROLLBACK_LINES)
+			sb_idx -= TERM_SCROLLBACK_LINES;
+		if (sb_idx < 0 || sb_idx >= TERM_SCROLLBACK_LINES)
+			return 0L;
+		return &term->sb_color[sb_idx * TERM_COLS + col];
+	}
+
+	return &term->screen_color[sb_row * TERM_COLS + col];
 }
 
 /*
@@ -527,6 +598,23 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 	c2 = term_clamp(c2, 0, term->active_cols - 1);
 
 	/*
+	 * Snapshot screen before full-screen clear (ESC[2J).
+	 * Remote servers send clear-screen during logout before TCP
+	 * closes. The snapshot lets us restore content on disconnect.
+	 * Skip during alt screen (main screen saved in alt_screen).
+	 */
+	if (r1 == 0 && c1 == 0 &&
+	    r2 >= term->active_rows - 1 &&
+	    c2 >= term->active_cols - 1 &&
+	    !term->alt_active) {
+		memcpy(term->snap_screen, term->screen,
+		    sizeof(term->screen));
+		term->snap_rows = term->active_rows;
+		term->snap_cols = term->active_cols;
+		term->snap_valid = 1;
+	}
+
+	/*
 	 * Word-at-a-time fill optimization: TermCell is 2 bytes
 	 * (ch + attr), so we can fill with 16-bit writes.
 	 * 68000 is big-endian: ch is high byte, attr is low byte.
@@ -538,6 +626,19 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 		for (c = c1; c <= c2; c++)
 			*p++ = fill;
 		term_dirty_row(term, r);
+	}
+
+	/* Clear color arrays separately (System 7 only) */
+	if (term->has_color && term->screen_color) {
+		for (r = r1; r <= r2; r++) {
+			CellColor *cc = &term->screen_color[
+			    r * TERM_COLS + c1];
+			for (c = c1; c <= c2; c++) {
+				cc->fg = COLOR_DEFAULT;
+				cc->bg = COLOR_DEFAULT;
+				cc++;
+			}
+		}
 	}
 }
 
@@ -552,6 +653,23 @@ term_save_scrollback(Terminal *term, short row)
 
 	memcpy(term->scrollback[term->sb_head], term->screen[row],
 	    term->active_cols * sizeof(TermCell));
+
+	/* Save color for this scrollback line (lazy-allocate on first use) */
+	if (term->has_color && term->screen_color) {
+		if (!term->sb_color) {
+			long sb_size = (long)TERM_SCROLLBACK_LINES *
+			    TERM_COLS * sizeof(CellColor);
+			term->sb_color = (CellColor *)NewPtr(sb_size);
+			if (term->sb_color)
+				memset(term->sb_color, COLOR_DEFAULT,
+				    sb_size);
+		}
+		if (term->sb_color) {
+			memcpy(&term->sb_color[term->sb_head * TERM_COLS],
+			    &term->screen_color[row * TERM_COLS],
+			    term->active_cols * sizeof(CellColor));
+		}
+	}
 
 	term->sb_head++;
 	if (term->sb_head >= TERM_SCROLLBACK_LINES)
@@ -588,6 +706,15 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		term->line_attr[r] = term->line_attr[r + count];
 	}
 
+	/* Scroll color arrays in parallel */
+	if (term->has_color && term->screen_color) {
+		for (r = top; r <= bottom - count; r++) {
+			memcpy(&term->screen_color[r * TERM_COLS],
+			    &term->screen_color[(r + count) * TERM_COLS],
+			    term->active_cols * sizeof(CellColor));
+		}
+	}
+
 	/* Clear newly exposed lines at bottom */
 	for (r = bottom - count + 1; r <= bottom; r++) {
 		for (c = 0; c < term->active_cols; c++) {
@@ -595,6 +722,16 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 			term->screen[r][c].attr = ATTR_NORMAL;
 		}
 		term->line_attr[r] = LINE_ATTR_NORMAL;
+
+		/* Clear color for exposed lines */
+		if (term->has_color && term->screen_color) {
+			CellColor *cc = &term->screen_color[r * TERM_COLS];
+			for (c = 0; c < term->active_cols; c++) {
+				cc->fg = COLOR_DEFAULT;
+				cc->bg = COLOR_DEFAULT;
+				cc++;
+			}
+		}
 	}
 
 	term_dirty_range(term, top, bottom);
@@ -621,6 +758,15 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		term->line_attr[r] = term->line_attr[r - count];
 	}
 
+	/* Scroll color arrays in parallel */
+	if (term->has_color && term->screen_color) {
+		for (r = bottom; r >= top + count; r--) {
+			memcpy(&term->screen_color[r * TERM_COLS],
+			    &term->screen_color[(r - count) * TERM_COLS],
+			    term->active_cols * sizeof(CellColor));
+		}
+	}
+
 	/* Clear newly exposed lines at top */
 	for (r = top; r < top + count; r++) {
 		for (c = 0; c < term->active_cols; c++) {
@@ -628,6 +774,16 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 			term->screen[r][c].attr = ATTR_NORMAL;
 		}
 		term->line_attr[r] = LINE_ATTR_NORMAL;
+
+		/* Clear color for exposed lines */
+		if (term->has_color && term->screen_color) {
+			CellColor *cc = &term->screen_color[r * TERM_COLS];
+			for (c = 0; c < term->active_cols; c++) {
+				cc->fg = COLOR_DEFAULT;
+				cc->bg = COLOR_DEFAULT;
+				cc++;
+			}
+		}
 	}
 
 	term_dirty_range(term, top, bottom);
@@ -669,10 +825,33 @@ term_put_char(Terminal *term, unsigned char ch)
 			term->screen[term->cur_row][c] =
 			    term->screen[term->cur_row][c - 1];
 		}
+		/* Shift color array too */
+		if (term->has_color && term->screen_color) {
+			for (c = term->active_cols - 1;
+			    c > term->cur_col; c--) {
+				term->screen_color[
+				    term->cur_row * TERM_COLS + c] =
+				    term->screen_color[
+				    term->cur_row * TERM_COLS + c - 1];
+			}
+		}
 	}
+
+	/* Set ATTR_HAS_COLOR if non-default colors active */
+	if (term->cur_fg != COLOR_DEFAULT || term->cur_bg != COLOR_DEFAULT)
+		attr |= ATTR_HAS_COLOR;
 
 	term->screen[term->cur_row][term->cur_col].ch = ch;
 	term->screen[term->cur_row][term->cur_col].attr = attr;
+
+	/* Write color to separate color array (System 7 only) */
+	if (term->has_color && term->screen_color) {
+		CellColor *cc = &term->screen_color[
+		    term->cur_row * TERM_COLS + term->cur_col];
+		cc->fg = term->cur_fg;
+		cc->bg = term->cur_bg;
+	}
+
 	term_dirty_row(term, term->cur_row);
 
 	if (term->cur_col < term->active_cols - 1) {
@@ -733,6 +912,10 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 
 	attr = term->cur_attr | attr_flag;
 
+	/* Set ATTR_HAS_COLOR if non-default colors active */
+	if (term->cur_fg != COLOR_DEFAULT || term->cur_bg != COLOR_DEFAULT)
+		attr |= ATTR_HAS_COLOR;
+
 	/* Insert mode: shift right */
 	if (term->insert_mode) {
 		short shift = wide ? 2 : 1;
@@ -742,11 +925,30 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 			term->screen[term->cur_row][c] =
 			    term->screen[term->cur_row][c - shift];
 		}
+		/* Shift color array too */
+		if (term->has_color && term->screen_color) {
+			for (c = term->active_cols - 1;
+			    c > term->cur_col + shift - 1; c--) {
+				term->screen_color[
+				    term->cur_row * TERM_COLS + c] =
+				    term->screen_color[
+				    term->cur_row * TERM_COLS + c - shift];
+			}
+		}
 	}
 
 	/* Place primary glyph cell */
 	term->screen[term->cur_row][term->cur_col].ch = glyph_id;
 	term->screen[term->cur_row][term->cur_col].attr = attr;
+
+	/* Write color for primary cell */
+	if (term->has_color && term->screen_color) {
+		CellColor *cc = &term->screen_color[
+		    term->cur_row * TERM_COLS + term->cur_col];
+		cc->fg = term->cur_fg;
+		cc->bg = term->cur_bg;
+	}
+
 	term_dirty_row(term, term->cur_row);
 
 	if (wide) {
@@ -755,6 +957,13 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 		term->screen[term->cur_row][term->cur_col].ch =
 		    GLYPH_WIDE_SPACER;
 		term->screen[term->cur_row][term->cur_col].attr = attr;
+		/* Write color for spacer cell too */
+		if (term->has_color && term->screen_color) {
+			CellColor *cc = &term->screen_color[
+			    term->cur_row * TERM_COLS + term->cur_col];
+			cc->fg = term->cur_fg;
+			cc->bg = term->cur_bg;
+		}
 	}
 
 	if (term->cur_col < term->active_cols - 1) {
@@ -811,6 +1020,8 @@ term_process_esc(Terminal *term, unsigned char ch)
 		term->saved_row = term->cur_row;
 		term->saved_col = term->cur_col;
 		term->saved_attr = term->cur_attr;
+		term->saved_fg = term->cur_fg;
+		term->saved_bg = term->cur_bg;
 		term->saved_g0_charset = term->g0_charset;
 		term->saved_g1_charset = term->g1_charset;
 		term->saved_gl_charset = term->gl_charset;
@@ -823,6 +1034,8 @@ term_process_esc(Terminal *term, unsigned char ch)
 		term->cur_row = term_clamp(term->saved_row, 0, term->active_rows - 1);
 		term->cur_col = term_clamp(term->saved_col, 0, term->active_cols - 1);
 		term->cur_attr = term->saved_attr;
+		term->cur_fg = term->saved_fg;
+		term->cur_bg = term->saved_bg;
 		term->g0_charset = term->saved_g0_charset;
 		term->g1_charset = term->saved_g1_charset;
 		term->gl_charset = term->saved_gl_charset;
@@ -1054,12 +1267,16 @@ term_dec_set_mode(Terminal *term)
 			term->saved_row = term->cur_row;
 			term->saved_col = term->cur_col;
 			term->saved_attr = term->cur_attr;
+			term->saved_fg = term->cur_fg;
+			term->saved_bg = term->cur_bg;
 			break;
 		case 1049:
 			/* Save cursor + switch to alt */
 			term->saved_row = term->cur_row;
 			term->saved_col = term->cur_col;
 			term->saved_attr = term->cur_attr;
+			term->saved_fg = term->cur_fg;
+			term->saved_bg = term->cur_bg;
 			term_switch_to_alt(term);
 			break;
 		case 2004:
@@ -1114,6 +1331,8 @@ term_dec_reset_mode(Terminal *term)
 			    term->saved_col, 0,
 			    term->active_cols - 1);
 			term->cur_attr = term->saved_attr;
+			term->cur_fg = term->saved_fg;
+			term->cur_bg = term->saved_bg;
 			term->wrap_pending = 0;
 			break;
 		case 1049:
@@ -1126,6 +1345,8 @@ term_dec_reset_mode(Terminal *term)
 			    term->saved_col, 0,
 			    term->active_cols - 1);
 			term->cur_attr = term->saved_attr;
+			term->cur_fg = term->saved_fg;
+			term->cur_bg = term->saved_bg;
 			term->wrap_pending = 0;
 			break;
 		case 2004:
@@ -1282,6 +1503,19 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->screen[term->cur_row][c].ch = ' ';
 			term->screen[term->cur_row][c].attr = ATTR_NORMAL;
 		}
+		if (term->has_color && term->screen_color) {
+			short row_off = term->cur_row * TERM_COLS;
+			for (c = term->active_cols - 1;
+			    c >= term->cur_col + p1; c--)
+				term->screen_color[row_off + c] =
+				    term->screen_color[row_off + c - p1];
+			for (c = term->cur_col; c < term->cur_col + p1; c++) {
+				term->screen_color[row_off + c].fg =
+				    COLOR_DEFAULT;
+				term->screen_color[row_off + c].bg =
+				    COLOR_DEFAULT;
+			}
+		}
 		term_dirty_row(term, term->cur_row);
 		break;
 
@@ -1296,6 +1530,20 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->screen[term->cur_row][c].ch = ' ';
 			term->screen[term->cur_row][c].attr = ATTR_NORMAL;
 		}
+		if (term->has_color && term->screen_color) {
+			short row_off = term->cur_row * TERM_COLS;
+			for (c = term->cur_col;
+			    c < term->active_cols - p1; c++)
+				term->screen_color[row_off + c] =
+				    term->screen_color[row_off + c + p1];
+			for (c = term->active_cols - p1;
+			    c < term->active_cols; c++) {
+				term->screen_color[row_off + c].fg =
+				    COLOR_DEFAULT;
+				term->screen_color[row_off + c].bg =
+				    COLOR_DEFAULT;
+			}
+		}
 		term_dirty_row(term, term->cur_row);
 		break;
 
@@ -1305,6 +1553,15 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		for (c = term->cur_col; c < term->cur_col + p1; c++) {
 			term->screen[term->cur_row][c].ch = ' ';
 			term->screen[term->cur_row][c].attr = ATTR_NORMAL;
+		}
+		if (term->has_color && term->screen_color) {
+			short row_off = term->cur_row * TERM_COLS;
+			for (c = term->cur_col; c < term->cur_col + p1; c++) {
+				term->screen_color[row_off + c].fg =
+				    COLOR_DEFAULT;
+				term->screen_color[row_off + c].bg =
+				    COLOR_DEFAULT;
+			}
 		}
 		term_dirty_row(term, term->cur_row);
 		break;
@@ -1337,22 +1594,51 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			short i;
 			for (i = 0; i < term->num_params; i++) {
 				if (term->params[i] == 38 ||
-				    term->params[i] == 48 ||
-				    term->params[i] == 58) {
-					/* Extended color: skip sub-params */
+				    term->params[i] == 48) {
+					/* Extended fg/bg color */
+					short is_fg = (term->params[i] == 38);
 					if (i + 1 < term->num_params &&
 					    term->params[i + 1] == 5) {
-						/* 256-color: 38;5;N */
+						/* 256-color: 38;5;N / 48;5;N */
+						if (i + 2 < term->num_params) {
+							unsigned char ci =
+							    (unsigned char)
+							    term->params[i + 2];
+							if (is_fg)
+								term->cur_fg = ci;
+							else
+								term->cur_bg = ci;
+						}
 						i += 2;
-						if (i >= term->num_params)
-							break;
 					} else if (i + 1 < term->num_params &&
 					    term->params[i + 1] == 2) {
 						/* Truecolor: 38;2;R;G;B */
+						if (i + 4 < term->num_params) {
+							unsigned char ci =
+							    color_nearest_256(
+							    (unsigned char)
+							    term->params[i + 2],
+							    (unsigned char)
+							    term->params[i + 3],
+							    (unsigned char)
+							    term->params[i + 4]);
+							if (is_fg)
+								term->cur_fg = ci;
+							else
+								term->cur_bg = ci;
+						}
 						i += 4;
-						if (i >= term->num_params)
-							break;
 					}
+					continue;
+				}
+				if (term->params[i] == 58) {
+					/* Underline color: skip */
+					if (i + 1 < term->num_params &&
+					    term->params[i + 1] == 5)
+						i += 2;
+					else if (i + 1 < term->num_params &&
+					    term->params[i + 1] == 2)
+						i += 4;
 					continue;
 				}
 				term_set_attr(term, term->params[i]);
@@ -1449,6 +1735,8 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->saved_row = term->cur_row;
 			term->saved_col = term->cur_col;
 			term->saved_attr = term->cur_attr;
+			term->saved_fg = term->cur_fg;
+			term->saved_bg = term->cur_bg;
 		}
 		break;
 
@@ -1460,6 +1748,8 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->cur_col = term_clamp(term->saved_col,
 			    0, term->active_cols - 1);
 			term->cur_attr = term->saved_attr;
+			term->cur_fg = term->saved_fg;
+			term->cur_bg = term->saved_bg;
 			term->wrap_pending = 0;
 		}
 		break;
@@ -1492,6 +1782,8 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		/* DECSTR - soft reset (CSI ! p) */
 		if (term->intermediate == '!') {
 			term->cur_attr = ATTR_NORMAL;
+			term->cur_fg = COLOR_DEFAULT;
+			term->cur_bg = COLOR_DEFAULT;
 			term->g0_charset = 'B';
 			term->g1_charset = 'B';
 			term->gl_charset = 0;
@@ -1506,6 +1798,8 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->saved_row = 0;
 			term->saved_col = 0;
 			term->saved_attr = ATTR_NORMAL;
+			term->saved_fg = COLOR_DEFAULT;
+			term->saved_bg = COLOR_DEFAULT;
 			term->wrap_pending = 0;
 			term->cursor_style = 0;
 			/* Reset tab stops to defaults */
@@ -1556,8 +1850,10 @@ term_set_attr(Terminal *term, short param)
 {
 	switch (param) {
 	case 0:
-		/* Reset all attributes */
+		/* Reset all attributes and colors */
 		term->cur_attr = ATTR_NORMAL;
+		term->cur_fg = COLOR_DEFAULT;
+		term->cur_bg = COLOR_DEFAULT;
 		break;
 	case 1:
 		/* Bold */
@@ -1604,14 +1900,30 @@ term_set_attr(Terminal *term, short param)
 		/* Not inverse */
 		term->cur_attr &= ~ATTR_INVERSE;
 		break;
+	case 39:
+		/* Default foreground */
+		term->cur_fg = COLOR_DEFAULT;
+		break;
+	case 49:
+		/* Default background */
+		term->cur_bg = COLOR_DEFAULT;
+		break;
 	default:
-		/* Bright foreground 90-97: map to bold on monochrome */
-		if (param >= 90 && param <= 97)
+		if (param >= 30 && param <= 37) {
+			/* Standard ANSI foreground (palette 0-7) */
+			term->cur_fg = (unsigned char)(param - 30);
+		} else if (param >= 40 && param <= 47) {
+			/* Standard ANSI background (palette 0-7) */
+			term->cur_bg = (unsigned char)(param - 40);
+		} else if (param >= 90 && param <= 97) {
+			/* Bright foreground (palette 8-15) */
+			term->cur_fg = (unsigned char)(param - 90 + 8);
+			/* Also set bold for monochrome fallback */
 			term->cur_attr |= ATTR_BOLD;
-		/*
-		 * Ignore standard fg/bg (30-37, 40-47, 100-107, 39, 49)
-		 * and anything else — this is a monochrome terminal.
-		 */
+		} else if (param >= 100 && param <= 107) {
+			/* Bright background (palette 8-15) */
+			term->cur_bg = (unsigned char)(param - 100 + 8);
+		}
 		break;
 	}
 }
@@ -1727,7 +2039,23 @@ term_switch_to_alt(Terminal *term)
 	term->alt_cur_row = term->cur_row;
 	term->alt_cur_col = term->cur_col;
 	term->alt_cur_attr = term->cur_attr;
+	term->alt_cur_fg = term->cur_fg;
+	term->alt_cur_bg = term->cur_bg;
 	term->alt_active = 1;
+
+	/* Save color arrays to alt buffer (lazy-allocate on first use) */
+	if (term->has_color && term->screen_color) {
+		if (!term->alt_color) {
+			long sc_size = (long)TERM_ROWS * TERM_COLS *
+			    sizeof(CellColor);
+			term->alt_color = (CellColor *)NewPtr(sc_size);
+		}
+		if (term->alt_color) {
+			memcpy(term->alt_color, term->screen_color,
+			    (long)TERM_ROWS * TERM_COLS *
+			    sizeof(CellColor));
+		}
+	}
 
 	/* Clear the screen and line attributes for alt buffer use */
 	term_clear_region(term, 0, 0, term->active_rows - 1, term->active_cols - 1);
@@ -1754,8 +2082,17 @@ term_switch_to_main(Terminal *term)
 	term->cur_row = term->alt_cur_row;
 	term->cur_col = term->alt_cur_col;
 	term->cur_attr = term->alt_cur_attr;
+	term->cur_fg = term->alt_cur_fg;
+	term->cur_bg = term->alt_cur_bg;
 	term->alt_active = 0;
 	term->wrap_pending = 0;
+
+	/* Restore color arrays from alt buffer */
+	if (term->has_color && term->screen_color && term->alt_color) {
+		memcpy(term->screen_color, term->alt_color,
+		    (long)TERM_ROWS * TERM_COLS * sizeof(CellColor));
+	}
+
 	term_dirty_all(term);
 }
 

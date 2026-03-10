@@ -67,12 +67,6 @@ void term_ui_set_font(WindowPtr win, short font_id, short font_size);
 /* Draw terminal contents (only dirty rows + cursor) */
 void term_ui_draw(WindowPtr win, Terminal *term);
 
-/* Invalidate only dirty rows (call after terminal_process) */
-void term_ui_invalidate(WindowPtr win, Terminal *term);
-
-/* Invalidate entire terminal area (for full redraws) */
-void term_ui_invalidate_all(WindowPtr win);
-
 /* Update cursor blink state; call from event loop idle */
 void term_ui_cursor_blink(WindowPtr win, Terminal *term);
 

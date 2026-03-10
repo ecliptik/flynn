@@ -2,6 +2,70 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-03-10
+
+### Added
+- 256-color support on System 7 with Color QuickDraw
+  - Full 256-color palette: 16 ANSI colors + 216 color cube + 24 grayscale
+  - Truecolor (24-bit) SGR sequences downgraded to nearest 256-color match
+  - Palette Manager rendering via PmForeColor/PmBackColor for performance
+  - Color windows with NewCWindow/NewPalette on System 7, standard NewWindow on System 6
+  - Runtime detection via SysEnvirons() hasColorQD — zero impact on System 6
+  - Per-cell foreground and background colors stored in CellColor arrays
+  - ATTR_HAS_COLOR (bit 6) flag for fast skip of default-colored cells
+  - Color-aware dark mode: swaps default fg/bg, skips InvertRect on color systems
+  - New source files: `color.c`, `color.h`
+  - Memory: +52KB per session on System 7 color, zero on System 6 monochrome
+- 38 new QuickDraw primitive glyphs (103 total, up from 65):
+  - Outline triangles: △ ▽ ▷ ◁ (U+25B3, U+25BD, U+25B7, U+25C1)
+  - Small filled triangles: ▸ ◂ (U+25B8, U+25C2)
+  - Diamonds: ◆ ◇ (U+25C6, U+25C7)
+  - Half-circle variants: ◐ ◑ ◒ ◓ (U+25D0-U+25D3)
+  - Fisheye circle: ◉ (U+25C9)
+  - Six-pointed star: ✶ (U+2736)
+  - Circled operators: ⊙ ⊕ ⊖ ⊗ (U+2299, U+2295-U+2297)
+  - Superscript digits: ⁰¹²³⁴⁵⁶⁷⁸⁹ (U+2070, U+00B9, U+00B2, U+00B3, U+2074-U+2079)
+  - Subscript digits: ₀₁₂₃₄₅₆₇₈₉ (U+2080-U+2089)
+  - Superscripts/subscripts rendered at 60% font size with scaled positioning
+
+### Fixed
+- Terminal type not saved between sessions — Connect dialog now persists
+  the last-used terminal type (xterm, VT220, VT100, xterm-256color)
+- Cursor XOR artifacts on color systems — arrow key editing on System 7
+  caused stale inverse highlights because CSI cursor movement didn't mark
+  rows dirty. Now tracks cursor position changes and marks affected rows
+- Disconnect screen preservation — screen buffer snapshotted on full
+  clear (ESC[2J) and restored on disconnect, instead of wiping to blank
+- Session not cleaned up on bookmark connect failure — now properly
+  destroys session if TCP connect fails after window was created
+- Replaced all `sprintf` with `snprintf` across 15 call sites
+  (defense-in-depth buffer overflow protection)
+- Added bounds check to TTYPE/TSPEED subnegotiation buffer in telnet.c
+
+### Changed
+- Glyph emoji base relocated from 0x60 to 0x80 to accommodate expanded
+  primitive range (0x00-0x66)
+- Lazy allocation of alt-screen and scrollback color arrays — deferred
+  until first use, saving up to 38.5KB/session on System 7
+- Screen snapshot moved from shared static to per-session Terminal struct
+  for multi-session correctness; only triggers on full-screen clear
+  instead of every data receive (~1.5ms/receive saved on 68000)
+- Color default restore deferred to end of row instead of per-run,
+  reducing redundant RGBForeColor/RGBBackColor traps by 10-15%
+- Removed idle polling skip counter — eliminates 8.5ms average added
+  latency on keystroke echo
+- Single-session fast path in event loop — skips save/load state cycling
+  when only one session is open
+- Idle WaitNextEvent timeout reduced from 500ms to 167ms when disconnected
+- SIZE resource increased from 640KB/512KB to 768KB/640KB for 4-session
+  color headroom
+- Removed ~450 lines of dead code: deleted dnr.c/dnr.h (superseded by
+  dns.c), 14 unused functions, 4 unused defines, deduplicated
+  ATTR_HAS_COLOR definition
+- Build size: ~103KB (down from ~110KB after dead code removal)
+- Memory per session: ~79KB System 6 mono, ~92KB System 7 color (initial),
+  ~130KB fully loaded with alt screen and scrollback color
+
 ## [1.8.1] - 2026-03-10
 
 ### Fixed

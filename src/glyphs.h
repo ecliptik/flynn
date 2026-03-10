@@ -37,7 +37,7 @@
 /* Wide spacer: second cell of a 2-cell glyph */
 #define GLYPH_WIDE_SPACER	0xFF
 
-/* --- Primitive symbol indices (0x00-0x40) --- */
+/* --- Primitive symbol indices (0x00-0x68) --- */
 #define GLYPH_ARROW_LEFT	0x00	/* U+2190 */
 #define GLYPH_ARROW_UP		0x01	/* U+2191 */
 #define GLYPH_ARROW_RIGHT	0x02	/* U+2192 */
@@ -111,25 +111,71 @@
 #define GLYPH_SHADE_LIGHT	0x3E	/* U+2591 ░ */
 #define GLYPH_SHADE_MEDIUM	0x3F	/* U+2592 ▒ */
 #define GLYPH_SHADE_DARK	0x40	/* U+2593 ▓ */
-#define GLYPH_PRIM_COUNT	65
+/* Outline triangles */
+#define GLYPH_TRI_UP_EMPTY	0x41	/* U+25B3 △ */
+#define GLYPH_TRI_RIGHT_EMPTY	0x42	/* U+25B7 ▷ */
+#define GLYPH_TRI_DOWN_EMPTY	0x43	/* U+25BD ▽ */
+#define GLYPH_TRI_LEFT_EMPTY	0x44	/* U+25C1 ◁ */
+/* Small filled triangles */
+#define GLYPH_TRI_RIGHT_SM	0x45	/* U+25B8 ▸ */
+#define GLYPH_TRI_LEFT_SM	0x46	/* U+25C2 ◂ */
+/* Diamonds */
+#define GLYPH_DIAMOND_FILLED	0x47	/* U+25C6 ◆ */
+#define GLYPH_DIAMOND_EMPTY	0x48	/* U+25C7 ◇ */
+/* Circle variants */
+#define GLYPH_CIRCLE_HALF_L	0x49	/* U+25D0 ◐ left half */
+#define GLYPH_CIRCLE_HALF_R	0x4A	/* U+25D1 ◑ right half */
+#define GLYPH_CIRCLE_HALF_B	0x4B	/* U+25D2 ◒ bottom half */
+#define GLYPH_CIRCLE_HALF_T	0x4C	/* U+25D3 ◓ top half */
+#define GLYPH_CIRCLE_DOT	0x4D	/* U+25C9 ◉ fisheye */
+/* Six-pointed star */
+#define GLYPH_STAR_SIX		0x4E	/* U+2736 ✶ */
+/* Circled operators */
+#define GLYPH_CIRCLED_DOT	0x4F	/* U+2299 ⊙ */
+#define GLYPH_CIRCLED_PLUS	0x50	/* U+2295 ⊕ */
+#define GLYPH_CIRCLED_MINUS	0x51	/* U+2296 ⊖ */
+#define GLYPH_CIRCLED_TIMES	0x52	/* U+2297 ⊗ */
+/* Superscript digits */
+#define GLYPH_SUPER_0		0x53	/* U+2070 ⁰ */
+#define GLYPH_SUPER_1		0x54	/* U+00B9 ¹ */
+#define GLYPH_SUPER_2		0x55	/* U+00B2 ² */
+#define GLYPH_SUPER_3		0x56	/* U+00B3 ³ */
+#define GLYPH_SUPER_4		0x57	/* U+2074 ⁴ */
+#define GLYPH_SUPER_5		0x58	/* U+2075 ⁵ */
+#define GLYPH_SUPER_6		0x59	/* U+2076 ⁶ */
+#define GLYPH_SUPER_7		0x5A	/* U+2077 ⁷ */
+#define GLYPH_SUPER_8		0x5B	/* U+2078 ⁸ */
+#define GLYPH_SUPER_9		0x5C	/* U+2079 ⁹ */
+/* Subscript digits */
+#define GLYPH_SUB_0		0x5D	/* U+2080 ₀ */
+#define GLYPH_SUB_1		0x5E	/* U+2081 ₁ */
+#define GLYPH_SUB_2		0x5F	/* U+2082 ₂ */
+#define GLYPH_SUB_3		0x60	/* U+2083 ₃ */
+#define GLYPH_SUB_4		0x61	/* U+2084 ₄ */
+#define GLYPH_SUB_5		0x62	/* U+2085 ₅ */
+#define GLYPH_SUB_6		0x63	/* U+2086 ₆ */
+#define GLYPH_SUB_7		0x64	/* U+2087 ₇ */
+#define GLYPH_SUB_8		0x65	/* U+2088 ₈ */
+#define GLYPH_SUB_9		0x66	/* U+2089 ₉ */
+#define GLYPH_PRIM_COUNT	103
 
-/* --- Bitmap emoji indices (0x60-0x7F) --- */
-#define GLYPH_EMOJI_BASE	0x60
-#define GLYPH_EMOJI_GRIN	0x60	/* U+1F600 */
-#define GLYPH_EMOJI_HEART	0x61	/* U+2764 */
-#define GLYPH_EMOJI_THUMBSUP	0x62	/* U+1F44D */
-#define GLYPH_EMOJI_FIRE	0x63	/* U+1F525 */
-#define GLYPH_EMOJI_STAR	0x64	/* U+2B50 */
-#define GLYPH_EMOJI_CHECK	0x65	/* U+2705 */
-#define GLYPH_EMOJI_CROSSMARK	0x66	/* U+274C */
-#define GLYPH_EMOJI_ROCKET	0x67	/* U+1F680 */
-#define GLYPH_EMOJI_FOLDER	0x68	/* U+1F4C1 */
-#define GLYPH_EMOJI_BULB	0x69	/* U+1F4A1 */
-#define GLYPH_EMOJI_GLOBE	0x6A	/* U+1F310 */
-#define GLYPH_EMOJI_WRENCH	0x6B	/* U+1F527 */
-#define GLYPH_EMOJI_PACKAGE	0x6C	/* U+1F4E6 */
-#define GLYPH_EMOJI_SNAKE	0x6D	/* U+1F40D */
-#define GLYPH_EMOJI_CRAB	0x6E	/* U+1F980 */
+/* --- Bitmap emoji indices (0x80-0x9F) --- */
+#define GLYPH_EMOJI_BASE	0x80
+#define GLYPH_EMOJI_GRIN	0x80	/* U+1F600 */
+#define GLYPH_EMOJI_HEART	0x81	/* U+2764 */
+#define GLYPH_EMOJI_THUMBSUP	0x82	/* U+1F44D */
+#define GLYPH_EMOJI_FIRE	0x83	/* U+1F525 */
+#define GLYPH_EMOJI_STAR	0x84	/* U+2B50 */
+#define GLYPH_EMOJI_CHECK	0x85	/* U+2705 */
+#define GLYPH_EMOJI_CROSSMARK	0x86	/* U+274C */
+#define GLYPH_EMOJI_ROCKET	0x87	/* U+1F680 */
+#define GLYPH_EMOJI_FOLDER	0x88	/* U+1F4C1 */
+#define GLYPH_EMOJI_BULB	0x89	/* U+1F4A1 */
+#define GLYPH_EMOJI_GLOBE	0x8A	/* U+1F310 */
+#define GLYPH_EMOJI_WRENCH	0x8B	/* U+1F527 */
+#define GLYPH_EMOJI_PACKAGE	0x8C	/* U+1F4E6 */
+#define GLYPH_EMOJI_SNAKE	0x8D	/* U+1F40D */
+#define GLYPH_EMOJI_CRAB	0x8E	/* U+1F980 */
 #define GLYPH_EMOJI_COUNT	15
 
 /* Glyph info: describes how to render a glyph */
@@ -151,7 +197,7 @@ typedef struct {
 /*
  * glyph_lookup - look up a Unicode codepoint in the glyph table
  *
- * Returns the glyph index (0x00-0x7F) or -1 if not found.
+ * Returns the glyph index (0x00-0x9F) or -1 if not found.
  * Braille (U+2800-U+28FF) is handled separately in terminal.c.
  */
 short glyph_lookup(long cp);

@@ -24,6 +24,7 @@
 #include "settings.h"
 #include "glyphs.h"
 #include "dialogs.h"
+#include "color.h"
 #include "macutil.h"
 #include "sysutil.h"
 
@@ -201,7 +202,7 @@ do_about(void)
 	DialogPtr dlg;
 	short item;
 	char machine[32];
-	char running_on[48];
+	char running_on[64];
 	short item_type;
 	Handle item_h;
 	Rect item_rect;
@@ -211,9 +212,10 @@ do_about(void)
 	if (!dlg)
 		return;
 
-	/* Set machine type in item 8 */
+	/* Set machine type in item 4 */
 	get_machine_name(machine, sizeof(machine));
-	sprintf(running_on, "Running on %s", machine);
+	snprintf(running_on, sizeof(running_on), "Running on %s%s",
+	    machine, g_has_color_qd ? " (Color)" : "");
 	c2pstr(pstr, running_on);
 	GetDialogItem(dlg, 4, &item_type, &item_h, &item_rect);
 	SetDialogItemText(item_h, pstr);
@@ -245,11 +247,12 @@ session_post_connect(Session *s, short ttype, short bm_index,
 	s->telnet.rows = s->terminal.active_rows;
 	terminal_reset(&s->terminal);
 
-	/* Save last-used host/port to prefs */
+	/* Save last-used host/port/terminal type to prefs */
 	strncpy(prefs.host, s->conn.host,
 	    sizeof(prefs.host) - 1);
 	prefs.host[sizeof(prefs.host) - 1] = '\0';
 	prefs.port = s->conn.port;
+	prefs.terminal_type = ttype;
 	prefs_save(&prefs);
 
 	/* Track bookmark */
@@ -436,7 +439,8 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 					/* Fill port */
 					{
 						char portbuf[8];
-						sprintf(portbuf,
+						snprintf(portbuf,
+						    sizeof(portbuf),
 						    "%d", bm->port);
 						dlg_set_text(dlg,
 						    DLOG_PORT_FIELD,
@@ -574,7 +578,8 @@ do_connect(void)
 		/* Pre-fill port */
 		if (prefill_port > 0) {
 			char portbuf[8];
-			sprintf(portbuf, "%d", prefill_port);
+			snprintf(portbuf, sizeof(portbuf), "%d",
+		    prefill_port);
 			dlg_set_text(dlg, DLOG_PORT_FIELD,
 			    portbuf);
 		}
@@ -728,11 +733,11 @@ do_connect(void)
 				char smsg[80];
 
 				if (ip2long(s->conn.host) != 0)
-					sprintf(smsg,
+					snprintf(smsg, sizeof(smsg),
 					    "Connecting to %.40s\311",
 					    s->conn.host);
 				else
-					sprintf(smsg,
+					snprintf(smsg, sizeof(smsg),
 					    "Resolving %.40s\311",
 					    s->conn.host);
 				sw = conn_status_show(smsg);
@@ -794,6 +799,7 @@ do_connect_bookmark(short index)
 {
 	Bookmark *bm;
 	Session *s = active_session;
+	Boolean created_session = false;
 
 	if (index < 0 || index >= prefs.bookmark_count)
 		return;
@@ -808,6 +814,7 @@ do_connect_bookmark(short index)
 		}
 		session_init_from_prefs(s);
 		active_session = s;
+		created_session = true;
 	}
 
 	/* If active session is already connected, create a new one */
@@ -823,6 +830,7 @@ do_connect_bookmark(short index)
 		session_init_from_prefs(s);
 		SelectWindow(s->window);
 		active_session = s;
+		created_session = true;
 	}
 
 	if (s->conn.state != CONN_STATE_IDLE) {
@@ -841,12 +849,24 @@ do_connect_bookmark(short index)
 		Boolean ok;
 		short ttype;
 
-		sprintf(smsg, "Resolving %.40s\311", bm->host);
+		snprintf(smsg, sizeof(smsg), "Resolving %.40s\311",
+		    bm->host);
 		sw = conn_status_show(smsg);
 		ok = conn_connect(&s->conn, bm->host, bm->port, sw);
 		conn_status_close(sw);
 
 		if (!ok) {
+			if (created_session &&
+			    s->conn.state == CONN_STATE_IDLE) {
+				if (s == active_session)
+					active_session = 0L;
+				session_destroy(s);
+				if (!active_session) {
+					WindowPtr front = FrontWindow();
+					active_session =
+					    session_from_window(front);
+				}
+			}
 			update_menus();
 			return;
 		}
@@ -887,12 +907,14 @@ bm_list_draw(WindowPtr win, short item)
 
 		MoveTo(r.left + 4, y + 12);
 		if (p->bookmarks[i].port != 23)
-			len = sprintf(line, "%s - %s:%u",
+			len = snprintf(line, sizeof(line),
+			    "%s - %s:%u",
 			    p->bookmarks[i].name,
 			    p->bookmarks[i].host,
 			    p->bookmarks[i].port);
 		else
-			len = sprintf(line, "%s - %s",
+			len = snprintf(line, sizeof(line),
+			    "%s - %s",
 			    p->bookmarks[i].name,
 			    p->bookmarks[i].host);
 		DrawText(line, 0, len);
@@ -1106,7 +1128,7 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 		dlg_set_text(dlg, BME_HOST_FIELD, bm->host);
 	if (bm->port > 0) {
 		char port_buf[8];
-		sprintf(port_buf, "%u", bm->port);
+		snprintf(port_buf, sizeof(port_buf), "%u", bm->port);
 		dlg_set_text(dlg, BME_PORT_FIELD, port_buf);
 	}
 	if (bm->username[0])
@@ -1410,7 +1432,8 @@ do_save_as_bookmark(void)
 	}
 	if (!bm.name[0]) {
 		if (s->conn.username[0])
-			sprintf(bm.name, "%.15s@%.15s",
+			snprintf(bm.name, sizeof(bm.name),
+			    "%.15s@%.15s",
 			    s->conn.username, s->conn.host);
 		else
 			strncpy(bm.name, s->conn.host,

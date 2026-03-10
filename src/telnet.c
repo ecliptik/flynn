@@ -66,10 +66,6 @@
 #define OPT_TTYPE	24
 #define OPT_NAWS	31
 #define OPT_TSPEED	32
-#define OPT_FLOWCTRL	33
-#define OPT_LINEMODE	34
-#define OPT_NEWENV	39
-
 /* Terminal identity */
 static const char tspeed_str[] = "19200,19200";
 
@@ -314,7 +310,8 @@ handle_sb(TelnetState *ts, unsigned char *send, short *sendlen)
 			buf[2] = OPT_TTYPE;
 			buf[3] = SB_IS;
 			len = 4;
-			for (i = 0; ttype[i] != '\0'; i++)
+			for (i = 0; ttype[i] != '\0' &&
+			    len < sizeof(buf) - 2; i++)
 				buf[len++] = (unsigned char)ttype[i];
 			buf[len++] = IAC;
 			buf[len++] = SE;
@@ -330,7 +327,8 @@ handle_sb(TelnetState *ts, unsigned char *send, short *sendlen)
 			buf[2] = OPT_TSPEED;
 			buf[3] = SB_IS;
 			len = 4;
-			for (i = 0; tspeed_str[i] != '\0'; i++)
+			for (i = 0; tspeed_str[i] != '\0' &&
+			    len < sizeof(buf) - 2; i++)
 				buf[len++] = (unsigned char)tspeed_str[i];
 			buf[len++] = IAC;
 			buf[len++] = SE;

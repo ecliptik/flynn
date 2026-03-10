@@ -17,6 +17,7 @@
 #include "settings.h"
 #include "macutil.h"
 #include "tcp.h"
+#include "color.h"
 
 static Session *sessions[MAX_SESSIONS];
 static short num_sessions = 0;
@@ -66,12 +67,25 @@ session_new(void)
 	SetRect(&bounds, 2 + offset, 40 + offset,
 	    2 + offset + win_w, 40 + offset + win_h);
 
-	s->window = NewWindow(0L, &bounds, "\pFlynn", true,
-	    documentProc, (WindowPtr)-1L, true, (long)s);
+	/* Use NewCWindow on System 7 for color, NewWindow on System 6 */
+	if (g_has_color_qd) {
+		s->window = NewCWindow(0L, &bounds, "\pFlynn", true,
+		    documentProc, (WindowPtr)-1L, true, (long)s);
+	} else {
+		s->window = NewWindow(0L, &bounds, "\pFlynn", true,
+		    documentProc, (WindowPtr)-1L, true, (long)s);
+	}
 	if (s->window == 0L) {
 		DisposePtr((Ptr)s);
 		return 0L;
 	}
+
+	/*
+	 * Note: Palette attachment removed — NSetPalette with
+	 * pmTolerant was interfering with RGBForeColor for text.
+	 * RGBForeColor/RGBBackColor work directly on color
+	 * displays without a custom palette.
+	 */
 
 	sessions[slot] = s;
 	num_sessions++;
@@ -86,6 +100,14 @@ session_destroy(Session *s)
 
 	if (s->conn.state != CONN_STATE_IDLE)
 		conn_close(&s->conn);
+
+	/* Free color arrays (System 7 only) */
+	if (s->terminal.screen_color)
+		DisposePtr((Ptr)s->terminal.screen_color);
+	if (s->terminal.alt_color)
+		DisposePtr((Ptr)s->terminal.alt_color);
+	if (s->terminal.sb_color)
+		DisposePtr((Ptr)s->terminal.sb_color);
 
 	if (s->window)
 		DisposeWindow(s->window);

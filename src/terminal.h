@@ -19,6 +19,8 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
+#include "color.h"
+
 /* Maximum screen dimensions (buffer size) */
 #define TERM_COLS		132
 #define TERM_ROWS		50
@@ -41,6 +43,7 @@
 #define ATTR_DEC_GRAPHICS	0x08
 #define ATTR_GLYPH		0x10	/* ch is a glyph index */
 #define ATTR_BRAILLE		0x20	/* ch is braille dot pattern */
+#define ATTR_HAS_COLOR		0x40	/* cell has non-default color */
 
 /* Line attributes (per-row) */
 #define LINE_ATTR_NORMAL    0
@@ -136,11 +139,20 @@ typedef struct {
 	unsigned char	alt_cur_attr;
 	unsigned char	alt_active;
 	unsigned char	alt_line_attr[TERM_ROWS];	/* saved line attrs for main screen */
+	unsigned char	alt_cur_fg;	/* alt screen saved fg */
+	unsigned char	alt_cur_bg;	/* alt screen saved bg */
+
+	/* Color state (System 7 only, zero-cost on System 6) */
+	unsigned char	has_color;	/* runtime: Color QD available + alloc'd */
+	unsigned char	cur_fg;		/* current fg (COLOR_DEFAULT = default) */
+	unsigned char	cur_bg;		/* current bg (COLOR_DEFAULT = default) */
 
 	/* Saved cursor (ESC 7 / ESC 8) */
 	short		saved_row;
 	short		saved_col;
 	unsigned char	saved_attr;
+	unsigned char	saved_fg;	/* saved cursor fg color */
+	unsigned char	saved_bg;	/* saved cursor bg color */
 	unsigned char	saved_g0_charset;
 	unsigned char	saved_g1_charset;
 	unsigned char	saved_gl_charset;
@@ -166,6 +178,16 @@ typedef struct {
 	unsigned char	utf8_expect;	/* total bytes expected (2, 3, or 4) */
 	unsigned char	last_was_emoji;	/* absorb following modifiers */
 
+	/* Screen snapshot for disconnect recovery (saved on full clear) */
+	short		snap_valid;	/* 1 if snap_screen has data */
+	short		snap_rows;	/* active rows at snapshot time */
+	short		snap_cols;	/* active cols at snapshot time */
+
+	/* --- Color arrays: dynamically allocated on System 7 only --- */
+	CellColor	*screen_color;	/* NULL on System 6 */
+	CellColor	*alt_color;	/* NULL on System 6, lazy alloc */
+	CellColor	*sb_color;	/* NULL on System 6, lazy alloc */
+
 	/* --- Large arrays LAST: pushed beyond hot-path offsets --- */
 
 	/* Screen buffer: rows x cols (13,200 bytes) */
@@ -176,6 +198,9 @@ typedef struct {
 
 	/* Scrollback ring buffer (25,344 bytes) */
 	TermCell	scrollback[TERM_SCROLLBACK_LINES][TERM_COLS];
+
+	/* Disconnect recovery snapshot (13,200 bytes) */
+	TermCell	snap_screen[TERM_ROWS][TERM_COLS];
 } Terminal;
 
 /* Initialize terminal to default state */
@@ -187,11 +212,11 @@ void terminal_process(Terminal *term, unsigned char *data, short len);
 /* Reset terminal to initial state */
 void terminal_reset(Terminal *term);
 
-/* Get cell at given position (returns pointer into screen buffer) */
-TermCell *terminal_get_cell(Terminal *term, short row, short col);
-
 /* Get display cell accounting for scroll_offset (for rendering) */
 TermCell *terminal_get_display_cell(Terminal *term, short row, short col);
+
+/* Get display color accounting for scroll_offset (NULL if no color) */
+CellColor *terminal_get_display_color(Terminal *term, short row, short col);
 
 /* Scroll back N lines into scrollback buffer */
 void terminal_scroll_back(Terminal *term, short lines);

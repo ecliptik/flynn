@@ -46,42 +46,6 @@ extern void session_load_font(Session *s);
 extern void do_font_change(short font_id, short font_size);
 extern void do_window_resize(Session *s, short width, short height);
 
-MenuHandle
-get_apple_menu(void)
-{
-	return apple_menu;
-}
-
-MenuHandle
-get_file_menu(void)
-{
-	return file_menu;
-}
-
-MenuHandle
-get_edit_menu(void)
-{
-	return edit_menu;
-}
-
-MenuHandle
-get_prefs_menu(void)
-{
-	return prefs_menu;
-}
-
-MenuHandle
-get_ctrl_menu(void)
-{
-	return ctrl_menu;
-}
-
-MenuHandle
-get_window_menu(void)
-{
-	return window_menu;
-}
-
 void
 init_menus(void)
 {
@@ -206,7 +170,8 @@ update_window_menu(void)
 
 	/* Add count header (disabled) */
 	sess_count = session_count();
-	sprintf(count_str, "%d of %d Sessions", sess_count, MAX_SESSIONS);
+	snprintf(count_str, sizeof(count_str), "%d of %d Sessions",
+	    sess_count, MAX_SESSIONS);
 	{
 		Str255 ps;
 		short len = strlen(count_str);

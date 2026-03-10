@@ -30,6 +30,7 @@ No build toolchain required — just download and run.
 
 - **Multiple sessions** (up to 4 simultaneous windows)
 - **VT100/VT220/xterm/xterm-256color terminal emulation**
+- **256-color support** on System 7 with Color QuickDraw (zero System 6 impact)
 - **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns**
 - **Resizable window and scrollback** (80x24 up to 132x50)
 - **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
@@ -40,7 +41,7 @@ No build toolchain required — just download and run.
 - **Dark mode**
 - **Settings persistence**
 - **System 7 compatible** (MultiFinder, Apple Events, Notification Manager)
-- **4MB Mac Plus** (~110KB on disk, ~73KB RAM per session)
+- **4MB Mac Plus** (~103KB on disk, ~79KB RAM per session mono / ~92KB color)
 
 ## Keyboard Shortcuts
 

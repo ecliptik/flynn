@@ -28,7 +28,29 @@
 #include <OSUtils.h>
 #include <Multiverse.h>
 #include "terminal_ui.h"
+#include "color.h"
 #include "glyphs.h"
+
+/*
+ * Set foreground/background color by palette index using RGBForeColor/
+ * RGBBackColor.  PmForeColor/PmBackColor don't work in Retro68's
+ * Palette Manager trap glue, so we use direct RGB calls instead.
+ */
+static void
+set_fg_color(unsigned char index)
+{
+	RGBColor rgb;
+	color_get_rgb(index, &rgb);
+	RGBForeColor(&rgb);
+}
+
+static void
+set_bg_color(unsigned char index)
+{
+	RGBColor rgb;
+	color_get_rgb(index, &rgb);
+	RGBBackColor(&rgb);
+}
 
 /* Cursor state */
 static unsigned long	cursor_last_tick;
@@ -148,6 +170,17 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	TextFont(g_font_id);
 	TextSize(g_font_size);
 
+	/* If cursor moved, mark old and new rows dirty to clean up
+	 * XOR artifacts from previous draw_cursor() calls */
+	if (cursor_initialized) {
+		short crow, ccol;
+		terminal_get_cursor(term, &crow, &ccol);
+		if (crow != cursor_prev_row || ccol != cursor_prev_col) {
+			term->dirty[cursor_prev_row] = 1;
+			term->dirty[crow] = 1;
+		}
+	}
+
 	for (row = 0; row < term->active_rows; row++) {
 		if (!terminal_is_row_dirty(term, row))
 			continue;
@@ -156,12 +189,31 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		SetRect(&r, LEFT_MARGIN, row_top(row),
 		    LEFT_MARGIN + term->active_cols * g_cell_width,
 		    row_bottom(row));
-		EraseRect(&r);
+
+		if (g_has_color_qd && g_dark_mode) {
+			/* Color dark mode: erase with black background */
+			set_bg_color(0);
+			EraseRect(&r);
+		} else if (g_has_color_qd) {
+			/* Color light mode: erase with white background */
+			set_bg_color(15);
+			EraseRect(&r);
+		} else {
+			EraseRect(&r);
+		}
+
+		/* Set default fg color before drawing row */
+		if (g_has_color_qd)
+			set_fg_color(g_dark_mode ? 15 : 0);
 
 		draw_row(term, row);
 
-		/* Dark mode: invert the rendered row (XOR all pixels) */
-		if (g_dark_mode)
+		/*
+		 * Dark mode: invert only on monochrome systems.
+		 * On color systems, draw_row() handles dark mode
+		 * by resolving COLOR_DEFAULT to white-on-black.
+		 */
+		if (g_dark_mode && !g_has_color_qd)
 			InvertRect(&r);
 	}
 
@@ -249,16 +301,21 @@ draw_row(Terminal *term, short row)
 	char buf[TERM_COLS];
 	short col, run_start, run_len;
 	unsigned char run_attr;
+	unsigned char run_fg, run_bg;
 	TermCell *cell;
+	CellColor *cc;
 	short baseline;
 	short last_face = -1;
 	short row_y;
 	short sel_start_col, sel_end_col;
 	short cell_w, eff_cols;
 	unsigned char lattr;
+	short use_color;
+	short color_dirty = 0;
 
 	baseline = row_top(row) + g_cell_baseline;
 	row_y = row_top(row);
+	use_color = g_has_color_qd && term->has_color;
 
 	/* Double-width/height: halve columns, double cell width */
 	lattr = term->line_attr[row];
@@ -304,30 +361,64 @@ draw_row(Terminal *term, short row)
 	col = 0;
 	while (col < eff_cols) {
 		unsigned char cell_attr;
+		unsigned char cell_fg, cell_bg;
 
 		cell = terminal_get_display_cell(term, row, col);
 		cell_attr = cell->attr;
 		if (col >= sel_start_col && col <= sel_end_col)
 			cell_attr ^= ATTR_INVERSE;
+
+		/* Get cell color */
+		cell_fg = COLOR_DEFAULT;
+		cell_bg = COLOR_DEFAULT;
+		if (use_color && (cell_attr & ATTR_HAS_COLOR)) {
+			cc = terminal_get_display_color(term, row, col);
+			if (cc) {
+				cell_fg = cc->fg;
+				cell_bg = cc->bg;
+			}
+		}
+
 		run_attr = cell_attr;
+		run_fg = cell_fg;
+		run_bg = cell_bg;
 		run_start = col;
 		run_len = 0;
 
-		/* Collect run of cells with same effective attributes */
+		/* Collect run of cells with same attributes and color */
 		while (col < eff_cols) {
 			cell = terminal_get_display_cell(term, row, col);
 			cell_attr = cell->attr;
 			if (col >= sel_start_col && col <= sel_end_col)
 				cell_attr ^= ATTR_INVERSE;
+
+			cell_fg = COLOR_DEFAULT;
+			cell_bg = COLOR_DEFAULT;
+			if (use_color && (cell_attr & ATTR_HAS_COLOR)) {
+				cc = terminal_get_display_color(
+				    term, row, col);
+				if (cc) {
+					cell_fg = cc->fg;
+					cell_bg = cc->bg;
+				}
+			}
+
 			if (cell_attr != run_attr)
 				break;
+			/* Break on color change (only on color systems) */
+			if (use_color &&
+			    (cell_fg != run_fg || cell_bg != run_bg))
+				break;
+
 			buf[run_len] = cell->ch;
 			run_len++;
 			col++;
 		}
 
-		/* Skip runs of plain spaces (already erased) */
-		if (run_attr == ATTR_NORMAL) {
+		/* Skip runs of plain spaces (already erased) —
+		 * but NOT if they have background color */
+		if (run_attr == ATTR_NORMAL &&
+		    !(use_color && run_bg != COLOR_DEFAULT)) {
 			short all_space, i;
 
 			all_space = 1;
@@ -341,124 +432,204 @@ draw_row(Terminal *term, short row)
 				continue;
 		}
 
-		/* DEC Special Graphics: render each cell individually
-		 * Batch PenNormal: set pen state before run, restore after */
-		if (run_attr & ATTR_DEC_GRAPHICS) {
-			short i, x;
-
-			x = LEFT_MARGIN + run_start * cell_w;
-			for (i = 0; i < run_len; i++) {
-				draw_line_char(buf[i], x, row_y, run_attr);
-				x += cell_w;
-			}
-			continue;
-		}
-
-		/* Braille patterns: render dot grid */
-		if (run_attr & ATTR_BRAILLE) {
-			short i, x;
-
-			x = LEFT_MARGIN + run_start * cell_w;
-			for (i = 0; i < run_len; i++) {
-				draw_braille((unsigned char)buf[i],
-				    x, row_y, run_attr);
-				x += cell_w;
-			}
-			continue;
-		}
-
-		/* Custom glyphs: primitives and emoji */
-		if (run_attr & ATTR_GLYPH) {
-			short i, x;
-
-			x = LEFT_MARGIN + run_start * cell_w;
-			for (i = 0; i < run_len; i++) {
-				unsigned char gid;
-
-				gid = (unsigned char)buf[i];
-				if (gid == GLYPH_WIDE_SPACER) {
-					x += cell_w;
-					continue;	/* skip second cell */
-				}
-				if (gid < GLYPH_EMOJI_BASE) {
-					draw_glyph_prim(gid,
-					    x, row_y, run_attr);
-				} else {
-					draw_glyph_bitmap(gid,
-					    x, row_y, run_attr);
-				}
-				x += cell_w;
-			}
-			continue;
-		}
-
-		/* Set text face for this run (cached to avoid redundant calls) */
+		/*
+		 * Resolve effective fg/bg for rendering.
+		 *
+		 * On color systems, COLOR_DEFAULT resolves to:
+		 *   Normal mode: fg=black(0), bg=white(15)
+		 *   Dark mode:   fg=white(15), bg=black(0)
+		 *
+		 * On monochrome, inverse is handled by the existing
+		 * PaintRect + srcBic path; dark mode by InvertRect.
+		 */
 		{
-			short face = 0;
+			unsigned char eff_fg = run_fg;
+			unsigned char eff_bg = run_bg;
 
-			if (run_attr & ATTR_BOLD)
-				face |= bold;
-			if (run_attr & ATTR_UNDERLINE)
-				face |= underline;
-			if (face != last_face) {
-				TextFace(face);
-				last_face = face;
+			if (use_color) {
+				/* Resolve defaults based on dark mode */
+				if (eff_fg == COLOR_DEFAULT)
+					eff_fg = g_dark_mode ? 15 : 0;
+				if (eff_bg == COLOR_DEFAULT)
+					eff_bg = g_dark_mode ? 0 : 15;
+
+				if (run_attr & ATTR_INVERSE) {
+					/* Swap fg and bg */
+					unsigned char tmp = eff_fg;
+					eff_fg = eff_bg;
+					eff_bg = tmp;
+				}
 			}
-		}
-
-		if (run_attr & ATTR_INVERSE) {
-			Rect inv_r;
-			short x;
-
-			/* Paint background black for inverse region */
-			SetRect(&inv_r,
-			    LEFT_MARGIN + run_start * cell_w, row_y,
-			    LEFT_MARGIN + run_start * cell_w +
-			    run_len * cell_w,
-			    row_bottom(row));
-			PaintRect(&inv_r);
 
 			/*
-			 * Draw text in white (srcBic: clears bits where
-			 * text is).  Always use per-character positioning
-			 * to avoid bold advance width drift.
-			 * Use incremental x instead of col_left() MULU.
+			 * Draw colored background.
+			 * On color systems, draw bg when it differs from
+			 * the row erase color. In dark mode, erase is
+			 * black (0); in normal mode, erase is white (15).
 			 */
-			TextMode(srcBic);
-			x = LEFT_MARGIN + run_start * cell_w;
+			if (use_color) {
+				unsigned char erase_bg =
+				    g_dark_mode ? 0 : 15;
+				if (eff_bg != erase_bg) {
+					Rect bg_r;
+					SetRect(&bg_r,
+					    LEFT_MARGIN +
+					    run_start * cell_w,
+					    row_y,
+					    LEFT_MARGIN +
+					    run_start * cell_w +
+					    run_len * cell_w,
+					    row_bottom(row));
+					set_bg_color(eff_bg);
+					EraseRect(&bg_r);
+				}
+			}
+
+			/*
+			 * Set fg color for pen-based paths
+			 * (line drawing, braille, glyphs).
+			 * Text fg is set AFTER TextFace below
+			 * because TextFace resets the port's
+			 * foreground color on Color QuickDraw.
+			 */
+			if (use_color)
+				set_fg_color(eff_fg);
+
+			/* DEC Special Graphics */
+			if (run_attr & ATTR_DEC_GRAPHICS) {
+				short i, x;
+				x = LEFT_MARGIN + run_start * cell_w;
+				for (i = 0; i < run_len; i++) {
+					draw_line_char(buf[i], x, row_y,
+					    run_attr);
+					x += cell_w;
+				}
+				if (use_color)
+					color_dirty = 1;
+				continue;
+			}
+
+			/* Braille patterns */
+			if (run_attr & ATTR_BRAILLE) {
+				short i, x;
+				x = LEFT_MARGIN + run_start * cell_w;
+				for (i = 0; i < run_len; i++) {
+					draw_braille((unsigned char)buf[i],
+					    x, row_y, run_attr);
+					x += cell_w;
+				}
+				if (use_color)
+					color_dirty = 1;
+				continue;
+			}
+
+			/* Custom glyphs: primitives and emoji */
+			if (run_attr & ATTR_GLYPH) {
+				short i, x;
+				x = LEFT_MARGIN + run_start * cell_w;
+				for (i = 0; i < run_len; i++) {
+					unsigned char gid;
+					gid = (unsigned char)buf[i];
+					if (gid == GLYPH_WIDE_SPACER) {
+						x += cell_w;
+						continue;
+					}
+					if (gid < GLYPH_EMOJI_BASE)
+						draw_glyph_prim(gid,
+						    x, row_y, run_attr);
+					else
+						draw_glyph_bitmap(gid,
+						    x, row_y, run_attr);
+					x += cell_w;
+				}
+				if (use_color)
+					color_dirty = 1;
+				continue;
+			}
+
+			/* Set text face for this run */
 			{
+				short face = 0;
+				if (run_attr & ATTR_BOLD)
+					face |= bold;
+				if (run_attr & ATTR_UNDERLINE)
+					face |= underline;
+				if (face != last_face) {
+					TextFace(face);
+					last_face = face;
+				}
+			}
+
+			/*
+			 * Set text fg AFTER TextFace — on Color
+			 * QuickDraw, TextFace resets the port's
+			 * foreground color.
+			 */
+			if (use_color)
+				set_fg_color(eff_fg);
+
+			if (run_attr & ATTR_INVERSE) {
+				if (use_color) {
+					short x = LEFT_MARGIN +
+					    run_start * cell_w;
+					short i;
+					for (i = 0; i < run_len; i++) {
+						MoveTo(x, baseline);
+						DrawChar(buf[i]);
+						x += cell_w;
+					}
+				} else {
+					/* Monochrome inverse: existing
+					 * PaintRect + srcBic path */
+					Rect inv_r;
+					short x;
+					SetRect(&inv_r,
+					    LEFT_MARGIN +
+					    run_start * cell_w,
+					    row_y,
+					    LEFT_MARGIN +
+					    run_start * cell_w +
+					    run_len * cell_w,
+					    row_bottom(row));
+					PaintRect(&inv_r);
+					TextMode(srcBic);
+					x = LEFT_MARGIN +
+					    run_start * cell_w;
+					{
+						short i;
+						for (i = 0; i < run_len;
+						    i++) {
+							MoveTo(x, baseline);
+							DrawChar(buf[i]);
+							x += cell_w;
+						}
+					}
+					TextMode(srcOr);
+				}
+			} else if ((run_attr & ATTR_BOLD) ||
+			    cell_w != g_cell_width) {
+				short x = LEFT_MARGIN +
+				    run_start * cell_w;
 				short i;
 				for (i = 0; i < run_len; i++) {
 					MoveTo(x, baseline);
 					DrawChar(buf[i]);
 					x += cell_w;
 				}
+			} else {
+				MoveTo(col_left(run_start), baseline);
+				DrawText(buf, 0, run_len);
 			}
-			TextMode(srcOr);
-		} else if ((run_attr & ATTR_BOLD) ||
-		    cell_w != g_cell_width) {
-			/*
-			 * Per-character MoveTo+DrawChar for:
-			 * - Bold text (advance width drift)
-			 * - Double-width lines (2x cell spacing)
-			 */
-			short x = LEFT_MARGIN + run_start * cell_w;
-			short i;
-			for (i = 0; i < run_len; i++) {
-				MoveTo(x, baseline);
-				DrawChar(buf[i]);
-				x += cell_w;
-			}
-		} else {
-			/*
-			 * Non-bold, non-inverse text: safe to use DrawText()
-			 * for the entire run.  This batches ~80 QuickDraw
-			 * calls into 1, giving ~10x speedup for plain text.
-			 * The bold drift bug only affects bold TextFace.
-			 */
-			MoveTo(col_left(run_start), baseline);
-			DrawText(buf, 0, run_len);
+
+			if (use_color)
+				color_dirty = 1;
 		}
+	}
+
+	/* Restore default colors once at end of row */
+	if (color_dirty) {
+		set_fg_color(g_dark_mode ? 15 : 0);
+		set_bg_color(g_dark_mode ? 0 : 15);
 	}
 
 	/* Restore normal face */
@@ -1247,6 +1418,236 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			FillRect(&cell_r, &qd.dkGray);
 		break;
 
+	/* --- Outline triangles --- */
+	case GLYPH_TRI_UP_EMPTY:
+		PenSize(1, 1);
+		MoveTo(cx, y + 2);
+		LineTo(right - 1, bottom - 2);
+		LineTo(x + 1, bottom - 2);
+		LineTo(cx, y + 2);
+		break;
+
+	case GLYPH_TRI_RIGHT_EMPTY:
+		PenSize(1, 1);
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, cy);
+		LineTo(x + 1, bottom - 2);
+		LineTo(x + 1, y + 2);
+		break;
+
+	case GLYPH_TRI_DOWN_EMPTY:
+		PenSize(1, 1);
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, y + 2);
+		LineTo(cx, bottom - 2);
+		LineTo(x + 1, y + 2);
+		break;
+
+	case GLYPH_TRI_LEFT_EMPTY:
+		PenSize(1, 1);
+		MoveTo(right - 1, y + 2);
+		LineTo(x + 1, cy);
+		LineTo(right - 1, bottom - 2);
+		LineTo(right - 1, y + 2);
+		break;
+
+	/* --- Small filled triangles --- */
+	case GLYPH_TRI_RIGHT_SM:
+		/* Small right triangle (inset ~25%) */
+		MoveTo(x + w4, cy - h4);
+		LineTo(right - w4, cy);
+		LineTo(x + w4, cy + h4);
+		LineTo(x + w4, cy - h4);
+		break;
+
+	case GLYPH_TRI_LEFT_SM:
+		/* Small left triangle (inset ~25%) */
+		MoveTo(right - w4, cy - h4);
+		LineTo(x + w4, cy);
+		LineTo(right - w4, cy + h4);
+		LineTo(right - w4, cy - h4);
+		break;
+
+	/* --- Diamonds --- */
+	case GLYPH_DIAMOND_FILLED:
+		/* Filled diamond */
+		{
+			short dx = g_cell_width / 3;
+			short dy = g_cell_height / 3;
+			Rect dr;
+
+			SetRect(&dr, cx - dx, cy - dy,
+			    cx + dx + 1, cy + dy + 1);
+			PaintOval(&dr);
+		}
+		break;
+
+	case GLYPH_DIAMOND_EMPTY:
+		/* Empty diamond */
+		PenSize(1, 1);
+		MoveTo(cx, y + 2);
+		LineTo(right - 1, cy);
+		LineTo(cx, bottom - 2);
+		LineTo(x + 1, cy);
+		LineTo(cx, y + 2);
+		break;
+
+	/* --- Circle variants --- */
+	case GLYPH_CIRCLE_HALF_L:
+		/* Left half black circle */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		SetRect(&r, x + 1, y + 2, cx, bottom - 1);
+		PaintRect(&r);
+		/* Clip to circle by redrawing outline */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		break;
+
+	case GLYPH_CIRCLE_HALF_R:
+		/* Right half black circle */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		SetRect(&r, cx, y + 2, right, bottom - 1);
+		PaintRect(&r);
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		break;
+
+	case GLYPH_CIRCLE_HALF_B:
+		/* Bottom half black circle */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		SetRect(&r, x + 1, cy, right, bottom - 1);
+		PaintRect(&r);
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		break;
+
+	case GLYPH_CIRCLE_HALF_T:
+		/* Top half black circle */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		SetRect(&r, x + 1, y + 2, right, cy);
+		PaintRect(&r);
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		break;
+
+	case GLYPH_CIRCLE_DOT:
+		/* Circle with dot inside (fisheye) */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		SetRect(&r, cx - 1, cy - 1, cx + 2, cy + 2);
+		PaintOval(&r);
+		break;
+
+	/* --- Six-pointed star --- */
+	case GLYPH_STAR_SIX:
+		/* Two overlapping triangles */
+		PenSize(1, 1);
+		/* Up triangle */
+		MoveTo(cx, y + 1);
+		LineTo(right - 1, bottom - 3);
+		LineTo(x + 1, bottom - 3);
+		LineTo(cx, y + 1);
+		/* Down triangle */
+		MoveTo(cx, bottom - 1);
+		LineTo(right - 1, y + 3);
+		LineTo(x + 1, y + 3);
+		LineTo(cx, bottom - 1);
+		break;
+
+	/* --- Circled operators --- */
+	case GLYPH_CIRCLED_DOT:
+		/* Circle with centered dot */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		SetRect(&r, cx - 1, cy - 1, cx + 1, cy + 1);
+		PaintOval(&r);
+		break;
+
+	case GLYPH_CIRCLED_PLUS:
+		/* Circle with + inside */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		PenSize(1, 1);
+		MoveTo(cx, y + 3);
+		LineTo(cx, bottom - 2);
+		MoveTo(x + 2, cy);
+		LineTo(right - 1, cy);
+		break;
+
+	case GLYPH_CIRCLED_MINUS:
+		/* Circle with - inside */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		PenSize(1, 1);
+		MoveTo(x + 2, cy);
+		LineTo(right - 1, cy);
+		break;
+
+	case GLYPH_CIRCLED_TIMES:
+		/* Circle with X inside */
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		FrameOval(&r);
+		PenSize(1, 1);
+		MoveTo(x + 2, y + 3);
+		LineTo(right - 2, bottom - 2);
+		MoveTo(right - 2, y + 3);
+		LineTo(x + 2, bottom - 2);
+		break;
+
+	/* --- Superscript digits --- */
+	case GLYPH_SUPER_0: case GLYPH_SUPER_1:
+	case GLYPH_SUPER_2: case GLYPH_SUPER_3:
+	case GLYPH_SUPER_4: case GLYPH_SUPER_5:
+	case GLYPH_SUPER_6: case GLYPH_SUPER_7:
+	case GLYPH_SUPER_8: case GLYPH_SUPER_9:
+		/* Draw digit at ~60% size in upper portion of cell */
+		{
+			char digit;
+			short small_size;
+
+			digit = '0' + (glyph_id - GLYPH_SUPER_0);
+			small_size = g_font_size * 3 / 5;
+			if (small_size < 6) small_size = 6;
+			TextSize(small_size);
+			if (attr & ATTR_INVERSE)
+				TextMode(srcBic);
+			MoveTo(x + 1, y + small_size);
+			DrawChar(digit);
+			if (attr & ATTR_INVERSE)
+				TextMode(srcOr);
+			TextSize(g_font_size);
+		}
+		break;
+
+	/* --- Subscript digits --- */
+	case GLYPH_SUB_0: case GLYPH_SUB_1:
+	case GLYPH_SUB_2: case GLYPH_SUB_3:
+	case GLYPH_SUB_4: case GLYPH_SUB_5:
+	case GLYPH_SUB_6: case GLYPH_SUB_7:
+	case GLYPH_SUB_8: case GLYPH_SUB_9:
+		/* Draw digit at ~60% size in lower portion of cell */
+		{
+			char digit;
+			short small_size;
+
+			digit = '0' + (glyph_id - GLYPH_SUB_0);
+			small_size = g_font_size * 3 / 5;
+			if (small_size < 6) small_size = 6;
+			TextSize(small_size);
+			if (attr & ATTR_INVERSE)
+				TextMode(srcBic);
+			MoveTo(x + 1, bottom - 1);
+			DrawChar(digit);
+			if (attr & ATTR_INVERSE)
+				TextMode(srcOr);
+			TextSize(g_font_size);
+		}
+		break;
+
 	default:
 		/* Unknown primitive: draw ? */
 		{
@@ -1433,75 +1834,6 @@ draw_cursor(Terminal *term, short on)
 		cursor_prev_row = crow;
 		cursor_prev_col = ccol;
 	}
-}
-
-/*
- * term_ui_invalidate - invalidate only dirty rows
- *
- * Called after terminal_process() in the event loop.  Instead of
- * invalidating the entire window, only mark the rows that changed.
- */
-void
-term_ui_invalidate(WindowPtr win, Terminal *term)
-{
-	GrafPtr old_port;
-	short row;
-	short crow, ccol;
-	Rect r;
-	short any_dirty;
-
-	GetPort(&old_port);
-	SetPort(win);
-
-	any_dirty = 0;
-	for (row = 0; row < term->active_rows; row++) {
-		if (terminal_is_row_dirty(term, row)) {
-			SetRect(&r, LEFT_MARGIN, row_top(row),
-			    LEFT_MARGIN + term->active_cols * g_cell_width,
-			    row_bottom(row));
-			InvalRect(&r);
-			any_dirty = 1;
-		}
-	}
-
-	/* If cursor moved, invalidate old and new cursor rows */
-	terminal_get_cursor(term, &crow, &ccol);
-	if (cursor_initialized &&
-	    (crow != cursor_prev_row || ccol != cursor_prev_col)) {
-		/* Invalidate old cursor position row */
-		SetRect(&r, LEFT_MARGIN, row_top(cursor_prev_row),
-		    LEFT_MARGIN + term->active_cols * g_cell_width,
-		    row_bottom(cursor_prev_row));
-		InvalRect(&r);
-
-		/* Invalidate new cursor position row */
-		SetRect(&r, LEFT_MARGIN, row_top(crow),
-		    LEFT_MARGIN + term->active_cols * g_cell_width,
-		    row_bottom(crow));
-		InvalRect(&r);
-
-		/* Mark both rows dirty so they get redrawn */
-		term->dirty[cursor_prev_row] = 1;
-		term->dirty[crow] = 1;
-	}
-
-	SetPort(old_port);
-}
-
-/*
- * term_ui_invalidate_all - invalidate entire terminal area
- *
- * Used for window reveals or full repaints.
- */
-void
-term_ui_invalidate_all(WindowPtr win)
-{
-	GrafPtr old_port;
-
-	GetPort(&old_port);
-	SetPort(win);
-	InvalRect(&win->portRect);
-	SetPort(old_port);
 }
 
 /*

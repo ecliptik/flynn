@@ -57,7 +57,7 @@ TrapAvailable(unsigned long trap)
 	    NGetTrapAddress(_Unimplemented, ToolTrap));
 }
 
-void
+static void
 GetSystemFolder(short *vRefNumP, long *dirIDP)
 {
 	SysEnvRec info;
@@ -70,7 +70,7 @@ GetSystemFolder(short *vRefNumP, long *dirIDP)
 	}
 }
 
-void
+static void
 GetSystemSubfolder(OSType folder, bool create, short *vRefNumP, long *dirIDP)
 {
 	bool hasFolderMgr = false;

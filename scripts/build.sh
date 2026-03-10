@@ -38,7 +38,7 @@ REZ_FILE="$SCRIPT_DIR/resources/telnet.r"
 REZ_BACKUP="$BUILD_DIR/.telnet.r.bak"
 mkdir -p "$BUILD_DIR"
 cp "$REZ_FILE" "$REZ_BACKUP"
-sed -i "s/\"Version ${VERSION}\"/\"Version ${VERSION_DISPLAY}\"/" "$REZ_FILE"
+sed -i "s/\"Flynn ${VERSION}\"/\"Flynn ${VERSION_DISPLAY}\"/" "$REZ_FILE"
 
 # Build (restore .r file on exit, even if build fails)
 cleanup() { cp "$REZ_BACKUP" "$REZ_FILE" 2>/dev/null; rm -f "$REZ_BACKUP"; }

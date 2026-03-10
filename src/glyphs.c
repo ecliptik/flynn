@@ -150,12 +150,36 @@ static const unsigned char block_element_glyphs[0x14] = {
  * ---------------------------------------------------------------- */
 
 static const GlyphMappingBMP glyph_map_bmp[] = {
+	{ 0x00B2, GLYPH_SUPER_2 },
+	{ 0x00B3, GLYPH_SUPER_3 },
 	{ 0x00B7, GLYPH_DOT_MIDDLE },
+	{ 0x00B9, GLYPH_SUPER_1 },
+	{ 0x2070, GLYPH_SUPER_0 },
+	{ 0x2074, GLYPH_SUPER_4 },
+	{ 0x2075, GLYPH_SUPER_5 },
+	{ 0x2076, GLYPH_SUPER_6 },
+	{ 0x2077, GLYPH_SUPER_7 },
+	{ 0x2078, GLYPH_SUPER_8 },
+	{ 0x2079, GLYPH_SUPER_9 },
+	{ 0x2080, GLYPH_SUB_0 },
+	{ 0x2081, GLYPH_SUB_1 },
+	{ 0x2082, GLYPH_SUB_2 },
+	{ 0x2083, GLYPH_SUB_3 },
+	{ 0x2084, GLYPH_SUB_4 },
+	{ 0x2085, GLYPH_SUB_5 },
+	{ 0x2086, GLYPH_SUB_6 },
+	{ 0x2087, GLYPH_SUB_7 },
+	{ 0x2088, GLYPH_SUB_8 },
+	{ 0x2089, GLYPH_SUB_9 },
 	{ 0x2190, GLYPH_ARROW_LEFT },
 	{ 0x2191, GLYPH_ARROW_UP },
 	{ 0x2192, GLYPH_ARROW_RIGHT },
 	{ 0x2193, GLYPH_ARROW_DOWN },
 	{ 0x2217, GLYPH_ASTERISK_OP },
+	{ 0x2295, GLYPH_CIRCLED_PLUS },
+	{ 0x2296, GLYPH_CIRCLED_MINUS },
+	{ 0x2297, GLYPH_CIRCLED_TIMES },
+	{ 0x2299, GLYPH_CIRCLED_DOT },
 	{ 0x22EE, GLYPH_ELLIPSIS_V },
 	{ 0x23F5, GLYPH_PLAY },
 	/* Quadrants (not in block_element_glyphs range) */
@@ -171,12 +195,25 @@ static const GlyphMappingBMP glyph_map_bmp[] = {
 	{ 0x25AA, GLYPH_SQ_SM_FILLED },
 	{ 0x25AB, GLYPH_SQ_SM_EMPTY },
 	{ 0x25B2, GLYPH_TRI_UP },
+	{ 0x25B3, GLYPH_TRI_UP_EMPTY },
 	{ 0x25B6, GLYPH_TRI_RIGHT },
+	{ 0x25B7, GLYPH_TRI_RIGHT_EMPTY },
+	{ 0x25B8, GLYPH_TRI_RIGHT_SM },
 	{ 0x25BC, GLYPH_TRI_DOWN },
+	{ 0x25BD, GLYPH_TRI_DOWN_EMPTY },
 	{ 0x25C0, GLYPH_TRI_LEFT },
+	{ 0x25C1, GLYPH_TRI_LEFT_EMPTY },
+	{ 0x25C2, GLYPH_TRI_LEFT_SM },
+	{ 0x25C6, GLYPH_DIAMOND_FILLED },
+	{ 0x25C7, GLYPH_DIAMOND_EMPTY },
+	{ 0x25C9, GLYPH_CIRCLE_DOT },
 	{ 0x25CA, GLYPH_LOZENGE },
 	{ 0x25CB, GLYPH_CIRCLE_EMPTY },
 	{ 0x25CF, GLYPH_CIRCLE_FILLED },
+	{ 0x25D0, GLYPH_CIRCLE_HALF_L },
+	{ 0x25D1, GLYPH_CIRCLE_HALF_R },
+	{ 0x25D2, GLYPH_CIRCLE_HALF_B },
+	{ 0x25D3, GLYPH_CIRCLE_HALF_T },
 	{ 0x25FB, GLYPH_SQ_MED_EMPTY },
 	{ 0x25FC, GLYPH_SQ_MED_FILLED },
 	/* Symbols */
@@ -197,6 +234,7 @@ static const GlyphMappingBMP glyph_map_bmp[] = {
 	/* Asterisk spinners and dingbats */
 	{ 0x2722, GLYPH_ASTERISK_FOUR },
 	{ 0x2733, GLYPH_ASTERISK_8 },
+	{ 0x2736, GLYPH_STAR_SIX },
 	{ 0x273B, GLYPH_ASTERISK_TEARDROP },
 	{ 0x273D, GLYPH_ASTERISK_HEAVY },
 	{ 0x274C, GLYPH_EMOJI_CROSSMARK },
@@ -307,25 +345,71 @@ static const GlyphInfo prim_info[] = {
 	/* 0x3E SHADE_LIGHT */     { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
 	/* 0x3F SHADE_MEDIUM */    { GLYPH_CAT_PRIMITIVE, 0, ':', 0 },
 	/* 0x40 SHADE_DARK */      { GLYPH_CAT_PRIMITIVE, 0, '#', 0 },
+	/* Outline triangles */
+	/* 0x41 TRI_UP_EMPTY */    { GLYPH_CAT_PRIMITIVE, 0, '^', 0 },
+	/* 0x42 TRI_RIGHT_EMPTY */ { GLYPH_CAT_PRIMITIVE, 0, '>', 0 },
+	/* 0x43 TRI_DOWN_EMPTY */  { GLYPH_CAT_PRIMITIVE, 0, 'v', 0 },
+	/* 0x44 TRI_LEFT_EMPTY */  { GLYPH_CAT_PRIMITIVE, 0, '<', 0 },
+	/* Small filled triangles */
+	/* 0x45 TRI_RIGHT_SM */    { GLYPH_CAT_PRIMITIVE, 0, '>', 0 },
+	/* 0x46 TRI_LEFT_SM */     { GLYPH_CAT_PRIMITIVE, 0, '<', 0 },
+	/* Diamonds */
+	/* 0x47 DIAMOND_FILLED */  { GLYPH_CAT_PRIMITIVE, 0, 'D', 0 },
+	/* 0x48 DIAMOND_EMPTY */   { GLYPH_CAT_PRIMITIVE, 0, 'D', 0 },
+	/* Circle variants */
+	/* 0x49 CIRCLE_HALF_L */   { GLYPH_CAT_PRIMITIVE, 0, 'o', 0 },
+	/* 0x4A CIRCLE_HALF_R */   { GLYPH_CAT_PRIMITIVE, 0, 'o', 0 },
+	/* 0x4B CIRCLE_HALF_B */   { GLYPH_CAT_PRIMITIVE, 0, 'o', 0 },
+	/* 0x4C CIRCLE_HALF_T */   { GLYPH_CAT_PRIMITIVE, 0, 'o', 0 },
+	/* 0x4D CIRCLE_DOT */      { GLYPH_CAT_PRIMITIVE, 0, 'o', 0 },
+	/* Six-pointed star */
+	/* 0x4E STAR_SIX */        { GLYPH_CAT_PRIMITIVE, 0, '*', 0 },
+	/* Circled operators */
+	/* 0x4F CIRCLED_DOT */     { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
+	/* 0x50 CIRCLED_PLUS */    { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x51 CIRCLED_MINUS */   { GLYPH_CAT_PRIMITIVE, 0, '-', 0 },
+	/* 0x52 CIRCLED_TIMES */   { GLYPH_CAT_PRIMITIVE, 0, 'x', 0 },
+	/* Superscript digits */
+	/* 0x53 SUPER_0 */         { GLYPH_CAT_PRIMITIVE, 0, '0', 0 },
+	/* 0x54 SUPER_1 */         { GLYPH_CAT_PRIMITIVE, 0, '1', 0 },
+	/* 0x55 SUPER_2 */         { GLYPH_CAT_PRIMITIVE, 0, '2', 0 },
+	/* 0x56 SUPER_3 */         { GLYPH_CAT_PRIMITIVE, 0, '3', 0 },
+	/* 0x57 SUPER_4 */         { GLYPH_CAT_PRIMITIVE, 0, '4', 0 },
+	/* 0x58 SUPER_5 */         { GLYPH_CAT_PRIMITIVE, 0, '5', 0 },
+	/* 0x59 SUPER_6 */         { GLYPH_CAT_PRIMITIVE, 0, '6', 0 },
+	/* 0x5A SUPER_7 */         { GLYPH_CAT_PRIMITIVE, 0, '7', 0 },
+	/* 0x5B SUPER_8 */         { GLYPH_CAT_PRIMITIVE, 0, '8', 0 },
+	/* 0x5C SUPER_9 */         { GLYPH_CAT_PRIMITIVE, 0, '9', 0 },
+	/* Subscript digits */
+	/* 0x5D SUB_0 */           { GLYPH_CAT_PRIMITIVE, 0, '0', 0 },
+	/* 0x5E SUB_1 */           { GLYPH_CAT_PRIMITIVE, 0, '1', 0 },
+	/* 0x5F SUB_2 */           { GLYPH_CAT_PRIMITIVE, 0, '2', 0 },
+	/* 0x60 SUB_3 */           { GLYPH_CAT_PRIMITIVE, 0, '3', 0 },
+	/* 0x61 SUB_4 */           { GLYPH_CAT_PRIMITIVE, 0, '4', 0 },
+	/* 0x62 SUB_5 */           { GLYPH_CAT_PRIMITIVE, 0, '5', 0 },
+	/* 0x63 SUB_6 */           { GLYPH_CAT_PRIMITIVE, 0, '6', 0 },
+	/* 0x64 SUB_7 */           { GLYPH_CAT_PRIMITIVE, 0, '7', 0 },
+	/* 0x65 SUB_8 */           { GLYPH_CAT_PRIMITIVE, 0, '8', 0 },
+	/* 0x66 SUB_9 */           { GLYPH_CAT_PRIMITIVE, 0, '9', 0 },
 };
 
 /* Emoji glyphs: wide (2-cell), drawn with CopyBits */
 static const GlyphInfo emoji_info[] = {
-	/* 0x60 GRIN */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, ':', 0 },
-	/* 0x61 HEART */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, '<', 0 },
-	/* 0x62 THUMBSUP */      { GLYPH_CAT_EMOJI, GLYPH_WIDE, '+', 0 },
-	/* 0x63 FIRE */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
-	/* 0x64 STAR */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
-	/* 0x65 CHECK */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'Y', 0 },
-	/* 0x66 CROSSMARK */     { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'X', 0 },
-	/* 0x67 ROCKET */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '^', 0 },
-	/* 0x68 FOLDER */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'F', 0 },
-	/* 0x69 BULB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '!', 0 },
-	/* 0x6A GLOBE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'O', 0 },
-	/* 0x6B WRENCH */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '/', 0 },
-	/* 0x6C PACKAGE */       { GLYPH_CAT_EMOJI, GLYPH_WIDE, '#', 0 },
-	/* 0x6D SNAKE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'S', 0 },
-	/* 0x6E CRAB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'V', 0 },
+	/* 0x80 GRIN */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, ':', 0 },
+	/* 0x81 HEART */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, '<', 0 },
+	/* 0x82 THUMBSUP */      { GLYPH_CAT_EMOJI, GLYPH_WIDE, '+', 0 },
+	/* 0x83 FIRE */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
+	/* 0x84 STAR */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
+	/* 0x85 CHECK */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'Y', 0 },
+	/* 0x86 CROSSMARK */     { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'X', 0 },
+	/* 0x87 ROCKET */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '^', 0 },
+	/* 0x88 FOLDER */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'F', 0 },
+	/* 0x89 BULB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '!', 0 },
+	/* 0x8A GLOBE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'O', 0 },
+	/* 0x8B WRENCH */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '/', 0 },
+	/* 0x8C PACKAGE */       { GLYPH_CAT_EMOJI, GLYPH_WIDE, '#', 0 },
+	/* 0x8D SNAKE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'S', 0 },
+	/* 0x8E CRAB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'V', 0 },
 };
 
 /* ----------------------------------------------------------------
@@ -550,21 +634,21 @@ static const unsigned char bmp_crab[] = {
 
 /* Bitmap table: indexed by (glyph_id - GLYPH_EMOJI_BASE) */
 static const GlyphBitmap emoji_bitmaps[] = {
-	{ 10, 10, 2, bmp_grin },	/* 0x60 */
-	{ 10, 10, 2, bmp_heart },	/* 0x61 */
-	{ 10, 10, 2, bmp_thumbsup },	/* 0x62 */
-	{ 10, 10, 2, bmp_fire },	/* 0x63 */
-	{ 10, 10, 2, bmp_star },	/* 0x64 */
-	{ 10, 10, 2, bmp_check },	/* 0x65 */
-	{ 10, 10, 2, bmp_crossmark },	/* 0x66 */
-	{ 10, 10, 2, bmp_rocket },	/* 0x67 */
-	{ 10, 10, 2, bmp_folder },	/* 0x68 */
-	{ 10, 10, 2, bmp_bulb },	/* 0x69 */
-	{ 10, 10, 2, bmp_globe },	/* 0x6A */
-	{ 10, 10, 2, bmp_wrench },	/* 0x6B */
-	{ 10, 10, 2, bmp_package },	/* 0x6C */
-	{ 10, 10, 2, bmp_snake },	/* 0x6D */
-	{ 10, 10, 2, bmp_crab },	/* 0x6E */
+	{ 10, 10, 2, bmp_grin },	/* 0x80 */
+	{ 10, 10, 2, bmp_heart },	/* 0x81 */
+	{ 10, 10, 2, bmp_thumbsup },	/* 0x82 */
+	{ 10, 10, 2, bmp_fire },	/* 0x83 */
+	{ 10, 10, 2, bmp_star },	/* 0x84 */
+	{ 10, 10, 2, bmp_check },	/* 0x85 */
+	{ 10, 10, 2, bmp_crossmark },	/* 0x86 */
+	{ 10, 10, 2, bmp_rocket },	/* 0x87 */
+	{ 10, 10, 2, bmp_folder },	/* 0x88 */
+	{ 10, 10, 2, bmp_bulb },	/* 0x89 */
+	{ 10, 10, 2, bmp_globe },	/* 0x8A */
+	{ 10, 10, 2, bmp_wrench },	/* 0x8B */
+	{ 10, 10, 2, bmp_package },	/* 0x8C */
+	{ 10, 10, 2, bmp_snake },	/* 0x8D */
+	{ 10, 10, 2, bmp_crab },	/* 0x8E */
 };
 
 /* ----------------------------------------------------------------

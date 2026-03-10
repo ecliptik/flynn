@@ -146,7 +146,8 @@ conn_resolve_host(Connection *conn, WindowPtr status_win)
 		conn->remote_ip = ip;
 	} else {
 		/* Show DNS resolution status */
-		sprintf(status_msg, "Resolving %.40s\311", conn->host);
+		snprintf(status_msg, sizeof(status_msg),
+		    "Resolving %.40s\311", conn->host);
 		conn_status_update(status_win, status_msg);
 
 		/* DNS lookup via UDP */
@@ -198,7 +199,8 @@ conn_connect(Connection *conn, const char *host, short port,
 	conn->remote_port = conn->port;
 
 	/* Show TCP connect status */
-	sprintf(status_msg, "Connecting to %.40s\311", conn->host);
+	snprintf(status_msg, sizeof(status_msg),
+	    "Connecting to %.40s\311", conn->host);
 	conn_status_update(status_win, status_msg);
 
 	/* Allocate receive buffer */
@@ -248,30 +250,20 @@ conn_idle(Connection *conn)
 	if (conn->state != CONN_STATE_CONNECTED)
 		return;
 
-	if (conn->idle_skip > 0) {
-		conn->idle_skip--;
-		return;  /* skip this poll */
-	}
-
 	err = _TCPStatus(&conn->pb, conn->stream, &status, 0L, 0L, false);
 	if (err != noErr) {
-		conn->idle_skip = 0;
 		conn_close(conn);
 		return;
 	}
 
 	/* Check if connection was closed by remote */
 	if (status.connectionState == TCP_STATE_TIME_WAIT) {
-		conn->idle_skip = 0;
 		conn_close(conn);
 		return;
 	}
 
-	if (status.amtUnreadData == 0) {
-		conn->idle_skip = 1;  /* skip next idle call (~17ms at 60Hz) */
+	if (status.amtUnreadData == 0)
 		return;
-	}
-	conn->idle_skip = 0;  /* reset when data is available */
 
 	/* Read available data */
 	len = status.amtUnreadData;
@@ -293,8 +285,6 @@ conn_close(Connection *conn)
 {
 	if (conn->state == CONN_STATE_IDLE)
 		return;
-
-	conn->idle_skip = 0;  /* reset polling skip on disconnect */
 
 	conn->state = CONN_STATE_CLOSING;
 
@@ -326,41 +316,4 @@ conn_send(Connection *conn, char *data, short len)
 	wds[0].length = len;
 
 	return _TCPSend(&conn->pb, conn->stream, wds, 0L, 0L, false);
-}
-
-void
-conn_status_str(Connection *conn, char *buf, short buflen)
-{
-	char ip_str[16];
-
-	if (buflen <= 0)
-		return;
-
-	switch (conn->state) {
-	case CONN_STATE_IDLE:
-		strncpy(buf, "Not connected", buflen - 1);
-		break;
-	case CONN_STATE_RESOLVING:
-		strncpy(buf, "Resolving...", buflen - 1);
-		break;
-	case CONN_STATE_CONNECTING:
-		strncpy(buf, "Connecting...", buflen - 1);
-		break;
-	case CONN_STATE_CONNECTED:
-		long2ip(conn->remote_ip, ip_str);
-		/* ip_str max 15 chars + "Connected to " = 28, safe for any reasonable buflen */
-		if (buflen >= 29) {
-			sprintf(buf, "Connected to %s", ip_str);
-		} else {
-			strncpy(buf, "Connected", buflen - 1);
-		}
-		break;
-	case CONN_STATE_CLOSING:
-		strncpy(buf, "Closing...", buflen - 1);
-		break;
-	default:
-		strncpy(buf, "Unknown", buflen - 1);
-		break;
-	}
-	buf[buflen - 1] = '\0';
 }

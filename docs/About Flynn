@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.8.1
+                    Version 1.9.0
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -23,6 +23,12 @@ Midnight Commander. It renders box-drawing characters,
 handles UTF-8 text, and provides all the keyboard
 mappings needed to work comfortably on the original
 Macintosh keyboard.
+
+On System 7 with Color QuickDraw, Flynn supports full
+256-color rendering (16 ANSI + 216 color cube + 24
+grayscale). Truecolor sequences are downgraded to the
+nearest 256-color match. Color support is automatic
+and has zero impact on System 6 monochrome systems.
 
 
 System Requirements
@@ -76,9 +82,12 @@ Features
     (tmux borders, dialog boxes, Midnight Commander)
   - UTF-8 support for accented characters, curly
     quotes, em dashes, and other Unicode symbols
-  - Unicode glyph rendering: arrows, shapes, blocks,
-    card suits, monochrome emoji, and braille patterns
-    drawn natively via QuickDraw primitives
+  - 256-color support on System 7 with Color QuickDraw
+    (automatic detection, zero impact on System 6)
+  - Unicode glyph rendering: 103 QuickDraw primitives
+    (arrows, shapes, blocks, triangles, diamonds,
+    circles, superscripts, subscripts, card suits),
+    15 monochrome bitmap emoji, and braille patterns
   - Alternate screen buffer for full-screen apps
     (vi, nano, less, tmux)
   - 96-line scrollback buffer with position indicator

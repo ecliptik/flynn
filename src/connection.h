@@ -29,7 +29,6 @@
 #define DLOG_HOST_FIELD  4
 #define DLOG_PORT_LABEL  5
 #define DLOG_PORT_FIELD  6
-#define DLOG_INFO_TEXT   7
 #define DLOG_USER_LABEL  8
 #define DLOG_USER_FIELD  9
 #define DLOG_BOOKMARKS   10
@@ -71,8 +70,5 @@ void conn_close(Connection *conn);
 
 /* Send data */
 OSErr conn_send(Connection *conn, char *data, short len);
-
-/* Get connection state string for status display */
-void conn_status_str(Connection *conn, char *buf, short buflen);
 
 #endif /* CONNECTION_H */

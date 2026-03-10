@@ -19,9 +19,6 @@
 
 TrapType GetTrapType(unsigned long theTrap);
 bool TrapAvailable(unsigned long trap);
-void GetSystemFolder(short *vRefNumP, long *dirIDP);
-void GetSystemSubfolder(OSType folder, bool create, short *vRefNumP,
-    long *dirIDP);
 void get_machine_name(char *buf, short buflen);
 
 #endif /* SYSUTIL_H */

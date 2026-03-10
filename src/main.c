@@ -31,6 +31,7 @@
 #include "input.h"
 #include "clipboard.h"
 #include "macutil.h"
+#include "color.h"
 
 /* Globals */
 Boolean running = true;
@@ -46,6 +47,8 @@ static Boolean notification_posted = false;
 /* Shared buffers for telnet/terminal processing (static to avoid stack) */
 static unsigned char out_buf[TCP_READ_BUFSIZ];
 static unsigned char send_buf[TCP_READ_BUFSIZ];
+
+/* (Screen snapshot moved to Terminal struct — saved on full clear only) */
 
 /* Forward declarations */
 static void init_toolbox(void);
@@ -118,6 +121,7 @@ main(void)
 {
 	init_toolbox();
 	init_apple_events();
+	color_detect();
 	init_menus();
 
 	/* Load prefs and fast init before showing window */
@@ -176,6 +180,14 @@ session_handle_disconnect(Session *sess)
 	telnet_init(&sess->telnet);
 	sess->telnet.preferred_ttype = prefs.terminal_type;
 	sess->key_send_len = 0;
+
+	/* Restore pre-clear screen content if remote sent
+	 * clear-screen sequences during logout */
+	if (sess->terminal.snap_valid) {
+		memcpy(sess->terminal.screen, sess->terminal.snap_screen,
+		    sizeof(sess->terminal.screen));
+		sess->terminal.snap_valid = 0;
+	}
 
 	/* Set title to show disconnected state */
 	if (sess->conn.host[0])
@@ -295,7 +307,7 @@ main_event_loop(void)
 		if (g_suspended)
 			wait_ticks = 60L;
 		else
-			wait_ticks = session_any_connected() ? 1L : 30L;
+			wait_ticks = session_any_connected() ? 1L : 10L;
 		WaitNextEvent(everyEvent, &event, wait_ticks, 0L);
 
 		switch (event.what) {
@@ -309,6 +321,36 @@ main_event_loop(void)
 			 * before cycling through sessions */
 			if (active_session)
 				term_ui_save_state(&active_session->ui);
+
+			/* Fast path: single session skips save/load cycling */
+			if (session_count() == 1 && active_session) {
+				prev_state = active_session->conn.state;
+				conn_idle(&active_session->conn);
+
+				if (prev_state == CONN_STATE_CONNECTED &&
+				    active_session->conn.state ==
+				    CONN_STATE_IDLE) {
+					session_handle_disconnect(
+					    active_session);
+				} else if (active_session->conn.read_len >
+				    0) {
+					session_poll_data(active_session);
+				}
+
+				if (!g_suspended &&
+				    active_session->conn.state ==
+				    CONN_STATE_CONNECTED) {
+					GrafPtr save;
+
+					GetPort(&save);
+					SetPort(active_session->window);
+					term_ui_cursor_blink(
+					    active_session->window,
+					    &active_session->terminal);
+					SetPort(save);
+				}
+				break;
+			}
 
 			for (si = 0; si < MAX_SESSIONS; si++) {
 				sess = session_get(si);

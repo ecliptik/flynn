@@ -15,15 +15,6 @@
 /* C string to Pascal string (caller-provided Str255 buffer) */
 void c2pstr(Str255 dst, const char *src);
 
-/* C string to Pascal string with max length */
-void c2pstrn(Str255 dst, const char *src, short maxlen);
-
-/* sprintf into Pascal string, returns length */
-short sprintfp(Str255 dst, const char *fmt, ...);
-
-/* SetWTitle from C string */
-void set_wtitle_c(WindowPtr win, const char *title);
-
 /* Formatted window title (sprintf + SetWTitle) */
 void set_wtitlef(WindowPtr win, const char *fmt, ...);
 

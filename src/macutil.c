@@ -27,49 +27,6 @@ c2pstr(Str255 dst, const char *src)
 }
 
 void
-c2pstrn(Str255 dst, const char *src, short maxlen)
-{
-	short len;
-
-	len = strlen(src);
-	if (maxlen < 255 && len > maxlen)
-		len = maxlen;
-	if (len > 255)
-		len = 255;
-	dst[0] = len;
-	memcpy(dst + 1, src, len);
-}
-
-short
-sprintfp(Str255 dst, const char *fmt, ...)
-{
-	va_list ap;
-	char tmp[256];
-	short len;
-
-	va_start(ap, fmt);
-	len = vsnprintf(tmp, sizeof(tmp), fmt, ap);
-	va_end(ap);
-
-	if (len < 0)
-		len = 0;
-	if (len > 255)
-		len = 255;
-	dst[0] = len;
-	memcpy(dst + 1, tmp, len);
-	return len;
-}
-
-void
-set_wtitle_c(WindowPtr win, const char *title)
-{
-	Str255 ptitle;
-
-	c2pstr(ptitle, title);
-	SetWTitle(win, ptitle);
-}
-
-void
 set_wtitlef(WindowPtr win, const char *fmt, ...)
 {
 	va_list ap;

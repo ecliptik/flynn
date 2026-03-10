@@ -8,14 +8,6 @@
 
 #include <Menus.h>
 
-/* Menu handle accessors (owned by menus.c) */
-MenuHandle get_apple_menu(void);
-MenuHandle get_file_menu(void);
-MenuHandle get_edit_menu(void);
-MenuHandle get_prefs_menu(void);
-MenuHandle get_ctrl_menu(void);
-MenuHandle get_window_menu(void);
-
 /* Initialize menus from MBAR resource */
 void init_menus(void);
 
