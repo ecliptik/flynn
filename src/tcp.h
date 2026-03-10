@@ -14,10 +14,10 @@ typedef struct
 	struct hostInfo hi;
 } HostInfoQ, *HostInfoQPtr, **HostInfoQHandle;
 
-typedef ProcPtr TCPNotifyProc;
-typedef ProcPtr UDPNotifyProc;
-typedef void (*TCPIOCompletionProc)(struct TCPiopb *iopb);
-typedef void (*UDPIOCompletionProc)(struct UDPiopb *iopb);
+typedef TCPNotifyUPP TCPNotifyProc;
+typedef UDPNotifyUPP UDPNotifyProc;
+typedef TCPIOCompletionUPP TCPIOCompletionProc;
+typedef UDPIOCompletionUPP UDPIOCompletionProc;
 
 OSErr _TCPInit(void);
 OSErr _TCPGetOurIP(ip_addr *ip, long *netMask);
