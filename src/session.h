@@ -6,6 +6,7 @@
 #define SESSION_H
 
 #include <Windows.h>
+#include "main.h"
 #include "terminal.h"
 #include "terminal_ui.h"
 #include "connection.h"
@@ -60,5 +61,23 @@ Session *session_get(short index);
 
 /* Check if any session is currently connected */
 Boolean session_any_connected(void);
+
+/* Font preset table and helpers */
+extern FontPreset font_presets[];
+void ttype_to_str(short ttype, char *buf, short buflen);
+void font_to_str(short font_id, short font_size, char *buf, short buflen);
+
+/* Initialize session font, UI state, DNS from global prefs */
+void session_init_from_prefs(Session *s);
+
+/* Save/restore per-session font metrics to/from globals */
+void session_save_font(Session *s);
+void session_load_font(Session *s);
+
+/* Change active session's font and resize window */
+void do_font_change(short font_id, short font_size);
+
+/* Resize session window and update terminal grid */
+void do_window_resize(Session *s, short width, short height);
 
 #endif /* SESSION_H */

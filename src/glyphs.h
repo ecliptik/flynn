@@ -25,9 +25,7 @@
 #ifndef GLYPHS_H
 #define GLYPHS_H
 
-/* Attribute flags for glyph cells (stored in TermCell.attr) */
-#define ATTR_GLYPH		0x10	/* ch is a glyph index, not a character */
-#define ATTR_BRAILLE		0x20	/* ch is braille dot pattern (cp & 0xFF) */
+/* ATTR_GLYPH and ATTR_BRAILLE are defined in terminal.h */
 
 /* Glyph categories */
 #define GLYPH_CAT_PRIMITIVE	0	/* QuickDraw primitives */

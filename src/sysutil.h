@@ -7,6 +7,11 @@
 
 #include <stdbool.h>
 
+/* Boot volume constant — not in Retro68 Multiversal headers */
+#ifndef kOnSystemDisk
+#define kOnSystemDisk	((short)0x8000)
+#endif
+
 TrapType GetTrapType(unsigned long theTrap);
 bool TrapAvailable(unsigned long trap);
 void GetSystemFolder(short *vRefNumP, long *dirIDP);

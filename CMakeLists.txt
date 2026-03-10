@@ -3,6 +3,10 @@ project(Flynn VERSION 1.6.1)
 
 add_application(Flynn
     src/main.c
+    src/menus.c
+    src/input.c
+    src/clipboard.c
+    src/dialogs.c
     src/session.c
     src/connection.c
     src/telnet.c
@@ -11,7 +15,7 @@ add_application(Flynn
     src/tcp.c
     src/dns.c
     src/glyphs.c
-    src/dnr.c
+    src/macutil.c
     src/sysutil.c
     src/settings.c
     resources/telnet.r

@@ -19,10 +19,6 @@
 #define _GestaltDispatch _Gestalt
 #endif
 
-/* kOnSystemDisk = boot volume (-1) */
-#ifndef kOnSystemDisk
-#define kOnSystemDisk ((short)-1)
-#endif
 #include <stdbool.h>
 
 #include "sysutil.h"

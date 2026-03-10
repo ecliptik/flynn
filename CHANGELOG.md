@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-03-10
+
+### Changed
+- Major codebase refactor: main.c reduced from 3,478 to ~494 lines (86% reduction)
+- Extracted dialogs.c: all dialog handling (connect, bookmarks, about, disconnect)
+- Extracted menus.c: menu management with per-menu dispatch handlers
+- Extracted input.c: keyboard/mouse handling with data-driven key mapping tables
+- Extracted clipboard.c: copy/paste/select all operations
+- Extracted macutil.c: shared utilities (c2pstr, sprintfp, set_wtitlef, clear_window_bg)
+- Extended session.c: font presets, ttype/font string helpers, window resize, init from prefs
+- Collapsed identical telnet option handlers with fallthrough in telnet.c
+- Extracted conn_resolve_host() from conn_connect() in connection.c
+- Split handle_menu() into per-menu handlers (handle_file_menu, handle_edit_menu, etc.)
+- Data-driven key mapping replaces if/else chain in handle_key_down()
+- Total compiled LOC reduced from 12,027 to 10,036 (17% reduction)
+
+### Fixed
+- Remote disconnect preserves terminal screen content (was wiped by terminal_reset)
+- Window repaint after disconnect alert restores terminal content in all modes
+
+### Removed
+- Dead conn_open_dialog() from connection.c
+- 6 unused TCP wrapper functions from tcp.c (~256 lines)
+
+## [1.6.1] - 2026-03-10
+
+### Fixed
+- MacTCP.h: add forward declarations for struct GetAddrParamBlock,
+  ICMPParamBlock, TCPiopb, and UDPiopb to eliminate "declared inside
+  parameter list" compiler warnings
+- tcp.h: alias proc typedefs (TCPIOCompletionProc, TCPNotifyProc, etc.)
+  to actual MacTCP UPP types instead of incompatible ProcPtr/re-declared
+  function pointers, eliminating all -Wincompatible-pointer-types warnings
+- MacTCP.h: convert from classic Mac CR to Unix LF line endings for
+  consistent cross-platform source formatting
+
 ## [1.6.0] - 2026-03-10
 
 ### Added

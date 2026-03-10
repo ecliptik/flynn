@@ -118,4 +118,13 @@
 #define APP_CREATOR         'FLYN'
 #define APP_TYPE            'APPL'
 
+/* Font preset table for bookmark font cycling */
+typedef struct {
+	short	font_id;
+	short	font_size;
+	char	name[16];
+} FontPreset;
+
+#define NUM_FONT_PRESETS 6
+
 #endif /* MAIN_H */

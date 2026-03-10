@@ -150,23 +150,9 @@ handle_will(TelnetState *ts, unsigned char opt, unsigned char *send,
 
 	switch (opt) {
 	case OPT_ECHO:
-		/* Server will echo for us -- accept */
-		if (!(ts->opts[idx] & OPTFLAG_REMOTE)) {
-			send_iac(send, sendlen, DO, opt);
-			ts->opts[idx] |= OPTFLAG_REMOTE;
-		}
-		break;
-
 	case OPT_SGA:
-		/* Server will suppress go-ahead -- accept */
-		if (!(ts->opts[idx] & OPTFLAG_REMOTE)) {
-			send_iac(send, sendlen, DO, opt);
-			ts->opts[idx] |= OPTFLAG_REMOTE;
-		}
-		break;
-
 	case OPT_BINARY:
-		/* Server wants to send binary -- accept */
+		/* Accept: echo, suppress go-ahead, binary */
 		if (!(ts->opts[idx] & OPTFLAG_REMOTE)) {
 			send_iac(send, sendlen, DO, opt);
 			ts->opts[idx] |= OPTFLAG_REMOTE;
@@ -237,23 +223,9 @@ handle_do(TelnetState *ts, unsigned char opt, unsigned char *send,
 		break;
 
 	case OPT_TSPEED:
-		/* We will send terminal speed */
-		if (!(ts->opts[idx] & OPTFLAG_LOCAL)) {
-			send_iac(send, sendlen, WILL, opt);
-			ts->opts[idx] |= OPTFLAG_LOCAL;
-		}
-		break;
-
 	case OPT_SGA:
-		/* We will suppress go-ahead */
-		if (!(ts->opts[idx] & OPTFLAG_LOCAL)) {
-			send_iac(send, sendlen, WILL, opt);
-			ts->opts[idx] |= OPTFLAG_LOCAL;
-		}
-		break;
-
 	case OPT_BINARY:
-		/* We can send binary */
+		/* Accept: terminal speed, suppress go-ahead, binary */
 		if (!(ts->opts[idx] & OPTFLAG_LOCAL)) {
 			send_iac(send, sendlen, WILL, opt);
 			ts->opts[idx] |= OPTFLAG_LOCAL;

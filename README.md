@@ -29,16 +29,12 @@ No build toolchain required — just download and run.
 ## Features
 
 - **Multiple sessions** (up to 4 simultaneous windows)
-- **VT100/VT220/xterm terminal emulation**
-- **Box-drawing characters**
-- **Unicode glyph rendering**
-- **Resizable window** (80x24 up to 132x50)
+- **VT100/VT220/xterm/xterm-256color terminal emulation**
+- **Box-drawing characters, Unicode glyph rendering**
+- **Resizable window and scrollback** (80x24 up to 132x50)
 - **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
 - **Session bookmarks**
-- **Username auto-login**
 - **Mouse text selection**
-- **Scrollback** (96 lines)
-- **Control menu**
 - **Keystroke buffering**
 - **M0110 keyboard support**
 - **Dark mode**
@@ -62,6 +58,7 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | Extend selection | Shift+click | Extends selection to click point |
 | Copy | Cmd+C | Copies selection, or full screen if none |
 | Paste | Cmd+V | Sends clipboard to connection |
+| Select All | Cmd+A | Selects entire terminal screen |
 | F1-F10 | Cmd+1..0 | For M0110 keyboards without function keys |
 | Bookmarks | Cmd+B | Open bookmark manager |
 | New Session | Cmd+N | New session (new window if connected) |

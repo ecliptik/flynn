@@ -26,6 +26,7 @@
 #include <Windows.h>
 #include <ToolUtils.h>
 #include <OSUtils.h>
+#include <Multiverse.h>
 #include "terminal_ui.h"
 #include "glyphs.h"
 
@@ -1765,7 +1766,7 @@ term_ui_sel_check_double_click(unsigned long when, short row, short col)
 	short is_dbl;
 
 	is_dbl = (sel.last_click_ticks != 0 &&
-	    (when - sel.last_click_ticks) <= (*(unsigned long *)0x02F0) &&
+	    (when - sel.last_click_ticks) <= (unsigned long)LMGetDoubleTime() &&
 	    row == sel.last_click_row &&
 	    col == sel.last_click_col);
 

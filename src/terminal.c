@@ -36,6 +36,8 @@ static void term_carriage_return(Terminal *term);
 static void term_process_esc(Terminal *term, unsigned char ch);
 static void term_process_csi(Terminal *term, unsigned char ch);
 static void term_execute_csi(Terminal *term, unsigned char cmd);
+static void term_dec_set_mode(Terminal *term);
+static void term_dec_reset_mode(Terminal *term);
 static void term_set_attr(Terminal *term, short param);
 static void term_process_osc(Terminal *term, unsigned char ch);
 static void term_finish_osc(Terminal *term);
@@ -43,7 +45,6 @@ static void term_switch_to_alt(Terminal *term);
 static void term_switch_to_main(Terminal *term);
 static void term_dirty_row(Terminal *term, short row);
 static void term_dirty_range(Terminal *term, short r1, short r2);
-static void term_dirty_all(Terminal *term);
 static short term_clamp(short val, short lo, short hi);
 static long utf8_decode(unsigned char *buf, short len);
 static void term_put_unicode(Terminal *term, long cp);
@@ -424,6 +425,7 @@ terminal_scroll_back(Terminal *term, short lines)
 void
 terminal_scroll_forward(Terminal *term, short lines)
 {
+	if (lines <= 0) return;
 	term->scroll_offset -= lines;
 	if (term->scroll_offset < 0)
 		term->scroll_offset = 0;
@@ -504,7 +506,7 @@ term_dirty_range(Terminal *term, short r1, short r2)
 /*
  * term_dirty_all - mark entire screen dirty
  */
-static void
+void
 term_dirty_all(Terminal *term)
 {
 	term_dirty_range(term, 0, term->active_rows - 1);
@@ -1019,6 +1021,128 @@ term_process_csi(Terminal *term, unsigned char ch)
 }
 
 /*
+ * term_dec_set_mode - handle CSI ? h (DECSET)
+ */
+static void
+term_dec_set_mode(Terminal *term)
+{
+	short i;
+
+	for (i = 0; i < term->num_params; i++) {
+		switch (term->params[i]) {
+		case 1:
+			term->cursor_key_mode = 1;
+			break;
+		case 6:
+			term->origin_mode = 1;
+			term->cur_row = term->scroll_top;
+			term->cur_col = 0;
+			term->wrap_pending = 0;
+			break;
+		case 7:
+			term->autowrap = 1;
+			break;
+		case 25:
+			term->cursor_visible = 1;
+			break;
+		case 47:
+		case 1047:
+			term_switch_to_alt(term);
+			break;
+		case 1048:
+			/* Save cursor */
+			term->saved_row = term->cur_row;
+			term->saved_col = term->cur_col;
+			term->saved_attr = term->cur_attr;
+			break;
+		case 1049:
+			/* Save cursor + switch to alt */
+			term->saved_row = term->cur_row;
+			term->saved_col = term->cur_col;
+			term->saved_attr = term->cur_attr;
+			term_switch_to_alt(term);
+			break;
+		case 2004:
+			term->bracketed_paste = 1;
+			break;
+		case 12:	/* cursor blink */
+		case 1000:	/* mouse click reporting */
+		case 1002:	/* mouse button-event tracking */
+		case 1003:	/* mouse all-motion tracking */
+		case 1004:	/* focus events */
+		case 1006:	/* SGR mouse mode */
+			break;
+		}
+	}
+}
+
+/*
+ * term_dec_reset_mode - handle CSI ? l (DECRST)
+ */
+static void
+term_dec_reset_mode(Terminal *term)
+{
+	short i;
+
+	for (i = 0; i < term->num_params; i++) {
+		switch (term->params[i]) {
+		case 1:
+			term->cursor_key_mode = 0;
+			break;
+		case 6:
+			term->origin_mode = 0;
+			term->cur_row = 0;
+			term->cur_col = 0;
+			term->wrap_pending = 0;
+			break;
+		case 7:
+			term->autowrap = 0;
+			break;
+		case 25:
+			term->cursor_visible = 0;
+			break;
+		case 47:
+		case 1047:
+			term_switch_to_main(term);
+			break;
+		case 1048:
+			/* Restore cursor */
+			term->cur_row = term_clamp(
+			    term->saved_row, 0,
+			    term->active_rows - 1);
+			term->cur_col = term_clamp(
+			    term->saved_col, 0,
+			    term->active_cols - 1);
+			term->cur_attr = term->saved_attr;
+			term->wrap_pending = 0;
+			break;
+		case 1049:
+			/* Switch to main + restore cursor */
+			term_switch_to_main(term);
+			term->cur_row = term_clamp(
+			    term->saved_row, 0,
+			    term->active_rows - 1);
+			term->cur_col = term_clamp(
+			    term->saved_col, 0,
+			    term->active_cols - 1);
+			term->cur_attr = term->saved_attr;
+			term->wrap_pending = 0;
+			break;
+		case 2004:
+			term->bracketed_paste = 0;
+			break;
+		case 12:	/* cursor blink */
+		case 1000:	/* mouse click reporting */
+		case 1002:	/* mouse button-event tracking */
+		case 1003:	/* mouse all-motion tracking */
+		case 1004:	/* focus events */
+		case 1006:	/* SGR mouse mode */
+			break;
+		}
+	}
+}
+
+/*
  * term_execute_csi - execute a fully parsed CSI sequence
  */
 static void
@@ -1281,134 +1405,26 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 
 	case 'h':
 		/* SM - set mode */
-		if (term->intermediate == '?') {
+		if (term->intermediate == '?')
+			term_dec_set_mode(term);
+		else if (term->intermediate == 0) {
 			short i;
 			for (i = 0; i < term->num_params; i++) {
-				switch (term->params[i]) {
-				case 1:
-					term->cursor_key_mode = 1;
-					break;
-				case 6:
-					term->origin_mode = 1;
-					term->cur_row = term->scroll_top;
-					term->cur_col = 0;
-					term->wrap_pending = 0;
-					break;
-				case 7:
-					term->autowrap = 1;
-					break;
-				case 25:
-					term->cursor_visible = 1;
-					break;
-				case 47:
-				case 1047:
-					term_switch_to_alt(term);
-					break;
-				case 1048:
-					/* Save cursor */
-					term->saved_row = term->cur_row;
-					term->saved_col = term->cur_col;
-					term->saved_attr = term->cur_attr;
-					break;
-				case 1049:
-					/* Save cursor + switch to alt */
-					term->saved_row = term->cur_row;
-					term->saved_col = term->cur_col;
-					term->saved_attr = term->cur_attr;
-					term_switch_to_alt(term);
-					break;
-				case 2004:
-					term->bracketed_paste = 1;
-					break;
-				case 12:	/* cursor blink */
-				case 1000:	/* mouse click reporting */
-				case 1002:	/* mouse button-event tracking */
-				case 1003:	/* mouse all-motion tracking */
-				case 1004:	/* focus events */
-				case 1006:	/* SGR mouse mode */
-					break;
-				}
-			}
-		} else if (term->intermediate == 0) {
-			short i;
-			for (i = 0; i < term->num_params; i++) {
-				switch (term->params[i]) {
-				case 4:
+				if (term->params[i] == 4)
 					term->insert_mode = 1;
-					break;
-				}
 			}
 		}
 		break;
 
 	case 'l':
 		/* RM - reset mode */
-		if (term->intermediate == '?') {
+		if (term->intermediate == '?')
+			term_dec_reset_mode(term);
+		else if (term->intermediate == 0) {
 			short i;
 			for (i = 0; i < term->num_params; i++) {
-				switch (term->params[i]) {
-				case 1:
-					term->cursor_key_mode = 0;
-					break;
-				case 6:
-					term->origin_mode = 0;
-					term->cur_row = 0;
-					term->cur_col = 0;
-					term->wrap_pending = 0;
-					break;
-				case 7:
-					term->autowrap = 0;
-					break;
-				case 25:
-					term->cursor_visible = 0;
-					break;
-				case 47:
-				case 1047:
-					term_switch_to_main(term);
-					break;
-				case 1048:
-					/* Restore cursor */
-					term->cur_row = term_clamp(
-					    term->saved_row, 0,
-					    term->active_rows - 1);
-					term->cur_col = term_clamp(
-					    term->saved_col, 0,
-					    term->active_cols - 1);
-					term->cur_attr = term->saved_attr;
-					term->wrap_pending = 0;
-					break;
-				case 1049:
-					/* Switch to main + restore cursor */
-					term_switch_to_main(term);
-					term->cur_row = term_clamp(
-					    term->saved_row, 0,
-					    term->active_rows - 1);
-					term->cur_col = term_clamp(
-					    term->saved_col, 0,
-					    term->active_cols - 1);
-					term->cur_attr = term->saved_attr;
-					term->wrap_pending = 0;
-					break;
-				case 2004:
-					term->bracketed_paste = 0;
-					break;
-				case 12:	/* cursor blink */
-				case 1000:	/* mouse click reporting */
-				case 1002:	/* mouse button-event tracking */
-				case 1003:	/* mouse all-motion tracking */
-				case 1004:	/* focus events */
-				case 1006:	/* SGR mouse mode */
-					break;
-				}
-			}
-		} else if (term->intermediate == 0) {
-			short i;
-			for (i = 0; i < term->num_params; i++) {
-				switch (term->params[i]) {
-				case 4:
+				if (term->params[i] == 4)
 					term->insert_mode = 0;
-					break;
-				}
 			}
 		}
 		break;

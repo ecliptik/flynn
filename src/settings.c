@@ -10,13 +10,10 @@
 #include <Memory.h>
 #include <string.h>
 #include "settings.h"
+#include "sysutil.h"
+#include "tcp.h"
 
 #define PREFS_FILENAME	"\pFlynn Preferences"
-
-/* Not defined in Retro68 Multiversal headers */
-#ifndef kOnSystemDisk
-#define kOnSystemDisk	((short)0x8000)
-#endif
 
 /*
  * Locate the directory for preferences storage.
@@ -104,7 +101,6 @@ prefs_load(FlynnPrefs *prefs)
 
 	/* Validate DNS server IP */
 	{
-		extern unsigned long ip2long(char *);
 		if (prefs->dns_server[0] == '\0' || ip2long(prefs->dns_server) == 0) {
 			strncpy(prefs->dns_server, "1.1.1.1",
 			    sizeof(prefs->dns_server) - 1);

@@ -58,25 +58,10 @@ typedef struct {
 	ip_addr     dns_server;	/* DNS server to use for lookups */
 } Connection;
 
-/* Initialize connection subsystem (no-op, MacTCP lazily initialized on first connect) */
-OSErr conn_init(void);
-
-/* Show connect dialog and initiate connection */
-Boolean conn_open_dialog(Connection *conn);
-
 /* Connect directly to host:port without showing a dialog.
  * If status_win is non-NULL, update it with progress messages. */
 Boolean conn_connect(Connection *conn, const char *host, short port,
     WindowPtr status_win);
-
-/* Show a small status window with an initial message */
-WindowPtr conn_status_show(const char *msg);
-
-/* Update the status window message */
-void conn_status_update(WindowPtr w, const char *msg);
-
-/* Close and dispose the status window */
-void conn_status_close(WindowPtr w);
 
 /* Poll for incoming data — call from event loop */
 void conn_idle(Connection *conn);

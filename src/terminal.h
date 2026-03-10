@@ -205,6 +205,9 @@ short terminal_is_row_dirty(Terminal *term, short row);
 /* Clear all dirty flags */
 void terminal_clear_dirty(Terminal *term);
 
+/* Mark all rows dirty (full redraw) */
+void term_dirty_all(Terminal *term);
+
 /* Get current cursor position */
 void terminal_get_cursor(Terminal *term, short *row, short *col);
 
