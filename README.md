@@ -34,7 +34,7 @@ No build toolchain required — just download and run.
 - **Resizable window and scrollback** (80x24 up to 132x50)
 - **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
 - **Session bookmarks**
-- **Mouse text selection**
+- **Mouse text selection with copy/paste**
 - **Keystroke buffering**
 - **M0110 keyboard support**
 - **Dark mode**
