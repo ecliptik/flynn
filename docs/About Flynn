@@ -12,8 +12,9 @@ About Flynn
 
 Flynn is a Telnet client for the Apple Macintosh Plus
 and later models running System 6.0.8 or later. It
-connects to remote hosts over TCP/IP using MacTCP or
-Open Transport, providing a full-featured terminal for
+connects to remote hosts over TCP/IP using MacTCP (also
+works under Open Transport's MacTCP compatibility layer),
+providing a full-featured terminal for
 interactive sessions with Linux, Unix, and other
 Telnet-capable servers.
 
@@ -36,8 +37,9 @@ System Requirements
 
   - Macintosh Plus or later (68000 CPU)
   - System 6.0.8 or later (tested through 7.5.5)
-  - MacTCP 2.1 or Open Transport (configured with
-    a valid TCP/IP connection)
+  - MacTCP 2.1 (configured with a valid TCP/IP
+    connection; also works under Open Transport's
+    MacTCP compatibility layer)
   - 4 MB RAM recommended
   - Network connection (Ethernet or compatible)
 
@@ -356,7 +358,7 @@ Troubleshooting
   DNS resolution fails
   Flynn uses its own DNS resolver (default server:
   1.1.1.1). You can change the DNS server in
-  Preferences > Networking > DNS Server. You can
+  Options > Networking > DNS Server. You can
   also try connecting by IP address instead of
   hostname.
 

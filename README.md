@@ -1,6 +1,6 @@
 # Flynn
 
-A Telnet client for classic Macintosh (68000/Mac Plus). Built for monochrome System 6.0.8 with MacTCP 2.1, with full System 7 compatibility including MultiFinder, Apple Events, and Notification Manager support. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
+A Telnet client for classic Macintosh (68000/Mac Plus). Built for monochrome System 6.0.8 with MacTCP 2.1 (also works under Open Transport's MacTCP compatibility layer), with full System 7 compatibility including MultiFinder, Apple Events, and Notification Manager support. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 
 This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
@@ -36,6 +36,7 @@ No build toolchain required — just download and run.
 - **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
 - **Session bookmarks**
 - **Mouse text selection with copy/paste**
+- **Bracketed paste mode**
 - **Keystroke buffering**
 - **M0110 keyboard support**
 - **Dark mode**
@@ -66,6 +67,7 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | New Session | Cmd+N | New session (new window if connected) |
 | Save Contents | Cmd+S | Save scrollback and screen to text file |
 | Close Window | Cmd+W | Close active session window |
+| Quit | Cmd+Q | Quit Flynn |
 
 ## Building
 
