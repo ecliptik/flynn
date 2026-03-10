@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.1] - 2026-03-10
+
+### Added
+- Save Contents... (Cmd+S): save terminal scrollback and screen buffer to a
+  plain text file via SFPutFile dialog. Creates TEXT/ttxt files readable by
+  TeachText. Default filename is the connection hostname.
+- New savefile.c/savefile.h module for file save functionality
+
+### Changed
+- File menu reorganized per Apple HIG:
+  - "Save Contents..." (Cmd+S) in its own section
+  - "Bookmarks..." (Cmd+B) leads the bookmark section
+  - Recent bookmarks listed under Bookmarks
+  - "Add Bookmark..." (renamed from "Save as Bookmark...") moved after recents
+  - Separators between file operations, save, and bookmark management
+- Cmd+S reassigned from "Save as Bookmark" to "Save Contents" (standard HIG
+  convention for Cmd+S = save to file)
+- "Add Bookmark..." is now a dynamic menu item, enabling proper bookmark
+  section grouping with Bookmarks... as the section leader
+
 ## [1.7.0] - 2026-03-10
 
 ### Changed

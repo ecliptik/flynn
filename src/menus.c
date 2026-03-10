@@ -24,11 +24,12 @@
 #include "settings.h"
 #include "dialogs.h"
 #include "clipboard.h"
+#include "savefile.h"
 #include "macutil.h"
 #include "menus.h"
 
 /* Number of static items in File menu (before dynamic recent bookmarks) */
-#define FILE_MENU_STATIC_ITEMS  5
+#define FILE_MENU_STATIC_ITEMS  6
 
 /* Menu handles (private to this module) */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
@@ -131,14 +132,26 @@ update_menus(void)
 	else
 		DisableItem(file_menu, FILE_MENU_DISCONNECT_ID);
 
-	/* Save as Bookmark: only when connected and not already from a bookmark */
-	if (active_session &&
-	    active_session->conn.state == CONN_STATE_CONNECTED &&
-	    active_session->bookmark_index < 0 &&
-	    prefs.bookmark_count < MAX_BOOKMARKS)
-		EnableItem(file_menu, FILE_MENU_SAVE_BM_ID);
+	/* Save Session: enable when session exists */
+	if (active_session)
+		EnableItem(file_menu, FILE_MENU_SAVE_ID);
 	else
-		DisableItem(file_menu, FILE_MENU_SAVE_BM_ID);
+		DisableItem(file_menu, FILE_MENU_SAVE_ID);
+
+	/* Add Bookmark: dynamic item after recents, enable/disable */
+	{
+		short add_bm_item = FILE_MENU_STATIC_ITEMS +
+		    prefs.recent_count + 1;
+
+		if (active_session &&
+		    active_session->conn.state ==
+		    CONN_STATE_CONNECTED &&
+		    active_session->bookmark_index < 0 &&
+		    prefs.bookmark_count < MAX_BOOKMARKS)
+			EnableItem(file_menu, add_bm_item);
+		else
+			DisableItem(file_menu, add_bm_item);
+	}
 
 	/* Edit menu: Copy when selection active, Paste when connected */
 	if (active_session)
@@ -307,7 +320,8 @@ rebuild_file_menu(void)
 		}
 	}
 
-	/* Separator + Quit */
+	/* Add Bookmark + Separator + Quit */
+	AppendMenu(file_menu, "\pAdd Bookmark\311");
 	AppendMenu(file_menu, "\p(-");
 	AppendMenu(file_menu, "\pQuit/Q");
 }
@@ -395,13 +409,16 @@ handle_file_menu(short item)
 			update_menus();
 		}
 		break;
-	case FILE_MENU_SAVE_BM_ID:
-		do_save_as_bookmark();
+	case FILE_MENU_SAVE_ID:
+		do_save_session();
 		break;
 	case FILE_MENU_BOOKMARKS_ID:
 		do_bookmarks();
 		break;
-	default:
+	default: {
+		short add_bm_item = FILE_MENU_STATIC_ITEMS +
+		    prefs.recent_count + 1;
+
 		/* Quit is always last item */
 		if (item == CountMItems(file_menu)) {
 			if (session_any_connected()) {
@@ -425,7 +442,10 @@ handle_file_menu(short item)
 			}
 			active_session = 0L;
 			running = false;
+		} else if (item == add_bm_item) {
+			do_save_as_bookmark();
 		} else if (item > FILE_MENU_STATIC_ITEMS
+		    && item < add_bm_item
 		    && prefs.recent_count > 0) {
 			/* Recent bookmark click */
 			short ri = item -
@@ -441,6 +461,7 @@ handle_file_menu(short item)
 			}
 		}
 		break;
+	}
 	}
 }
 

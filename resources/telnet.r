@@ -23,9 +23,10 @@ resource 'MENU' (129, "File") {
 		"New Session\311", noIcon, "N", noMark, plain;
 		"Close Session", noIcon, "W", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Save as Bookmark\311", noIcon, "S", noMark, plain;
+		"Save Contents\311", noIcon, "S", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
 		"Bookmarks\311", noIcon, "B", noMark, plain
-		/* Recent bookmarks + separator + Quit added dynamically */
+		/* Recent bookmarks + Add Bookmark + separator + Quit added dynamically */
 	}
 };
 
@@ -183,7 +184,7 @@ resource 'DITL' (130, "About Flynn") {
 
 		/* Version */
 		{33, 55, 49, 280},
-		StaticText { disabled, "Version 1.6.1" };
+		StaticText { disabled, "Version 1.7.1" };
 
 		/* Description */
 		{62, 30, 78, 270},

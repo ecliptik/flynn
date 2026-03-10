@@ -1,11 +1,12 @@
 cmake_minimum_required(VERSION 3.9)
-project(Flynn VERSION 1.7.0)
+project(Flynn VERSION 1.7.1)
 
 add_application(Flynn
     src/main.c
     src/menus.c
     src/input.c
     src/clipboard.c
+    src/savefile.c
     src/dialogs.c
     src/session.c
     src/connection.c

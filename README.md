@@ -62,7 +62,7 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | F1-F10 | Cmd+1..0 | For M0110 keyboards without function keys |
 | Bookmarks | Cmd+B | Open bookmark manager |
 | New Session | Cmd+N | New session (new window if connected) |
-| Save as Bookmark | Cmd+S | Save current session as bookmark |
+| Save Contents | Cmd+S | Save scrollback and screen to text file |
 | Close Window | Cmd+W | Close active session window |
 
 ## Building

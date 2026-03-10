@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.7.0
+                    Version 1.7.1
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -86,7 +86,8 @@ Features
   - Select All (Cmd+A) for full-screen copy
   - Session bookmarks with per-bookmark username,
     terminal type, and font settings
-  - Save as Bookmark (Cmd+S) from active session
+  - Save Contents (Cmd+S) exports scrollback and
+    screen to a TEXT file via standard Save dialog
   - Recent bookmarks in File menu for quick access
   - Resizable window (drag the grow box to resize)
   - Six font choices: Monaco 9, Monaco 12, Courier
@@ -121,7 +122,7 @@ and USB keyboards.
   ~~~~~~~~~~~~~
   Command-N       New session (new window if connected)
   Command-W       Close active session window
-  Command-S       Save as Bookmark
+  Command-S       Save Contents to file
   Command-B       Open Bookmark Manager
   Command-A       Select All (entire terminal screen)
   Command-C       Copy selected text
@@ -258,12 +259,11 @@ servers you connect to frequently.
   These overrides apply only to the session opened
   from that bookmark, not to other windows.
 
-  Save as Bookmark:
-  While connected, choose "Save as Bookmark" from
-  the File menu (Command-S) to save the current
-  session as a bookmark. The name, host, port,
-  username, and settings are pre-filled from the
-  active session.
+  Add Bookmark:
+  While connected, choose "Add Bookmark..." from
+  the File menu to save the current session as a
+  bookmark. The name, host, port, username, and
+  settings are pre-filled from the active session.
 
   Connecting via Bookmark:
   - Your 5 most recently used bookmarks appear in
