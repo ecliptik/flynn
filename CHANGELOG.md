@@ -2,14 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.7.1] - 2026-03-10
+## [1.8.0] - 2026-03-10
 
 ### Added
-- Save Contents... (Cmd+S): save terminal scrollback and screen buffer to a
-  plain text file via SFPutFile dialog. Creates TEXT/ttxt files readable by
-  TeachText. Default filename is the connection hostname.
-- New savefile.c/savefile.h module for file save functionality
-- System 7 improvements (all conditional, System 6 unchanged):
+- System 7 improvements (all conditional, System 6 behavior unchanged):
   - MultiFinder suspend/resume: proper app4Evt handling, cursor blink stops
     when backgrounded, WaitNextEvent sleep increases to 60 ticks when suspended
   - Required Apple Events: kAEOpenApplication, kAEQuitApplication handlers
@@ -22,6 +18,18 @@ All notable changes to this project will be documented in this file.
     II, IIci, etc.) via Gestalt
 
 ### Changed
+- About dialog simplified per Apple HIG: condensed to app name/version,
+  machine type, copyright, and GitHub link
+
+## [1.7.1] - 2026-03-10
+
+### Added
+- Save Contents... (Cmd+S): save terminal scrollback and screen buffer to a
+  plain text file via SFPutFile dialog. Creates TEXT/ttxt files readable by
+  TeachText. Default filename is the connection hostname.
+- New savefile.c/savefile.h module for file save functionality
+
+### Changed
 - File menu reorganized per Apple HIG:
   - "Save Contents..." (Cmd+S) in its own section
   - "Bookmarks..." (Cmd+B) leads the bookmark section
@@ -32,8 +40,6 @@ All notable changes to this project will be documented in this file.
   convention for Cmd+S = save to file)
 - "Add Bookmark..." is now a dynamic menu item, enabling proper bookmark
   section grouping with Bookmarks... as the section leader
-- About dialog simplified per Apple HIG: condensed to app name/version,
-  machine type, copyright, and GitHub link
 
 ## [1.7.0] - 2026-03-10
 
