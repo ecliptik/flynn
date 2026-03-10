@@ -1,5 +1,9 @@
 /*
  * settings.c - Preferences persistence for Flynn
+ *
+ * On System 7+, preferences are stored in the Preferences folder
+ * inside the System Folder.  On System 6, they are stored at the
+ * root of the default volume.
  */
 
 #include <Files.h>
@@ -7,7 +11,35 @@
 #include <string.h>
 #include "settings.h"
 
-#define PREFS_FILENAME	"\pFlynn Prefs"
+#define PREFS_FILENAME	"\pFlynn Preferences"
+
+/* Not defined in Retro68 Multiversal headers */
+#ifndef kOnSystemDisk
+#define kOnSystemDisk	((short)0x8000)
+#endif
+
+/*
+ * Locate the directory for preferences storage.
+ * System 7+: Preferences folder (via FindFolder).
+ * System 6:  default volume root (via GetVol).
+ */
+static OSErr
+prefs_get_location(short *vRefNum, long *dirID)
+{
+	long response;
+
+	if (Gestalt('fold', &response) == noErr) {
+		OSErr err;
+		err = FindFolder(kOnSystemDisk, kPreferencesFolderType,
+		    true, vRefNum, dirID);
+		if (err == noErr)
+			return noErr;
+	}
+
+	/* System 6 fallback: default volume root */
+	*dirID = 0;
+	return GetVol(0L, vRefNum);
+}
 
 static void
 prefs_defaults(FlynnPrefs *prefs)
@@ -27,24 +59,30 @@ prefs_defaults(FlynnPrefs *prefs)
 void
 prefs_load(FlynnPrefs *prefs)
 {
-	short refNum;
+	HParamBlockRec pb;
 	long count;
 	short vRefNum;
+	long dirID;
 	OSErr err;
 
 	prefs_defaults(prefs);
 
-	err = GetVol(0L, &vRefNum);
+	err = prefs_get_location(&vRefNum, &dirID);
 	if (err != noErr)
 		return;
 
-	err = FSOpen(PREFS_FILENAME, vRefNum, &refNum);
+	memset(&pb, 0, sizeof(pb));
+	pb.ioParam.ioNamePtr = (StringPtr)PREFS_FILENAME;
+	pb.ioParam.ioVRefNum = vRefNum;
+	pb.ioParam.ioPermssn = fsRdPerm;
+	pb.fileParam.ioDirID = dirID;
+	err = PBHOpenSync(&pb);
 	if (err != noErr)
 		return;
 
 	count = sizeof(FlynnPrefs);
-	err = FSRead(refNum, &count, (Ptr)prefs);
-	FSClose(refNum);
+	err = FSRead(pb.ioParam.ioRefNum, &count, (Ptr)prefs);
+	FSClose(pb.ioParam.ioRefNum);
 
 	if (err != noErr && err != eofErr) {
 		prefs_defaults(prefs);
@@ -149,26 +187,57 @@ prefs_load(FlynnPrefs *prefs)
 void
 prefs_save(FlynnPrefs *prefs)
 {
-	short refNum;
+	HParamBlockRec pb;
 	long count;
 	short vRefNum;
+	long dirID;
 	OSErr err;
 
-	err = GetVol(0L, &vRefNum);
+	err = prefs_get_location(&vRefNum, &dirID);
 	if (err != noErr)
 		return;
 
-	FSDelete(PREFS_FILENAME, vRefNum);
-	err = Create(PREFS_FILENAME, vRefNum, 'FLYN', 'pref');
+	/* Delete existing file */
+	memset(&pb, 0, sizeof(pb));
+	pb.ioParam.ioNamePtr = (StringPtr)PREFS_FILENAME;
+	pb.ioParam.ioVRefNum = vRefNum;
+	pb.fileParam.ioDirID = dirID;
+	PBHDeleteSync(&pb);
+
+	/* Create new file */
+	memset(&pb, 0, sizeof(pb));
+	pb.ioParam.ioNamePtr = (StringPtr)PREFS_FILENAME;
+	pb.ioParam.ioVRefNum = vRefNum;
+	pb.fileParam.ioDirID = dirID;
+	err = PBHCreateSync(&pb);
 	if (err != noErr)
 		return;
 
-	err = FSOpen(PREFS_FILENAME, vRefNum, &refNum);
+	/* Set type and creator */
+	memset(&pb, 0, sizeof(pb));
+	pb.ioParam.ioNamePtr = (StringPtr)PREFS_FILENAME;
+	pb.ioParam.ioVRefNum = vRefNum;
+	pb.fileParam.ioDirID = dirID;
+	err = PBHGetFInfoSync(&pb);
+	if (err != noErr)
+		return;
+	pb.fileParam.ioDirID = dirID;	/* PBHGetFInfo clears this */
+	pb.fileParam.ioFlFndrInfo.fdType = 'pref';
+	pb.fileParam.ioFlFndrInfo.fdCreator = 'FLYN';
+	PBHSetFInfoSync(&pb);
+
+	/* Open and write */
+	memset(&pb, 0, sizeof(pb));
+	pb.ioParam.ioNamePtr = (StringPtr)PREFS_FILENAME;
+	pb.ioParam.ioVRefNum = vRefNum;
+	pb.ioParam.ioPermssn = fsWrPerm;
+	pb.fileParam.ioDirID = dirID;
+	err = PBHOpenSync(&pb);
 	if (err != noErr)
 		return;
 
 	prefs->version = PREFS_VERSION;
 	count = sizeof(FlynnPrefs);
-	FSWrite(refNum, &count, (Ptr)prefs);
-	FSClose(refNum);
+	FSWrite(pb.ioParam.ioRefNum, &count, (Ptr)prefs);
+	FSClose(pb.ioParam.ioRefNum);
 }

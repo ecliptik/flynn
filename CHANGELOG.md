@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.1] - 2026-03-09
+
+### Added
+- Custom Finder icon for "Flynn Preferences" file: document page with terminal
+  prompt (>_) motif, via ICN# 129 + FREF/BNDL mapping for 'pref' file type
+- System 7 Preferences folder support: on System 7+, "Flynn Preferences" is
+  stored in the Preferences folder inside the System Folder (via FindFolder);
+  on System 6, it remains at the volume root (unchanged behavior)
+
+### Changed
+- "Flynn Prefs" renamed to "Flynn Preferences" (more formal, matches Apple
+  convention, still under 31-char HFS limit)
+- Preferences I/O uses directory-aware PBH*Sync calls (replaces FSOpen/Create/
+  FSDelete) for System 7 Preferences folder compatibility
+
 ## [1.6.0] - 2026-03-09
 
 ### Added

@@ -35,10 +35,10 @@ typedef struct {
 	short		recent_count;
 } FlynnPrefs;
 
-/* Load preferences from "Flynn Prefs" file. Returns defaults if not found. */
+/* Load preferences from "Flynn Preferences" file. Returns defaults if not found. */
 void prefs_load(FlynnPrefs *prefs);
 
-/* Save preferences to "Flynn Prefs" file. */
+/* Save preferences to "Flynn Preferences" file. */
 void prefs_save(FlynnPrefs *prefs);
 
 #endif /* SETTINGS_H */

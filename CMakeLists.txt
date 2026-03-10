@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.9)
-project(Flynn VERSION 1.5.2)
+project(Flynn VERSION 1.6.1)
 
 add_application(Flynn
     src/main.c

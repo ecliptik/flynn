@@ -4,6 +4,22 @@ A living document recording the development of Flynn, a Telnet client for classi
 
 ---
 
+## 2026-03-09 — v1.6.1: Preferences Polish
+
+### Naming and Icons
+
+Renamed the preferences file from "Flynn Prefs" to "Flynn Preferences" to match the convention used by polished Mac apps of the era (cf. "Wallops Preferences" in our reference code). Added a custom Finder document icon — a page with a dog-ear fold containing a `>_` terminal prompt motif, tying the preferences file visually to the application. This required adding ICN# 129, a FREF entry mapping the `'pref'` file type to the icon, and expanding the BNDL from 1 to 2 entries per type.
+
+### System 7 Preferences Folder
+
+The original code used `GetVol()` + `FSOpen()`/`Create()` — simple but puts the preferences file at the volume root on both System 6 and System 7. Wallops (our reference IRC client) uses `FindFolder(kPreferencesFolderType)` which only works on System 7+.
+
+Flynn now does runtime detection via `Gestalt('fold')`: if FindFolder is available (System 7+), preferences go to `System Folder:Preferences:Flynn Preferences`; otherwise it falls back to the volume root (System 6 behavior). Both paths use the directory-aware `PBH*Sync` calls (`PBHOpenSync`, `PBHCreateSync`, `PBHDeleteSync`, `PBHGetFInfoSync`, `PBHSetFInfoSync`) instead of the flat `FSOpen`/`Create`/`FSDelete`, since those don't accept a directory ID parameter.
+
+The Retro68 Multiversal headers have `FindFolder`, `kPreferencesFolderType`, and `gestaltFindFolderAttr` in `Multiverse.h` (included via `Files.h`), but lack `kOnSystemDisk` — defined manually as `0x8000`. PBH function names use the explicit `Sync` suffix (e.g., `PBHOpenSync` not `PBHOpen`) since Retro68 doesn't provide the classic `PBHOpen(pb, false)` macros.
+
+---
+
 ## 2026-03-07 — v1.0.0: Control Menu, Keystroke Buffering, and 1.0
 
 ### The Control Menu

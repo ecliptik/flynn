@@ -183,7 +183,7 @@ resource 'DITL' (130, "About Flynn") {
 
 		/* Version */
 		{33, 55, 49, 280},
-		StaticText { disabled, "Version 1.6.0" };
+		StaticText { disabled, "Version 1.6.1" };
 
 		/* Description */
 		{62, 30, 78, 270},
@@ -466,22 +466,67 @@ data 'ICN#' (128) {
 	$"00000000 00000000"
 };
 
+/* Preferences document icon - Terminal Prompt >_ */
+data 'ICN#' (129) {
+	/* Icon bitmap */
+	$"00000000 00000000"
+	$"0FFFE000 08001F00"
+	$"08000F00 08000700"
+	$"08000300 08000100"
+	$"08000100 08000100"
+	$"09000100 08800100"
+	$"08400100 08200100"
+	$"08100100 08200100"
+	$"08400100 08800100"
+	$"09000100 08000100"
+	$"080FE100 08000100"
+	$"08000100 08000100"
+	$"08000100 0FFFFF00"
+	$"00000000 00000000"
+	$"00000000 00000000"
+	$"00000000 00000000"
+	/* Mask */
+	$"00000000 00000000"
+	$"0FFFE000 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"0FFFFF00 0FFFFF00"
+	$"00000000 00000000"
+	$"00000000 00000000"
+	$"00000000 00000000"
+};
+
 /* File reference - APPL type, icon 0 */
 data 'FREF' (128) {
 	$"4150 504C 0000 00"                                  /* APPL... */
 };
 
-/* Bundle - associates creator 'FLYN' with icon and file ref */
+/* File reference - pref type, icon 1 */
+data 'FREF' (129) {
+	$"7072 6566 0001 00"                                  /* pref... */
+};
+
+/* Bundle - associates creator 'FLYN' with icons and file refs */
 data 'BNDL' (128) {
 	$"464C 594E"                                          /* FLYN */
 	$"0000"                                               /* owner ID */
 	$"0001"                                               /* 2 types */
 	$"4652 4546"                                          /* FREF */
-	$"0000"                                               /* 1 entry */
-	$"0000 0080"                                          /* local 0 -> res 128 */
+	$"0001"                                               /* 2 entries */
+	$"0000 0080"                                          /* local 0 -> res 128 (APPL) */
+	$"0001 0081"                                          /* local 1 -> res 129 (pref) */
 	$"4943 4E23"                                          /* ICN# */
-	$"0000"                                               /* 1 entry */
-	$"0000 0080"                                          /* local 0 -> res 128 */
+	$"0001"                                               /* 2 entries */
+	$"0000 0080"                                          /* local 0 -> res 128 (app icon) */
+	$"0001 0081"                                          /* local 1 -> res 129 (pref icon) */
 };
 
 /* Application signature string */
