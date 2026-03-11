@@ -15,14 +15,14 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 | ![Flynn telnet session with neofetch](docs/screenshots/flynn-neofetch.png) | ![Flynn running tmux with split panes](docs/screenshots/flynn-tmux.png) |
 | **Telnet Session** | **tmux Split Panes** |
 | ![Flynn connect dialog](docs/screenshots/flynn-connect.png) | ![Flynn BBS and terminal multi-window](docs/screenshots/flynn-bbs-multiwindow.png) |
-| **Connect Dialog** | **ANSI-BBS + Terminal Multi-Window** |
+| **Connect Dialog** | **Multi-Session and ANSI-BBS** |
 
 ### System 7
 
 <p align="center">
 <img src="docs/screenshots/flynn-256color.png" alt="Flynn 256-color on System 7" width="100%">
 <br>
-<strong>256-Color BBS Session</strong>
+<strong>256-Color Multi-Session</strong>
 </p>
 
 ---
