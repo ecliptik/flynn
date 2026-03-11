@@ -256,10 +256,15 @@ conn_idle(Connection *conn)
 		return;
 	}
 
-	/* Check if connection was closed by remote */
+	/* Check if connection was closed by remote.
+	 * Drain any remaining data before closing so the final
+	 * screen (e.g. BBS goodbye message) gets displayed. */
 	if (status.connectionState == TCP_STATE_TIME_WAIT) {
-		conn_close(conn);
-		return;
+		if (status.amtUnreadData == 0) {
+			conn_close(conn);
+			return;
+		}
+		/* Fall through to read remaining data */
 	}
 
 	if (status.amtUnreadData == 0)

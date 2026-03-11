@@ -181,13 +181,16 @@ session_handle_disconnect(Session *sess)
 	sess->telnet.preferred_ttype = prefs.terminal_type;
 	sess->key_send_len = 0;
 
-	/* Restore pre-clear screen content if remote sent
-	 * clear-screen sequences during logout */
-	if (sess->terminal.snap_valid) {
+	/* Restore pre-clear screen content for xterm/VT types, which
+	 * send ESC[2J during logout leaving a blank screen.
+	 * For ANSI (BBS), keep the current screen — we now drain TCP
+	 * data before closing, so goodbye screens are already rendered. */
+	if (sess->terminal.snap_valid &&
+	    sess->telnet.preferred_ttype != 4) {
 		memcpy(sess->terminal.screen, sess->terminal.snap_screen,
 		    sizeof(sess->terminal.screen));
-		sess->terminal.snap_valid = 0;
 	}
+	sess->terminal.snap_valid = 0;
 
 	/* Set title to show disconnected state */
 	if (sess->conn.host[0])
