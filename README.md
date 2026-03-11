@@ -12,8 +12,8 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 |:---:|:---:|
 | ![Flynn telnet session with neofetch](docs/screenshots/flynn-neofetch.png) | ![Flynn running tmux with split panes](docs/screenshots/flynn-tmux.png) |
 | **Telnet Session** | **tmux Split Panes** |
-| ![Flynn connect dialog](docs/screenshots/flynn-connect.png) | ![Claude Code running inside Flynn](docs/screenshots/flynn-claudecode.png) |
-| **Connect Dialog** | **Claude Code via Flynn** |
+| ![Flynn connect dialog](docs/screenshots/flynn-connect.png) | ![Flynn BBS and terminal multi-window](docs/screenshots/flynn-bbs-multiwindow.png) |
+| **Connect Dialog** | **ANSI-BBS + Terminal Multi-Window** |
 
 ---
 
