@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.9.2
+                    Version 1.9.3
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -125,8 +125,12 @@ Features
   - Dark mode (white text on black background)
   - Custom DNS server configuration
   - Username auto-login
-  - Control menu for sending Ctrl-C, Ctrl-D, Ctrl-Z,
-    Escape, Ctrl-L, and Break without a Ctrl key
+  - Backspace mode toggle: DEL (0x7F) for xterm/VT220,
+    BS (0x08) for ANSI-BBS (auto-switches with terminal
+    type, or manual override in Options menu)
+  - Control menu for sending Ctrl-C, Ctrl-D, Ctrl-H,
+    Ctrl-X, Ctrl-Z, Escape, Ctrl-L, and Break without
+    a Ctrl key
   - Multiple simultaneous sessions (up to 4 windows)
   - Window menu with session list
   - Connection progress window with status updates
@@ -351,6 +355,13 @@ terminal type, networking, and display mode.
   ~~~~~~~~~~
   DNS Server: Configure a custom DNS server IP
   address. Default is 1.1.1.1 (Cloudflare DNS).
+
+  Backspace Sends BS
+  ~~~~~~~~~~~~~~~~~~
+  Toggle backspace behavior between DEL (0x7F, default
+  for xterm/VT220) and BS (0x08, required for BBSes).
+  Automatically set when changing terminal type:
+  ANSI-BBS enables BS, all others use DEL.
 
   Dark Mode
   ~~~~~~~~~

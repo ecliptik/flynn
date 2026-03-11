@@ -39,6 +39,7 @@ No build toolchain required — just download and run.
 - **Session bookmarks**
 - **Mouse text selection with copy/paste**
 - **Bracketed paste mode**
+- **Backspace DEL/BS toggle** (auto-switches with terminal type)
 - **Keystroke buffering**
 - **M0110 keyboard support**
 - **Dark mode**

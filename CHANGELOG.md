@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.3] - 2026-03-11
+
+### Added
+- Backspace mode toggle: DEL (0x7F) default for xterm/VT220, BS (0x08)
+  for ANSI-BBS. Auto-switches when changing terminal type; manual override
+  in Options menu ("Backspace Sends BS" checkmark)
+- Send Ctrl-H and Send Ctrl-X items in Control menu
+- Prefs v8→v9 migration for backspace_bs field
+
+### Fixed
+- DNS lookup failure after prefs migration: backspace_bs field was inserted
+  before dns_server in the FlynnPrefs struct, shifting all subsequent fields
+  by 1 byte. DNS server "1.1.1.1" became ".1.1.1" (invalid), and username
+  lost its first character. Fixed validation to reject leading-dot IPs and
+  reset dns_server in migration
+- Backspace mode not auto-enabled when connecting with ANSI-BBS terminal
+  type via bookmark or new session (only worked from Options menu)
+
+### Changed
+- Performance: hot path optimizations in terminal parser and draw routines
+- Security: bounds checking on terminal response buffer flush
+- Dead code removal: ~50 lines removed, unused functions and defines cleaned up
+- Defensive improvements: conn_send() rejects zero-length writes, removed
+  unused idle_skip field from Connection struct
+
 ## [1.9.2] - 2026-03-10
 
 ### Added
