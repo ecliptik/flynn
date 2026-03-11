@@ -8,12 +8,22 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 <a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> · <a href="#building">Building</a> · <a href="#testing">Testing</a> · <a href="#acknowledgments">Acknowledgments</a> · <a href="#license">License</a>
 </p>
 
+### System 6
+
 | | |
 |:---:|:---:|
 | ![Flynn telnet session with neofetch](docs/screenshots/flynn-neofetch.png) | ![Flynn running tmux with split panes](docs/screenshots/flynn-tmux.png) |
 | **Telnet Session** | **tmux Split Panes** |
 | ![Flynn connect dialog](docs/screenshots/flynn-connect.png) | ![Flynn BBS and terminal multi-window](docs/screenshots/flynn-bbs-multiwindow.png) |
 | **Connect Dialog** | **ANSI-BBS + Terminal Multi-Window** |
+
+### System 7
+
+<p align="center">
+<img src="docs/screenshots/flynn-256color.png" alt="Flynn 256-color on System 7" width="100%">
+<br>
+<strong>256-Color BBS Session</strong>
+</p>
 
 ---
 
