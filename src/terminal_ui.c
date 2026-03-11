@@ -69,6 +69,7 @@ short			g_cell_baseline = CELL_HEIGHT - 2;
 short			g_font_id = 4;
 short			g_font_size = 9;
 static short		g_dark_mode = 0;
+static short		g_mono_dark = 0;	/* monochrome dark mode active */
 
 /* Current effective colors for glyph shade blending (set by draw_row) */
 static unsigned char	g_eff_fg = 0;
@@ -79,6 +80,53 @@ static short row_top(short row)    { return TOP_MARGIN + row * g_cell_height; }
 static short row_bottom(short row) { return TOP_MARGIN + (row + 1) * g_cell_height; }
 static short col_left(short col)   { return LEFT_MARGIN + col * g_cell_width; }
 static short col_right(short col)  { return LEFT_MARGIN + (col + 1) * g_cell_width; }
+
+/*
+ * mono_eff_inv - effective inverse for monochrome rendering
+ *
+ * In dark mode, normal cells render as white-on-black (srcBic/patBic).
+ * In dark mode, ATTR_INVERSE cells render as black-on-white (srcOr).
+ * This eliminates the EraseRect→InvertRect flash ("shutter effect").
+ */
+static short
+mono_eff_inv(unsigned char attr)
+{
+	if (g_has_color_qd)
+		return 0;
+	if (g_mono_dark)
+		return !(attr & ATTR_INVERSE);
+	return (attr & ATTR_INVERSE) != 0;
+}
+
+/*
+ * mono_cell_prep - prepare cell background for monochrome rendering
+ *
+ * Returns 1 if caller should use srcBic/patBic (white on black).
+ * Returns 0 if caller should use srcOr/patCopy (black on white).
+ * Fills cell background as needed (EraseRect for dark+inverse).
+ */
+static short
+mono_cell_prep(Rect *cell_r, unsigned char attr)
+{
+	if (g_has_color_qd)
+		return 0;
+	if (g_mono_dark) {
+		if (attr & ATTR_INVERSE) {
+			/* Dark + inverse = normal appearance */
+			EraseRect(cell_r);
+			return 0;
+		}
+		/* Dark + normal: bg already black from row erase */
+		return 1;
+	}
+	if (attr & ATTR_INVERSE) {
+		/* Light + inverse: fill black */
+		PaintRect(cell_r);
+		return 1;
+	}
+	/* Light + normal: bg already white from row erase */
+	return 0;
+}
 
 static void draw_row(Terminal *term, short row);
 static void draw_line_char(unsigned char ch, short x, short y,
@@ -173,6 +221,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 	TextFont(g_font_id);
 	TextSize(g_font_size);
+	g_mono_dark = g_dark_mode && !g_has_color_qd;
 
 	/* If cursor moved, mark old and new rows dirty to clean up
 	 * XOR artifacts from previous draw_cursor() calls */
@@ -202,6 +251,9 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			/* Color light mode: erase with white background */
 			set_bg_color(15);
 			EraseRect(&r);
+		} else if (g_mono_dark) {
+			/* Mono dark: fill black directly (no white flash) */
+			PaintRect(&r);
 		} else {
 			EraseRect(&r);
 		}
@@ -213,12 +265,12 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		draw_row(term, row);
 
 		/*
-		 * Dark mode: invert only on monochrome systems.
 		 * On color systems, draw_row() handles dark mode
 		 * by resolving COLOR_DEFAULT to white-on-black.
+		 * On monochrome, draw_row/sub-functions now render
+		 * directly in white-on-black (srcBic/patBic) to
+		 * avoid the EraseRect→InvertRect flash.
 		 */
-		if (g_dark_mode && !g_has_color_qd)
-			InvertRect(&r);
 	}
 
 	terminal_clear_dirty(term);
@@ -433,8 +485,8 @@ draw_row(Terminal *term, short row)
 		 *   Normal mode: fg=black(0), bg=white(15)
 		 *   Dark mode:   fg=white(15), bg=black(0)
 		 *
-		 * On monochrome, inverse is handled by the existing
-		 * PaintRect + srcBic path; dark mode by InvertRect.
+		 * On monochrome, inverse and dark mode are handled
+		 * by mono_cell_prep/mono_eff_inv (srcBic/patBic).
 		 */
 		{
 			unsigned char eff_fg = run_fg;
@@ -590,10 +642,14 @@ draw_row(Terminal *term, short row)
 						x += cell_w;
 					}
 				} else {
-					/* Monochrome inverse: existing
-					 * PaintRect + srcBic path */
+					/*
+					 * Monochrome inverse text.
+					 * mono_cell_prep handles bg:
+					 * light+inv → PaintRect+srcBic
+					 * dark+inv → EraseRect+srcOr
+					 */
 					Rect inv_r;
-					short x;
+					short x, use_bic;
 					SetRect(&inv_r,
 					    LEFT_MARGIN +
 					    run_start * cell_w,
@@ -602,8 +658,11 @@ draw_row(Terminal *term, short row)
 					    run_start * cell_w +
 					    run_len * cell_w,
 					    row_bottom(row));
-					PaintRect(&inv_r);
-					TextMode(srcBic);
+					use_bic =
+					    mono_cell_prep(&inv_r,
+					    run_attr);
+					if (use_bic)
+						TextMode(srcBic);
 					x = LEFT_MARGIN +
 					    run_start * cell_w;
 					{
@@ -615,21 +674,30 @@ draw_row(Terminal *term, short row)
 							x += cell_w;
 						}
 					}
-					TextMode(srcOr);
+					if (use_bic)
+						TextMode(srcOr);
 				}
 			} else if ((run_attr & ATTR_BOLD) ||
 			    cell_w != g_cell_width) {
 				short x = LEFT_MARGIN +
 				    run_start * cell_w;
 				short i;
+				if (g_mono_dark)
+					TextMode(srcBic);
 				for (i = 0; i < run_len; i++) {
 					MoveTo(x, baseline);
 					DrawChar(buf[i]);
 					x += cell_w;
 				}
+				if (g_mono_dark)
+					TextMode(srcOr);
 			} else {
+				if (g_mono_dark)
+					TextMode(srcBic);
 				MoveTo(col_left(run_start), baseline);
 				DrawText(buf, 0, run_len);
+				if (g_mono_dark)
+					TextMode(srcOr);
 			}
 
 			/* Strikethrough post-pass */
@@ -639,8 +707,12 @@ draw_row(Terminal *term, short row)
 				short x0 = LEFT_MARGIN +
 				    run_start * cell_w;
 				short x1 = x0 + run_len * cell_w;
+				if (mono_eff_inv(run_attr))
+					PenMode(patBic);
 				MoveTo(x0, strike_y);
 				LineTo(x1, strike_y);
+				if (mono_eff_inv(run_attr))
+					PenMode(patCopy);
 			}
 
 			if (use_color)
@@ -679,13 +751,11 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
 	/*
-	 * Inverse: on monochrome, paint cell black and draw in white.
-	 * On color, draw_row already swapped fg/bg — no double-inverse.
+	 * Monochrome cell setup: handles inverse and dark mode.
+	 * On color, draw_row already swapped fg/bg.
 	 */
-	if ((attr & ATTR_INVERSE) && !g_has_color_qd) {
-		PaintRect(&cell_r);
+	if (mono_cell_prep(&cell_r, attr))
 		PenMode(patBic);
-	}
 
 	/* Bold: thicker horizontal pen */
 	if (attr & ATTR_BOLD)
@@ -828,11 +898,11 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 		{
 			short bl = y + g_cell_baseline;
 
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcBic);
 			MoveTo(x, bl);
 			DrawChar(ch);
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcOr);
 		}
 		break;
@@ -865,13 +935,11 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
 	/*
-	 * Inverse: on monochrome, paint cell black and draw in white.
-	 * On color, draw_row already swapped fg/bg — no double-inverse.
+	 * Monochrome cell setup: handles inverse and dark mode.
+	 * On color, draw_row already swapped fg/bg.
 	 */
-	if ((attr & ATTR_INVERSE) && !g_has_color_qd) {
-		PaintRect(&cell_r);
+	if (mono_cell_prep(&cell_r, attr))
 		PenMode(patBic);
-	}
 
 	/* Bold: thicker strokes */
 	if (attr & ATTR_BOLD)
@@ -1786,11 +1854,11 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			small_size = g_font_size * 3 / 5;
 			if (small_size < 6) small_size = 6;
 			TextSize(small_size);
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcBic);
 			MoveTo(x + 1, y + small_size);
 			DrawChar(digit);
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcOr);
 			TextSize(g_font_size);
 		}
@@ -1811,11 +1879,11 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			small_size = g_font_size * 3 / 5;
 			if (small_size < 6) small_size = 6;
 			TextSize(small_size);
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcBic);
 			MoveTo(x + 1, bottom - 1);
 			DrawChar(digit);
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcOr);
 			TextSize(g_font_size);
 		}
@@ -2214,7 +2282,9 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 		/* ☻ black smiley face (filled circle, white features) */
 		SetRect(&r, x + 1, y + 1, right, bottom - 1);
 		PaintOval(&r);
-		PenMode(patBic);
+		/* Features: opposite of body (white on black, or
+		 * black on white when cell is effective-inverse) */
+		PenMode(mono_eff_inv(attr) ? patCopy : patBic);
 		/* Eyes */
 		MoveTo(cx - 1, cy - 1);
 		LineTo(cx - 1, cy - 1);
@@ -2233,7 +2303,7 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 	case GLYPH_INV_BULLET:
 		/* ◘ inverse bullet: filled rect + white circle */
 		PaintRect(&cell_r);
-		PenMode(patBic);
+		PenMode(mono_eff_inv(attr) ? patCopy : patBic);
 		SetRect(&r, x + 1, y + 2, right, bottom - 1);
 		PaintOval(&r);
 		PenMode(patCopy);
@@ -2243,7 +2313,7 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 		/* ◙ inverse circle: filled circle + white circle inside */
 		SetRect(&r, x + 1, y + 1, right, bottom - 1);
 		PaintOval(&r);
-		PenMode(patBic);
+		PenMode(mono_eff_inv(attr) ? patCopy : patBic);
 		SetRect(&r, x + 2, y + 3, right - 1, bottom - 2);
 		PaintOval(&r);
 		PenMode(patCopy);
@@ -2390,7 +2460,7 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			small_size = g_font_size * 3 / 5;
 			if (small_size < 6) small_size = 6;
 			TextSize(small_size);
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcBic);
 			MoveTo(x, y + small_size);
 			DrawChar('1');
@@ -2399,7 +2469,7 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			LineTo(right - 1, y + 2);
 			MoveTo(cx, bottom - 1);
 			DrawChar('2');
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcOr);
 			TextSize(g_font_size);
 		}
@@ -2412,7 +2482,7 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			small_size = g_font_size * 3 / 5;
 			if (small_size < 6) small_size = 6;
 			TextSize(small_size);
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcBic);
 			MoveTo(x, y + small_size);
 			DrawChar('1');
@@ -2421,7 +2491,7 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			LineTo(right - 1, y + 2);
 			MoveTo(cx, bottom - 1);
 			DrawChar('4');
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcOr);
 			TextSize(g_font_size);
 		}
@@ -2477,9 +2547,9 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 		PenSize(1, 1);
 		SetRect(&r, x + 1, y + 2, right - 1, bottom + 2);
 		FrameOval(&r);
-		/* Erase bottom half */
+		/* Erase bottom half (fill with cell background) */
 		SetRect(&r, x + 2, cy, right - 2, bottom);
-		EraseRect(&r);
+		FillRect(&r, mono_eff_inv(attr) ? &qd.black : &qd.white);
 		/* Vertical sides */
 		MoveTo(x + 1, cy);
 		LineTo(x + 1, bottom - 1);
@@ -2545,11 +2615,11 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			small_size = g_font_size * 3 / 5;
 			if (small_size < 6) small_size = 6;
 			TextSize(small_size);
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcBic);
 			MoveTo(x + 1, y + small_size);
 			DrawChar('n');
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcOr);
 			TextSize(g_font_size);
 		}
@@ -2608,11 +2678,11 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			/* Unknown primitive: draw ? */
 			short bl = y + g_cell_baseline;
 
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcBic);
 			MoveTo(x, bl);
 			DrawChar('?');
-			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+			if (mono_eff_inv(attr))
 				TextMode(srcOr);
 		}
 		break;
@@ -2648,11 +2718,10 @@ draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	SetRect(&cell_r, x, y, x + cell2_w, y + g_cell_height);
 
 	/*
-	 * Inverse: on monochrome, paint 2-cell area black and blit in
-	 * white.  On color, draw_row already swapped fg/bg.
+	 * Monochrome cell setup: handles inverse and dark mode.
+	 * On color, draw_row already swapped fg/bg.
 	 */
-	if ((attr & ATTR_INVERSE) && !g_has_color_qd)
-		PaintRect(&cell_r);
+	mono_cell_prep(&cell_r, attr);
 
 	/* Build source BitMap from glyph data */
 	src_bits.baseAddr = (Ptr)bm->bits;
@@ -2670,7 +2739,7 @@ draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	/* Blit: srcOr for normal, srcBic for inverse on monochrome */
 	CopyBits(&src_bits, &qd.thePort->portBits,
 	    &src_r, &dst_r,
-	    ((attr & ATTR_INVERSE) && !g_has_color_qd) ? srcBic : srcOr,
+	    mono_eff_inv(attr) ? srcBic : srcOr,
 	    NULL);
 }
 
@@ -2700,13 +2769,11 @@ draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
 	/*
-	 * Inverse: on monochrome, paint cell black and draw in white.
-	 * On color, draw_row already swapped fg/bg — no double-inverse.
+	 * Monochrome cell setup: handles inverse and dark mode.
+	 * On color, draw_row already swapped fg/bg.
 	 */
-	if ((attr & ATTR_INVERSE) && !g_has_color_qd) {
-		PaintRect(&cell_r);
+	if (mono_cell_prep(&cell_r, attr))
 		PenMode(patBic);
-	}
 
 	/* Compute dot dimensions (scale with font) */
 	dot_w = g_cell_width / 4;
@@ -2742,7 +2809,7 @@ draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 		}
 	}
 
-	if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+	if (mono_eff_inv(attr))
 		PenMode(patCopy);
 	PenNormal();
 }
