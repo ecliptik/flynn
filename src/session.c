@@ -186,6 +186,7 @@ session_init_from_prefs(Session *s)
 	term_ui_init(s->window, &s->terminal);
 	term_ui_save_state(&s->ui);
 	s->conn.dns_server = ip2long(prefs.dns_server);
+	s->terminal.dark_mode = prefs.dark_mode;
 	if (prefs.dark_mode)
 		PaintRect(&s->window->portRect);
 }

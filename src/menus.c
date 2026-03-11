@@ -584,6 +584,8 @@ handle_prefs_menu(short item)
 				if (!sess)
 					continue;
 				SetPort(sess->window);
+				sess->terminal.dark_mode =
+				    prefs.dark_mode;
 				clear_window_bg(sess->window,
 				    prefs.dark_mode);
 				term_dirty_all(&sess->terminal);

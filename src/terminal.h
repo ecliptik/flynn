@@ -159,6 +159,7 @@ typedef struct {
 	unsigned char	cur_fg;		/* current fg (COLOR_DEFAULT = default) */
 	unsigned char	cur_bg;		/* current bg (COLOR_DEFAULT = default) */
 	unsigned char	pre_dim_fg;	/* saved fg before SGR 2 dim */
+	unsigned char	dark_mode;	/* mirror of prefs.dark_mode for OSC queries */
 
 	/* Saved cursor (ESC 7 / ESC 8) */
 	short		saved_row;
@@ -172,12 +173,12 @@ typedef struct {
 	unsigned char	saved_origin_mode;
 	unsigned char	saved_autowrap;
 
-	/* Response buffer for DA/DSR replies */
-	char		response[32];
+	/* Response buffer for DA/DSR replies and OSC 52 clipboard */
+	char		response[768];
 	short		response_len;
 
 	/* OSC buffer */
-	char		osc_buf[128];
+	char		osc_buf[512];
 	short		osc_len;
 	short		osc_param;
 
