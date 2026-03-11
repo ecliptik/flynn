@@ -100,12 +100,12 @@ Features
     and blink (DOS-style bright background on color)
   - Bold-to-bright color promotion for standard
     ANSI/BBS color rendering
-  - Unicode glyph rendering: 202 QuickDraw primitives
+  - Unicode glyph rendering: 213 QuickDraw primitives
     (arrows, shapes, blocks, triangles, diamonds,
     circles, superscripts, subscripts, card suits,
     double-line box drawing, sextants, fractional
-    blocks), 17 monochrome bitmap emoji, and braille
-    patterns
+    blocks, flowers, snowflake), 19 monochrome bitmap
+    emoji, and braille patterns
   - OSC sequences: window title (OSC 0/2), palette
     color query (OSC 4), foreground/background color
     query (OSC 10/11), cursor color (OSC 12/112,

@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [1.9.3] - 2026-03-11
 
 ### Added
+- 13 new Unicode glyph mappings: flower/florette dingbats (U+273E-2741),
+  snowflake (U+2744), sparkles (U+2728), flower emoji (🌸🌺🌼🌟💫),
+  plus 2 new QuickDraw primitives (flower, snowflake)
 - Backspace mode toggle: DEL (0x7F) default for xterm/VT220, BS (0x08)
   for ANSI-BBS. Auto-switches when changing terminal type; manual override
   in Options menu ("Backspace Sends BS" checkmark)

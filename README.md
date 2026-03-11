@@ -38,7 +38,7 @@ No build toolchain required — just download and run.
 - **VT100/VT220/xterm/xterm-256color/ANSI-BBS terminal emulation** with CP437 rendering
 - **256-color support** on System 7 with Color QuickDraw (zero System 6 impact)
 - **SGR attributes**: bold, italic, underline, dim, strikethrough, blink, inverse
-- **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns** (202 glyphs + 17 emoji)
+- **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns** (213 glyphs + 19 emoji)
 - **OSC support**: window title, palette and color queries
 
 **Display & Windowing**
