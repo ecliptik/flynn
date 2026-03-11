@@ -15,11 +15,13 @@
 #include "telnet.h"
 #include "terminal.h"
 #include "terminal_ui.h"
+#include "settings.h"
 #include "macutil.h"
 #include "menus.h"
 #include "input.h"
 
 /* External references to main.c globals */
+extern FlynnPrefs prefs;
 extern Session *active_session;
 
 /* Forward declaration for local helper */
@@ -49,7 +51,7 @@ static const struct { unsigned char vkey, len; char seq[6]; } special_key_map[] 
 	{0x74, 4, "\033[5~"},	/* Page Up */
 	{0x79, 4, "\033[6~"},	/* Page Down */
 	{0x75, 4, "\033[3~"},	/* Forward Delete */
-	{0x33, 1, {0x08}},	/* Delete/Backspace → BS */
+	/* Backspace (0x33) handled separately: DEL/BS per terminal type */
 	{0x35, 1, {0x1B}},	/* Escape */
 	{0x24, 1, {0x0D}},	/* Return */
 	{0x4C, 1, {0x0D}},	/* Keypad Enter */
@@ -224,6 +226,13 @@ handle_key_down(Session *s, EventRecord *event)
 				return;
 			}
 		}
+	}
+
+	/* Backspace: DEL or BS per user preference */
+	if (vkey == 0x33) {
+		char bs = prefs.backspace_bs ? 0x08 : 0x7F;
+		buffer_key_send(s, &bs, 1);
+		return;
 	}
 
 	/* Special keys and function keys: table-driven lookup */

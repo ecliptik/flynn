@@ -52,7 +52,8 @@ resource 'MENU' (131, "Options") {
 		"Terminal Type", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"DNS Server\311", noIcon, noKey, noMark, plain;
-		"Dark Mode", noIcon, noKey, noMark, plain
+		"Dark Mode", noIcon, noKey, noMark, plain;
+		"Backspace Sends BS", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -99,7 +100,9 @@ resource 'MENU' (132, "Control") {
 	{
 		"Send Ctrl-C", noIcon, noKey, noMark, plain;
 		"Send Ctrl-D", noIcon, noKey, noMark, plain;
+		"Send Ctrl-H", noIcon, noKey, noMark, plain;
 		"Send Ctrl-L", noIcon, noKey, noMark, plain;
+		"Send Ctrl-X", noIcon, noKey, noMark, plain;
 		"Send Ctrl-Z", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Send Break", noIcon, noKey, noMark, plain;

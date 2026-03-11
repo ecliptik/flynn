@@ -269,6 +269,8 @@ update_prefs_menu(void)
 	/* Options menu checkmarks */
 	CheckItem(prefs_menu, PREFS_DARK_ID,
 	    prefs.dark_mode != 0);
+	CheckItem(prefs_menu, PREFS_BKSP_DEL_ID,
+	    prefs.backspace_bs != 0);
 }
 
 void
@@ -480,8 +482,18 @@ handle_ctrl_menu(short item)
 			conn_send(&active_session->conn,
 			    &ctrl_byte, 1);
 			break;
+		case CTRL_MENU_CTRLH:
+			ctrl_byte = 0x08;
+			conn_send(&active_session->conn,
+			    &ctrl_byte, 1);
+			break;
 		case CTRL_MENU_CTRLL:
 			ctrl_byte = 0x0C;
+			conn_send(&active_session->conn,
+			    &ctrl_byte, 1);
+			break;
+		case CTRL_MENU_CTRLX:
+			ctrl_byte = 0x18;
 			conn_send(&active_session->conn,
 			    &ctrl_byte, 1);
 			break;
@@ -551,6 +563,8 @@ handle_ttype_submenu(short item)
 	}
 	/* Also update global default */
 	prefs.terminal_type = ttype;
+	/* Sync backspace mode to match terminal type default */
+	prefs.backspace_bs = (ttype == 4) ? 1 : 0;
 	prefs_save(&prefs);
 	update_prefs_menu();
 	if (active_session &&
@@ -597,6 +611,11 @@ handle_prefs_menu(short item)
 		break;
 	case PREFS_DNS_ID:
 		do_dns_server_dialog();
+		break;
+	case PREFS_BKSP_DEL_ID:
+		prefs.backspace_bs = !prefs.backspace_bs;
+		prefs_save(&prefs);
+		update_prefs_menu();
 		break;
 	}
 }
