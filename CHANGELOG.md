@@ -8,6 +8,12 @@ All notable changes to this project will be documented in this file.
 - 13 new Unicode glyph mappings: flower/florette dingbats (U+273E-2741),
   snowflake (U+2744), sparkles (U+2728), flower emoji (🌸🌺🌼🌟💫),
   plus 2 new QuickDraw primitives (flower, snowflake)
+- OSC 4 palette color query (rgb:RRRR/GGGG/BBBB replies from 256-color
+  palette), OSC 10/11 default fg/bg color queries (dark_mode-aware),
+  OSC 12/112 cursor color set/reset (no-op on monochrome XOR cursor)
+- Hierarchical submenus: Options menu now uses Font and Terminal Type
+  submenus (20 items → 5), fixing menu scrolling off-screen on Mac Plus.
+  File menu uses Favorites submenu for bookmark entries
 - Backspace mode toggle: DEL (0x7F) default for xterm/VT220, BS (0x08)
   for ANSI-BBS. Auto-switches when changing terminal type; manual override
   in Options menu ("Backspace Sends BS" checkmark)
@@ -15,6 +21,12 @@ All notable changes to this project will be documented in this file.
 - Prefs v8→v9 migration for backspace_bs field
 
 ### Fixed
+- Dark mode shutter effect on monochrome: EraseRect (white) → draw →
+  InvertRect caused visible white flash per row. Now renders directly
+  with PaintRect (black bg) + srcBic/patBic (white drawing)
+- BBS goodbye screen not displayed on disconnect: drain remaining TCP
+  data before closing on TIME_WAIT; skip snapshot restore for ANSI-BBS
+  terminal type to preserve goodbye screen
 - DNS lookup failure after prefs migration: backspace_bs field was inserted
   before dns_server in the FlynnPrefs struct, shifting all subsequent fields
   by 1 byte. DNS server "1.1.1.1" became ".1.1.1" (invalid), and username
@@ -24,6 +36,11 @@ All notable changes to this project will be documented in this file.
   type via bookmark or new session (only worked from Options menu)
 
 ### Changed
+- Bookmarks renamed to Favorites throughout UI (menus, dialogs, labels)
+- Terminal Type menu reordered: xterm, xterm-256color, VT100, VT220,
+  ANSI-BBS (display order decoupled from internal storage indices)
+- Connection status window widened from 240→320px, hostname truncation
+  40→50 chars to accommodate longer hostnames
 - Performance: hot path optimizations in terminal parser and draw routines
 - Security: bounds checking on terminal response buffer flush
 - Dead code removal: ~50 lines removed, unused functions and defines cleaned up
