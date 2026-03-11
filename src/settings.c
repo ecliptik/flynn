@@ -102,7 +102,8 @@ prefs_load(FlynnPrefs *prefs)
 
 	/* Validate DNS server IP */
 	{
-		if (prefs->dns_server[0] == '\0' || ip2long(prefs->dns_server) == 0) {
+		if (prefs->dns_server[0] == '\0' || prefs->dns_server[0] == '.' ||
+		    ip2long(prefs->dns_server) == 0) {
 			strncpy(prefs->dns_server, "1.1.1.1",
 			    sizeof(prefs->dns_server) - 1);
 			prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
@@ -187,9 +188,15 @@ prefs_load(FlynnPrefs *prefs)
 	}
 
 	if (prefs->version == 8) {
-		/* v8→v9 migration: add backspace_bs */
+		/* v8→v9 migration: add backspace_bs.
+		 * backspace_bs was inserted before dns_server in the struct,
+		 * so reading v8 data into v9 layout shifts dns_server by 1 byte
+		 * (e.g., "1.1.1.1" becomes ".1.1.1"). Reset dns_server to default. */
 		prefs->backspace_bs =
 		    (prefs->terminal_type == 4) ? 1 : 0;
+		strncpy(prefs->dns_server, "1.1.1.1",
+		    sizeof(prefs->dns_server) - 1);
+		prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

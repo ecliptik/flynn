@@ -34,6 +34,7 @@ typedef struct {
 	char		username[64];	/* auto-login username, empty = disabled */
 	short		recent[MAX_RECENT];	/* recently used bookmark indices */
 	short		recent_count;
+	/* NOTE: always append new fields here, never insert above */
 } FlynnPrefs;
 
 /* Load preferences from "Flynn Preferences" file. Returns defaults if not found. */
