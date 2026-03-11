@@ -1,5 +1,5 @@
 /*
- * dns.h - Custom DNS resolver using MacTCP UDP
+ * dns.h - Custom DNS resolver using MacTCP
  */
 
 #ifndef DNS_H
@@ -16,7 +16,8 @@
 #define DNS_ERR_SERVFAIL -5   /* DNS server error */
 
 /*
- * Resolve a hostname to an IP address using DNS over UDP.
+ * Resolve a hostname to an IP address.
+ * Tries UDP first, falls back to TCP if UDP times out.
  * dns_server is the IP of the DNS server to query.
  * Returns DNS_OK on success with *ip set to the resolved address.
  * Returns DNS_ERR_* on failure.

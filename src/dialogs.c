@@ -246,6 +246,7 @@ session_post_connect(Session *s, short ttype, short bm_index,
 	s->telnet.cols = s->terminal.active_cols;
 	s->telnet.rows = s->terminal.active_rows;
 	terminal_reset(&s->terminal);
+	s->terminal.cp437_mode = (ttype == 4) ? 1 : 0;
 
 	/* Save last-used host/port/terminal type to prefs */
 	strncpy(prefs.host, s->conn.host,
@@ -357,6 +358,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			AppendMenu(popup, "\pVT220");
 			AppendMenu(popup, "\pVT100");
 			AppendMenu(popup, "\pxterm-256color");
+			AppendMenu(popup, "\pANSI-BBS");
 			InsertMenu(popup, -1);
 
 			CheckItem(popup, g_connect_ttype + 1, true);
@@ -988,6 +990,7 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			AppendMenu(popup, "\pVT220");
 			AppendMenu(popup, "\pVT100");
 			AppendMenu(popup, "\pxterm-256color");
+			AppendMenu(popup, "\pANSI-BBS");
 			InsertMenu(popup, -1);
 
 			/* Checkmark: -1=Default(1), 0=xterm(2),

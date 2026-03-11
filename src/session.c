@@ -209,6 +209,7 @@ ttype_to_str(short ttype, char *buf, short buflen)
 	case 1:  str = "VT220"; break;
 	case 2:  str = "VT100"; break;
 	case 3:  str = "xterm-256color"; break;
+	case 4:  str = "ANSI-BBS"; break;
 	default: str = "Default"; break;
 	}
 	strncpy(buf, str, buflen - 1);

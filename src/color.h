@@ -36,4 +36,7 @@ void color_get_rgb(unsigned char index, RGBColor *rgb);
 unsigned char color_nearest_256(unsigned char r, unsigned char g,
     unsigned char b);
 
+/* Return dimmed version of a palette color (halve RGB components) */
+unsigned char color_dim(unsigned char idx);
+
 #endif /* COLOR_H */

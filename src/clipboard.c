@@ -74,15 +74,15 @@ do_copy(void)
 
 				cell = terminal_get_display_cell(
 				    &s->terminal, row, col);
-				if ((cell->attr & ATTR_GLYPH) &&
+				if (CELL_IS_GLYPH(cell->attr) &&
 				    cell->ch == GLYPH_WIDE_SPACER) {
 					buf[len + (col - c_start)] = ' ';
 					continue;
 				}
-				if (cell->attr & ATTR_GLYPH) {
+				if (CELL_IS_GLYPH(cell->attr)) {
 					gi = glyph_get_info(cell->ch);
 					cc = gi ? gi->copy_char : '?';
-				} else if (cell->attr & ATTR_BRAILLE) {
+				} else if (CELL_IS_BRAILLE(cell->attr)) {
 					cc = '.';
 				} else {
 					cc = cell->ch;

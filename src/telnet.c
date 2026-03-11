@@ -284,22 +284,23 @@ handle_sb(TelnetState *ts, unsigned char *send, short *sendlen)
 			{
 				static const char *ttype_cycle[] = {
 					"xterm-256color", "xterm",
-					"VT220", "VT100"
+					"VT220", "VT100", "ansi"
 				};
 				/* Map pref value to cycle start:
 				 * 0=xterm->1, 1=VT220->2,
-				 * 2=VT100->3, 3=xterm-256color->0 */
+				 * 2=VT100->3, 3=xterm-256color->0,
+				 * 4=ansi->4 */
 				static const short ttype_start[] = {
-					1, 2, 3, 0
+					1, 2, 3, 0, 4
 				};
 				short idx, start;
 
 				start = (ts->preferred_ttype >= 0 &&
-				    ts->preferred_ttype <= 3) ?
+				    ts->preferred_ttype <= 4) ?
 				    ttype_start[ts->preferred_ttype] : 1;
 				idx = start + ts->ttype_count;
-				if (idx > 3)
-					idx = 3;
+				if (idx > 4)
+					idx = 4;
 				ttype = ttype_cycle[idx];
 				if (ts->ttype_count < 10)
 					ts->ttype_count++;

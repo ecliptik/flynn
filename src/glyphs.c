@@ -120,28 +120,63 @@ static const unsigned char box_drawing_glyphs[0x3D] = {
 	GLYPH_BOX_VH,		/* U+253C */
 };
 
-/* U+2580-U+2593: block elements and shade characters (20 slots) */
-static const unsigned char block_element_glyphs[0x14] = {
+/* U+2550-U+256C: double-line box drawing (29 slots) */
+static const unsigned char dbox_drawing_glyphs[0x1D] = {
+	GLYPH_BOX2_H,		/* U+2550 ═ */
+	GLYPH_BOX2_V,		/* U+2551 ║ */
+	GLYPH_BOX_sDdR,	/* U+2552 ╒ */
+	GLYPH_BOX_dDsR,	/* U+2553 ╓ */
+	GLYPH_BOX2_DR,		/* U+2554 ╔ */
+	GLYPH_BOX_sDdL,	/* U+2555 ╕ */
+	GLYPH_BOX_dDsL,	/* U+2556 ╖ */
+	GLYPH_BOX2_DL,		/* U+2557 ╗ */
+	GLYPH_BOX_sUdR,	/* U+2558 ╘ */
+	GLYPH_BOX_dUsR,	/* U+2559 ╙ */
+	GLYPH_BOX2_UR,		/* U+255A ╚ */
+	GLYPH_BOX_sUdL,	/* U+255B ╛ */
+	GLYPH_BOX_dUsL,	/* U+255C ╜ */
+	GLYPH_BOX2_UL,		/* U+255D ╝ */
+	GLYPH_BOX_sVdR,	/* U+255E ╞ */
+	GLYPH_BOX_dVsR,	/* U+255F ╟ */
+	GLYPH_BOX2_VR,		/* U+2560 ╠ */
+	GLYPH_BOX_sVdL,	/* U+2561 ╡ */
+	GLYPH_BOX_dVsL,	/* U+2562 ╢ */
+	GLYPH_BOX2_VL,		/* U+2563 ╣ */
+	GLYPH_BOX_dHsD,	/* U+2564 ╤ */
+	GLYPH_BOX_sHdD,	/* U+2565 ╥ */
+	GLYPH_BOX2_DH,		/* U+2566 ╦ */
+	GLYPH_BOX_dHsU,	/* U+2567 ╧ */
+	GLYPH_BOX_sHdU,	/* U+2568 ╨ */
+	GLYPH_BOX2_UH,		/* U+2569 ╩ */
+	GLYPH_BOX_sVdVH,	/* U+256A ╪ */
+	GLYPH_BOX_dVsVH,	/* U+256B ╫ */
+	GLYPH_BOX2_VH,		/* U+256C ╬ */
+};
+
+/* U+2580-U+2595: block elements, shade characters, edge blocks (22 slots) */
+static const unsigned char block_element_glyphs[0x16] = {
 	GLYPH_BLOCK_UPPER,	/* U+2580 */
-	GLYPH_NONE,		/* U+2581 */
-	GLYPH_NONE,		/* U+2582 */
-	GLYPH_NONE,		/* U+2583 */
-	GLYPH_BLOCK_LOWER,	/* U+2584 */
-	GLYPH_NONE,		/* U+2585 */
-	GLYPH_NONE,		/* U+2586 */
-	GLYPH_NONE,		/* U+2587 */
-	GLYPH_BLOCK_FULL,	/* U+2588 */
-	GLYPH_NONE,		/* U+2589 */
-	GLYPH_NONE,		/* U+258A */
-	GLYPH_NONE,		/* U+258B */
-	GLYPH_BLOCK_LEFT,	/* U+258C */
-	GLYPH_NONE,		/* U+258D */
-	GLYPH_NONE,		/* U+258E */
-	GLYPH_NONE,		/* U+258F */
-	GLYPH_BLOCK_RIGHT,	/* U+2590 */
+	GLYPH_BLOCK_LOWER_1,	/* U+2581 lower 1/8 */
+	GLYPH_BLOCK_LOWER_2,	/* U+2582 lower 1/4 */
+	GLYPH_BLOCK_LOWER_3,	/* U+2583 lower 3/8 */
+	GLYPH_BLOCK_LOWER,	/* U+2584 lower half */
+	GLYPH_BLOCK_LOWER_5,	/* U+2585 lower 5/8 */
+	GLYPH_BLOCK_LOWER_6,	/* U+2586 lower 3/4 */
+	GLYPH_BLOCK_LOWER_7,	/* U+2587 lower 7/8 */
+	GLYPH_BLOCK_FULL,	/* U+2588 full block */
+	GLYPH_BLOCK_LEFT_7,	/* U+2589 left 7/8 */
+	GLYPH_BLOCK_LEFT_6,	/* U+258A left 3/4 */
+	GLYPH_BLOCK_LEFT_5,	/* U+258B left 5/8 */
+	GLYPH_BLOCK_LEFT,	/* U+258C left half */
+	GLYPH_BLOCK_LEFT_3,	/* U+258D left 3/8 */
+	GLYPH_BLOCK_LEFT_2,	/* U+258E left 1/4 */
+	GLYPH_BLOCK_LEFT_1,	/* U+258F left 1/8 */
+	GLYPH_BLOCK_RIGHT,	/* U+2590 right half */
 	GLYPH_SHADE_LIGHT,	/* U+2591 */
 	GLYPH_SHADE_MEDIUM,	/* U+2592 */
 	GLYPH_SHADE_DARK,	/* U+2593 */
+	GLYPH_BLOCK_UPPER_1,	/* U+2594 upper 1/8 */
+	GLYPH_BLOCK_RIGHT_1,	/* U+2595 right 1/8 */
 };
 
 /* ----------------------------------------------------------------
@@ -154,6 +189,12 @@ static const GlyphMappingBMP glyph_map_bmp[] = {
 	{ 0x00B3, GLYPH_SUPER_3 },
 	{ 0x00B7, GLYPH_DOT_MIDDLE },
 	{ 0x00B9, GLYPH_SUPER_1 },
+	{ 0x00BC, GLYPH_QUARTER },
+	{ 0x00BD, GLYPH_HALF },
+	{ 0x0393, GLYPH_GAMMA },
+	{ 0x0398, GLYPH_THETA },
+	{ 0x03A6, GLYPH_PHI_UC },
+	{ 0x03B4, GLYPH_DELTA_LC },
 	{ 0x2070, GLYPH_SUPER_0 },
 	{ 0x2074, GLYPH_SUPER_4 },
 	{ 0x2075, GLYPH_SUPER_5 },
@@ -175,25 +216,43 @@ static const GlyphMappingBMP glyph_map_bmp[] = {
 	{ 0x2191, GLYPH_ARROW_UP },
 	{ 0x2192, GLYPH_ARROW_RIGHT },
 	{ 0x2193, GLYPH_ARROW_DOWN },
+	{ 0x2194, GLYPH_ARROW_LEFTRIGHT },
+	{ 0x2195, GLYPH_ARROW_UPDOWN },
+	{ 0x21A8, GLYPH_ARROW_UPDOWN_BASE },
 	{ 0x2217, GLYPH_ASTERISK_OP },
+	{ 0x221A, GLYPH_SQRT },
+	{ 0x221E, GLYPH_INFINITY },
+	{ 0x221F, GLYPH_RIGHT_ANGLE },
+	{ 0x2229, GLYPH_INTERSECT },
+	{ 0x2248, GLYPH_APPROX },
+	{ 0x2261, GLYPH_IDENTICAL },
 	{ 0x2295, GLYPH_CIRCLED_PLUS },
 	{ 0x2296, GLYPH_CIRCLED_MINUS },
 	{ 0x2297, GLYPH_CIRCLED_TIMES },
 	{ 0x2299, GLYPH_CIRCLED_DOT },
 	{ 0x22EE, GLYPH_ELLIPSIS_V },
+	{ 0x2302, GLYPH_HOUSE },
+	{ 0x2310, GLYPH_REVERSED_NOT },
+	{ 0x2320, GLYPH_INTEGRAL_T },
+	{ 0x2321, GLYPH_INTEGRAL_B },
 	{ 0x23F5, GLYPH_PLAY },
 	/* Quadrants (not in block_element_glyphs range) */
 	{ 0x2596, GLYPH_QUAD_LL },
 	{ 0x2597, GLYPH_QUAD_LR },
 	{ 0x2598, GLYPH_QUAD_UL },
+	{ 0x2599, GLYPH_QUAD_UL_LL_LR },
+	{ 0x259A, GLYPH_QUAD_UL_LR },
 	{ 0x259B, GLYPH_QUAD_UL_UR_LL },
 	{ 0x259C, GLYPH_QUAD_UL_UR_LR },
 	{ 0x259D, GLYPH_QUAD_UR },
+	{ 0x259E, GLYPH_QUAD_UR_LL },
+	{ 0x259F, GLYPH_QUAD_UR_LL_LR },
 	/* Geometric shapes */
 	{ 0x25A0, GLYPH_SQUARE_FILLED },
 	{ 0x25A1, GLYPH_SQUARE_EMPTY },
 	{ 0x25AA, GLYPH_SQ_SM_FILLED },
 	{ 0x25AB, GLYPH_SQ_SM_EMPTY },
+	{ 0x25AC, GLYPH_BAR_H },
 	{ 0x25B2, GLYPH_TRI_UP },
 	{ 0x25B3, GLYPH_TRI_UP_EMPTY },
 	{ 0x25B6, GLYPH_TRI_RIGHT },
@@ -214,11 +273,18 @@ static const GlyphMappingBMP glyph_map_bmp[] = {
 	{ 0x25D1, GLYPH_CIRCLE_HALF_R },
 	{ 0x25D2, GLYPH_CIRCLE_HALF_B },
 	{ 0x25D3, GLYPH_CIRCLE_HALF_T },
+	{ 0x25D8, GLYPH_INV_BULLET },
+	{ 0x25D9, GLYPH_INV_CIRCLE },
 	{ 0x25FB, GLYPH_SQ_MED_EMPTY },
 	{ 0x25FC, GLYPH_SQ_MED_FILLED },
 	/* Symbols */
 	{ 0x2605, GLYPH_STAR_FILLED },
 	{ 0x2606, GLYPH_STAR_EMPTY },
+	{ 0x263A, GLYPH_SMILEY },
+	{ 0x263B, GLYPH_SMILEY_INV },
+	{ 0x263C, GLYPH_SUN },
+	{ 0x2640, GLYPH_FEMALE },
+	{ 0x2642, GLYPH_MALE },
 	{ 0x2660, GLYPH_SPADE },
 	{ 0x2663, GLYPH_CLUB },
 	{ 0x2665, GLYPH_HEART },
@@ -391,25 +457,108 @@ static const GlyphInfo prim_info[] = {
 	/* 0x64 SUB_7 */           { GLYPH_CAT_PRIMITIVE, 0, '7', 0 },
 	/* 0x65 SUB_8 */           { GLYPH_CAT_PRIMITIVE, 0, '8', 0 },
 	/* 0x66 SUB_9 */           { GLYPH_CAT_PRIMITIVE, 0, '9', 0 },
+	/* CP437 double-line box drawing */
+	/* 0x67 BOX2_V */          { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0x68 BOX2_H */          { GLYPH_CAT_PRIMITIVE, 0, '=', 0 },
+	/* 0x69 BOX2_DR */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x6A BOX2_DL */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x6B BOX2_UR */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x6C BOX2_UL */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x6D BOX2_VR */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x6E BOX2_VL */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x6F BOX2_DH */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x70 BOX2_UH */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x71 BOX2_VH */         { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* Mixed single/double box junctions */
+	/* 0x72 BOX_sVdL */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x73 BOX_dVsL */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x74 BOX_dDsL */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x75 BOX_sDdL */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x76 BOX_dUsL */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x77 BOX_sUdL */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x78 BOX_sVdR */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x79 BOX_dVsR */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x7A BOX_dHsU */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x7B BOX_sHdU */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x7C BOX_dHsD */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x7D BOX_sHdD */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x7E BOX_dUsR */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x7F BOX_sUdR */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x80 BOX_sDdR */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x81 BOX_dDsR */        { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x82 BOX_dVsVH */       { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* 0x83 BOX_sVdVH */       { GLYPH_CAT_PRIMITIVE, 0, '+', 0 },
+	/* CP437 symbol glyphs */
+	/* 0x84 SMILEY */          { GLYPH_CAT_PRIMITIVE, 0, 'O', 0 },
+	/* 0x85 SMILEY_INV */      { GLYPH_CAT_PRIMITIVE, 0, 'O', 0 },
+	/* 0x86 INV_BULLET */      { GLYPH_CAT_PRIMITIVE, 0, 'o', 0 },
+	/* 0x87 INV_CIRCLE */      { GLYPH_CAT_PRIMITIVE, 0, 'o', 0 },
+	/* 0x88 MALE */            { GLYPH_CAT_PRIMITIVE, 0, 'M', 0 },
+	/* 0x89 FEMALE */          { GLYPH_CAT_PRIMITIVE, 0, 'F', 0 },
+	/* 0x8A SUN */             { GLYPH_CAT_PRIMITIVE, 0, '*', 0 },
+	/* 0x8B ARROW_UPDOWN */    { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0x8C BAR_H */           { GLYPH_CAT_PRIMITIVE, 0, '-', 0 },
+	/* 0x8D ARROW_UPDOWN_BASE */ { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0x8E RIGHT_ANGLE */     { GLYPH_CAT_PRIMITIVE, 0, 'L', 0 },
+	/* 0x8F ARROW_LEFTRIGHT */ { GLYPH_CAT_PRIMITIVE, 0, '-', 0 },
+	/* 0x90 HOUSE */           { GLYPH_CAT_PRIMITIVE, 0, '^', 0 },
+	/* CP437 math/Greek glyphs */
+	/* 0x91 REVERSED_NOT */    { GLYPH_CAT_PRIMITIVE, 0, '-', 0 },
+	/* 0x92 HALF */            { GLYPH_CAT_PRIMITIVE, 0, '/', 0 },
+	/* 0x93 QUARTER */         { GLYPH_CAT_PRIMITIVE, 0, '/', 0 },
+	/* 0x94 GAMMA */           { GLYPH_CAT_PRIMITIVE, 0, 'G', 0 },
+	/* 0x95 PHI_UC */          { GLYPH_CAT_PRIMITIVE, 0, 'O', 0 },
+	/* 0x96 THETA */           { GLYPH_CAT_PRIMITIVE, 0, 'O', 0 },
+	/* 0x97 DELTA_LC */        { GLYPH_CAT_PRIMITIVE, 0, 'd', 0 },
+	/* 0x98 INFINITY */        { GLYPH_CAT_PRIMITIVE, 0, '8', 0 },
+	/* 0x99 INTERSECT */       { GLYPH_CAT_PRIMITIVE, 0, 'n', 0 },
+	/* 0x9A IDENTICAL */       { GLYPH_CAT_PRIMITIVE, 0, '=', 0 },
+	/* 0x9B INTEGRAL_T */      { GLYPH_CAT_PRIMITIVE, 0, '/', 0 },
+	/* 0x9C INTEGRAL_B */      { GLYPH_CAT_PRIMITIVE, 0, '/', 0 },
+	/* 0x9D APPROX */          { GLYPH_CAT_PRIMITIVE, 0, '~', 0 },
+	/* 0x9E SQRT */            { GLYPH_CAT_PRIMITIVE, 0, 'V', 0 },
+	/* 0x9F SUPER_N */         { GLYPH_CAT_PRIMITIVE, 0, 'n', 0 },
+	/* Fractional lower blocks */
+	/* 0xA0 BLOCK_LOWER_1 */   { GLYPH_CAT_PRIMITIVE, 0, '_', 0 },
+	/* 0xA1 BLOCK_LOWER_2 */   { GLYPH_CAT_PRIMITIVE, 0, '_', 0 },
+	/* 0xA2 BLOCK_LOWER_3 */   { GLYPH_CAT_PRIMITIVE, 0, '_', 0 },
+	/* 0xA3 BLOCK_LOWER_5 */   { GLYPH_CAT_PRIMITIVE, 0, '#', 0 },
+	/* 0xA4 BLOCK_LOWER_6 */   { GLYPH_CAT_PRIMITIVE, 0, '#', 0 },
+	/* 0xA5 BLOCK_LOWER_7 */   { GLYPH_CAT_PRIMITIVE, 0, '#', 0 },
+	/* Fractional left blocks */
+	/* 0xA6 BLOCK_LEFT_7 */    { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0xA7 BLOCK_LEFT_6 */    { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0xA8 BLOCK_LEFT_5 */    { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0xA9 BLOCK_LEFT_3 */    { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0xAA BLOCK_LEFT_2 */    { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* 0xAB BLOCK_LEFT_1 */    { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* Edge blocks */
+	/* 0xAC BLOCK_UPPER_1 */   { GLYPH_CAT_PRIMITIVE, 0, '-', 0 },
+	/* 0xAD BLOCK_RIGHT_1 */   { GLYPH_CAT_PRIMITIVE, 0, '|', 0 },
+	/* Missing quadrants */
+	/* 0xAE QUAD_UL_LL_LR */   { GLYPH_CAT_PRIMITIVE, 0, '#', 0 },
+	/* 0xAF QUAD_UL_LR */      { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
+	/* 0xB0 QUAD_UR_LL */      { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
+	/* 0xB1 QUAD_UR_LL_LR */   { GLYPH_CAT_PRIMITIVE, 0, '#', 0 },
 };
 
 /* Emoji glyphs: wide (2-cell), drawn with CopyBits */
 static const GlyphInfo emoji_info[] = {
-	/* 0x80 GRIN */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, ':', 0 },
-	/* 0x81 HEART */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, '<', 0 },
-	/* 0x82 THUMBSUP */      { GLYPH_CAT_EMOJI, GLYPH_WIDE, '+', 0 },
-	/* 0x83 FIRE */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
-	/* 0x84 STAR */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
-	/* 0x85 CHECK */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'Y', 0 },
-	/* 0x86 CROSSMARK */     { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'X', 0 },
-	/* 0x87 ROCKET */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '^', 0 },
-	/* 0x88 FOLDER */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'F', 0 },
-	/* 0x89 BULB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '!', 0 },
-	/* 0x8A GLOBE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'O', 0 },
-	/* 0x8B WRENCH */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '/', 0 },
-	/* 0x8C PACKAGE */       { GLYPH_CAT_EMOJI, GLYPH_WIDE, '#', 0 },
-	/* 0x8D SNAKE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'S', 0 },
-	/* 0x8E CRAB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'V', 0 },
+	/* 0xA0 GRIN */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, ':', 0 },
+	/* 0xA1 HEART */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, '<', 0 },
+	/* 0xA2 THUMBSUP */      { GLYPH_CAT_EMOJI, GLYPH_WIDE, '+', 0 },
+	/* 0xA3 FIRE */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
+	/* 0xA4 STAR */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '*', 0 },
+	/* 0xA5 CHECK */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'Y', 0 },
+	/* 0xA6 CROSSMARK */     { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'X', 0 },
+	/* 0xA7 ROCKET */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '^', 0 },
+	/* 0xA8 FOLDER */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'F', 0 },
+	/* 0xA9 BULB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, '!', 0 },
+	/* 0xAA GLOBE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'O', 0 },
+	/* 0xAB WRENCH */        { GLYPH_CAT_EMOJI, GLYPH_WIDE, '/', 0 },
+	/* 0xAC PACKAGE */       { GLYPH_CAT_EMOJI, GLYPH_WIDE, '#', 0 },
+	/* 0xAD SNAKE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'S', 0 },
+	/* 0xAE CRAB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'V', 0 },
 };
 
 /* ----------------------------------------------------------------
@@ -658,7 +807,7 @@ static const GlyphBitmap emoji_bitmaps[] = {
 /*
  * glyph_lookup - look up Unicode codepoint in optimized glyph tables
  *
- * Returns glyph index (0x00-0x7F) or -1 if not found.
+ * Returns glyph index (0x00-0xED) or -1 if not found.
  * Caller handles braille (U+2800-U+28FF) separately.
  *
  * Optimization layers (68000 @ 8MHz):
@@ -692,8 +841,16 @@ glyph_lookup(long cp)
 			return -1;
 		}
 
-		/* Direct lookup: block elements U+2580-U+2593 */
-		if (cp >= 0x2580 && cp <= 0x2593) {
+		/* Direct lookup: double-line box drawing U+2550-U+256C */
+		if (cp >= 0x2550 && cp <= 0x256C) {
+			g = dbox_drawing_glyphs[cp - 0x2550];
+			if (g != GLYPH_NONE)
+				return (short)g;
+			return -1;
+		}
+
+		/* Direct lookup: block elements U+2580-U+2595 */
+		if (cp >= 0x2580 && cp <= 0x2595) {
 			g = block_element_glyphs[cp - 0x2580];
 			if (g != GLYPH_NONE)
 				return (short)g;
@@ -719,6 +876,11 @@ glyph_lookup(long cp)
 		return -1;
 	}
 
+	/* Legacy Computing: sextant characters U+1FB00-U+1FB3B */
+	if (cp >= 0x1FB00L && cp <= 0x1FB3BL) {
+		return GLYPH_SEXTANT_BASE + (short)(cp - 0x1FB00L);
+	}
+
 	/* Astral plane: linear search (only ~11 entries) */
 	for (i = 0; i < (short)GLYPH_ASTRAL_COUNT; i++) {
 		if (glyph_map_astral[i].codepoint == (unsigned long)cp)
@@ -734,8 +896,13 @@ glyph_lookup(long cp)
 const GlyphInfo *
 glyph_get_info(unsigned char glyph_id)
 {
+	static const GlyphInfo sextant_info =
+	    { GLYPH_CAT_PRIMITIVE, 0, '#', 0 };
+
 	if (glyph_id < GLYPH_PRIM_COUNT)
 		return &prim_info[glyph_id];
+	if (glyph_id >= GLYPH_SEXTANT_BASE && glyph_id < GLYPH_EMOJI_BASE)
+		return &sextant_info;
 	if (glyph_id >= GLYPH_EMOJI_BASE && glyph_id < GLYPH_EMOJI_BASE + GLYPH_EMOJI_COUNT)
 		return &emoji_info[glyph_id - GLYPH_EMOJI_BASE];
 	return (const GlyphInfo *)0;

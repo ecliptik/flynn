@@ -40,10 +40,21 @@
 #define ATTR_BOLD		0x01
 #define ATTR_UNDERLINE		0x02
 #define ATTR_INVERSE		0x04
-#define ATTR_DEC_GRAPHICS	0x08
-#define ATTR_GLYPH		0x10	/* ch is a glyph index */
-#define ATTR_BRAILLE		0x20	/* ch is braille dot pattern */
+#define ATTR_ITALIC		0x20	/* true italic rendering */
 #define ATTR_HAS_COLOR		0x40	/* cell has non-default color */
+#define ATTR_STRIKETHROUGH	0x80	/* strikethrough rendering */
+
+/* Cell type encoding (bits 3-4): mutually exclusive */
+#define CELL_TYPE_MASK		0x18	/* bits 3-4 */
+#define CELL_TYPE_NORMAL	0x00	/* 00: regular character */
+#define CELL_TYPE_DEC		0x08	/* 01: DEC Special Graphics */
+#define CELL_TYPE_GLYPH		0x10	/* 10: glyph index */
+#define CELL_TYPE_BRAILLE	0x18	/* 11: braille dot pattern */
+
+#define CELL_IS_NORMAL(a)	(((a) & CELL_TYPE_MASK) == CELL_TYPE_NORMAL)
+#define CELL_IS_DEC(a)		(((a) & CELL_TYPE_MASK) == CELL_TYPE_DEC)
+#define CELL_IS_GLYPH(a)	(((a) & CELL_TYPE_MASK) == CELL_TYPE_GLYPH)
+#define CELL_IS_BRAILLE(a)	(((a) & CELL_TYPE_MASK) == CELL_TYPE_BRAILLE)
 
 /* Line attributes (per-row) */
 #define LINE_ATTR_NORMAL    0
@@ -127,6 +138,7 @@ typedef struct {
 	unsigned char	origin_mode;		/* DECOM: 0=absolute, 1=relative */
 	unsigned char	insert_mode;		/* IRM: 0=replace, 1=insert */
 	unsigned char	bracketed_paste;	/* 0=off, 1=on */
+	unsigned char	cp437_mode;		/* 0=UTF-8/VT220, 1=CP437/ANSI-BBS */
 	unsigned char	tab_stops[TERM_COLS];	/* custom tab stops, 1=set */
 
 	/* Cursor visibility (DECTCEM: ESC[?25h / ESC[?25l) */
@@ -146,6 +158,7 @@ typedef struct {
 	unsigned char	has_color;	/* runtime: Color QD available + alloc'd */
 	unsigned char	cur_fg;		/* current fg (COLOR_DEFAULT = default) */
 	unsigned char	cur_bg;		/* current bg (COLOR_DEFAULT = default) */
+	unsigned char	pre_dim_fg;	/* saved fg before SGR 2 dim */
 
 	/* Saved cursor (ESC 7 / ESC 8) */
 	short		saved_row;

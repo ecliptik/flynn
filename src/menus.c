@@ -239,6 +239,8 @@ update_prefs_menu(void)
 	    ttype == 2);
 	CheckItem(prefs_menu, PREFS_XTERM256_ID,
 	    ttype == 3);
+	CheckItem(prefs_menu, PREFS_ANSI_ID,
+	    ttype == 4);
 	CheckItem(prefs_menu, PREFS_DARK_ID,
 	    prefs.dark_mode != 0);
 }
@@ -520,6 +522,7 @@ handle_prefs_menu(short item)
 	case PREFS_VT220_ID:
 	case PREFS_VT100_ID:
 	case PREFS_XTERM256_ID:
+	case PREFS_ANSI_ID:
 		if (active_session)
 			active_session->telnet.preferred_ttype =
 			    item - PREFS_XTERM_ID;

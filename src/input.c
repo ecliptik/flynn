@@ -49,7 +49,7 @@ static const struct { unsigned char vkey, len; char seq[6]; } special_key_map[] 
 	{0x74, 4, "\033[5~"},	/* Page Up */
 	{0x79, 4, "\033[6~"},	/* Page Down */
 	{0x75, 4, "\033[3~"},	/* Forward Delete */
-	{0x33, 1, {0x7F}},	/* Delete/Backspace → DEL */
+	{0x33, 1, {0x08}},	/* Delete/Backspace → BS */
 	{0x35, 1, {0x1B}},	/* Escape */
 	{0x24, 1, {0x0D}},	/* Return */
 	{0x4C, 1, {0x0D}},	/* Keypad Enter */

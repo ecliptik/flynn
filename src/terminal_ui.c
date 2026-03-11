@@ -70,6 +70,10 @@ short			g_font_id = 4;
 short			g_font_size = 9;
 static short		g_dark_mode = 0;
 
+/* Current effective colors for glyph shade blending (set by draw_row) */
+static unsigned char	g_eff_fg = 0;
+static unsigned char	g_eff_bg = 15;
+
 /* Row pixel helpers */
 static short row_top(short row)    { return TOP_MARGIN + row * g_cell_height; }
 static short row_bottom(short row) { return TOP_MARGIN + (row + 1) * g_cell_height; }
@@ -363,29 +367,12 @@ draw_row(Terminal *term, short row)
 		unsigned char cell_attr;
 		unsigned char cell_fg, cell_bg;
 
-		cell = terminal_get_display_cell(term, row, col);
-		cell_attr = cell->attr;
-		if (col >= sel_start_col && col <= sel_end_col)
-			cell_attr ^= ATTR_INVERSE;
-
-		/* Get cell color */
-		cell_fg = COLOR_DEFAULT;
-		cell_bg = COLOR_DEFAULT;
-		if (use_color && (cell_attr & ATTR_HAS_COLOR)) {
-			cc = terminal_get_display_color(term, row, col);
-			if (cc) {
-				cell_fg = cc->fg;
-				cell_bg = cc->bg;
-			}
-		}
-
-		run_attr = cell_attr;
-		run_fg = cell_fg;
-		run_bg = cell_bg;
 		run_start = col;
 		run_len = 0;
 
-		/* Collect run of cells with same attributes and color */
+		/* Collect run of cells with same attributes and color.
+		 * First cell seeds run_attr/fg/bg; subsequent cells
+		 * break on attribute or color change. */
 		while (col < eff_cols) {
 			cell = terminal_get_display_cell(term, row, col);
 			cell_attr = cell->attr;
@@ -403,12 +390,19 @@ draw_row(Terminal *term, short row)
 				}
 			}
 
-			if (cell_attr != run_attr)
-				break;
-			/* Break on color change (only on color systems) */
-			if (use_color &&
-			    (cell_fg != run_fg || cell_bg != run_bg))
-				break;
+			if (run_len == 0) {
+				/* First cell: seed the run */
+				run_attr = cell_attr;
+				run_fg = cell_fg;
+				run_bg = cell_bg;
+			} else {
+				if (cell_attr != run_attr)
+					break;
+				if (use_color &&
+				    (cell_fg != run_fg ||
+				    cell_bg != run_bg))
+					break;
+			}
 
 			buf[run_len] = cell->ch;
 			run_len++;
@@ -453,6 +447,18 @@ draw_row(Terminal *term, short row)
 				if (eff_bg == COLOR_DEFAULT)
 					eff_bg = g_dark_mode ? 0 : 15;
 
+				/*
+				 * Bold-to-bright promotion: standard
+				 * ANSI/BBS behavior.  SGR 1;30m means
+				 * "bright black" (dark gray, index 8),
+				 * not "bold black" (index 0).  Without
+				 * this, bold+dark colors are invisible
+				 * on matching backgrounds.
+				 */
+				if ((run_attr & ATTR_BOLD) &&
+				    eff_fg < 8)
+					eff_fg += 8;
+
 				if (run_attr & ATTR_INVERSE) {
 					/* Swap fg and bg */
 					unsigned char tmp = eff_fg;
@@ -492,11 +498,14 @@ draw_row(Terminal *term, short row)
 			 * because TextFace resets the port's
 			 * foreground color on Color QuickDraw.
 			 */
-			if (use_color)
+			if (use_color) {
 				set_fg_color(eff_fg);
+				g_eff_fg = eff_fg;
+				g_eff_bg = eff_bg;
+			}
 
 			/* DEC Special Graphics */
-			if (run_attr & ATTR_DEC_GRAPHICS) {
+			if (CELL_IS_DEC(run_attr)) {
 				short i, x;
 				x = LEFT_MARGIN + run_start * cell_w;
 				for (i = 0; i < run_len; i++) {
@@ -510,7 +519,7 @@ draw_row(Terminal *term, short row)
 			}
 
 			/* Braille patterns */
-			if (run_attr & ATTR_BRAILLE) {
+			if (CELL_IS_BRAILLE(run_attr)) {
 				short i, x;
 				x = LEFT_MARGIN + run_start * cell_w;
 				for (i = 0; i < run_len; i++) {
@@ -524,7 +533,7 @@ draw_row(Terminal *term, short row)
 			}
 
 			/* Custom glyphs: primitives and emoji */
-			if (run_attr & ATTR_GLYPH) {
+			if (CELL_IS_GLYPH(run_attr)) {
 				short i, x;
 				x = LEFT_MARGIN + run_start * cell_w;
 				for (i = 0; i < run_len; i++) {
@@ -554,6 +563,8 @@ draw_row(Terminal *term, short row)
 					face |= bold;
 				if (run_attr & ATTR_UNDERLINE)
 					face |= underline;
+				if (run_attr & ATTR_ITALIC)
+					face |= italic;
 				if (face != last_face) {
 					TextFace(face);
 					last_face = face;
@@ -621,6 +632,17 @@ draw_row(Terminal *term, short row)
 				DrawText(buf, 0, run_len);
 			}
 
+			/* Strikethrough post-pass */
+			if (run_attr & ATTR_STRIKETHROUGH) {
+				short strike_y = row_y +
+				    g_cell_height / 2;
+				short x0 = LEFT_MARGIN +
+				    run_start * cell_w;
+				short x1 = x0 + run_len * cell_w;
+				MoveTo(x0, strike_y);
+				LineTo(x1, strike_y);
+			}
+
 			if (use_color)
 				color_dirty = 1;
 		}
@@ -656,8 +678,11 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
-	/* Inverse: paint cell black first, draw lines in white */
-	if (attr & ATTR_INVERSE) {
+	/*
+	 * Inverse: on monochrome, paint cell black and draw in white.
+	 * On color, draw_row already swapped fg/bg — no double-inverse.
+	 */
+	if ((attr & ATTR_INVERSE) && !g_has_color_qd) {
 		PaintRect(&cell_r);
 		PenMode(patBic);
 	}
@@ -803,11 +828,11 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 		{
 			short bl = y + g_cell_baseline;
 
-			if (attr & ATTR_INVERSE)
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 				TextMode(srcBic);
 			MoveTo(x, bl);
 			DrawChar(ch);
-			if (attr & ATTR_INVERSE)
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 				TextMode(srcOr);
 		}
 		break;
@@ -839,8 +864,11 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
-	/* Inverse: paint cell black, draw in white */
-	if (attr & ATTR_INVERSE) {
+	/*
+	 * Inverse: on monochrome, paint cell black and draw in white.
+	 * On color, draw_row already swapped fg/bg — no double-inverse.
+	 */
+	if ((attr & ATTR_INVERSE) && !g_has_color_qd) {
 		PaintRect(&cell_r);
 		PenMode(patBic);
 	}
@@ -1165,6 +1193,112 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 		PaintRect(&r);
 		break;
 
+	/* --- Fractional lower blocks --- */
+	case GLYPH_BLOCK_LOWER_1:
+		SetRect(&r, x, y + g_cell_height - g_cell_height / 8,
+		    x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LOWER_2:
+		SetRect(&r, x, y + g_cell_height - g_cell_height * 2 / 8,
+		    x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LOWER_3:
+		SetRect(&r, x, y + g_cell_height - g_cell_height * 3 / 8,
+		    x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LOWER_5:
+		SetRect(&r, x, y + g_cell_height - g_cell_height * 5 / 8,
+		    x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LOWER_6:
+		SetRect(&r, x, y + g_cell_height - g_cell_height * 6 / 8,
+		    x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LOWER_7:
+		SetRect(&r, x, y + g_cell_height - g_cell_height * 7 / 8,
+		    x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	/* --- Fractional left blocks --- */
+	case GLYPH_BLOCK_LEFT_7:
+		SetRect(&r, x, y, x + g_cell_width * 7 / 8,
+		    y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LEFT_6:
+		SetRect(&r, x, y, x + g_cell_width * 6 / 8,
+		    y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LEFT_5:
+		SetRect(&r, x, y, x + g_cell_width * 5 / 8,
+		    y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LEFT_3:
+		SetRect(&r, x, y, x + g_cell_width * 3 / 8,
+		    y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LEFT_2:
+		SetRect(&r, x, y, x + g_cell_width * 2 / 8,
+		    y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_LEFT_1:
+		SetRect(&r, x, y, x + g_cell_width / 8,
+		    y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	/* --- Edge blocks --- */
+	case GLYPH_BLOCK_UPPER_1:
+		SetRect(&r, x, y, x + g_cell_width,
+		    y + g_cell_height / 8);
+		PaintRect(&r);
+		break;
+	case GLYPH_BLOCK_RIGHT_1:
+		SetRect(&r, x + g_cell_width - g_cell_width / 8, y,
+		    x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
+	/* --- Missing quadrants --- */
+	case GLYPH_QUAD_UL_LL_LR:
+		/* UL + LL + LR (missing UR) */
+		SetRect(&r, x, y, cx, y + g_cell_height);
+		PaintRect(&r);
+		SetRect(&r, cx, cy, x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_QUAD_UL_LR:
+		/* UL + LR (diagonal) */
+		SetRect(&r, x, y, cx, cy);
+		PaintRect(&r);
+		SetRect(&r, cx, cy, x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_QUAD_UR_LL:
+		/* UR + LL (diagonal) */
+		SetRect(&r, cx, y, x + g_cell_width, cy);
+		PaintRect(&r);
+		SetRect(&r, x, cy, cx, y + g_cell_height);
+		PaintRect(&r);
+		break;
+	case GLYPH_QUAD_UR_LL_LR:
+		/* UR + LL + LR (missing UL) */
+		SetRect(&r, cx, y, x + g_cell_width, cy);
+		PaintRect(&r);
+		SetRect(&r, x, cy, x + g_cell_width, y + g_cell_height);
+		PaintRect(&r);
+		break;
+
 	case GLYPH_ASTERISK_TEARDROP:
 		/* 6-spoke asterisk */
 		PenSize(1, 1);
@@ -1399,23 +1533,62 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 
 	case GLYPH_SHADE_LIGHT:
 		/* Light shade ~25% fill */
-		if (attr & ATTR_INVERSE)
-			FillRect(&cell_r, &qd.dkGray);
-		else
-			FillRect(&cell_r, &qd.ltGray);
+		if (g_has_color_qd) {
+			/* Solid blend: 25% fg + 75% bg */
+			RGBColor frgb, brgb, blend;
+			color_get_rgb(g_eff_fg, &frgb);
+			color_get_rgb(g_eff_bg, &brgb);
+			blend.red   = brgb.red   + (frgb.red   - brgb.red)   / 4;
+			blend.green = brgb.green + (frgb.green - brgb.green) / 4;
+			blend.blue  = brgb.blue  + (frgb.blue  - brgb.blue)  / 4;
+			RGBForeColor(&blend);
+			PaintRect(&cell_r);
+			set_fg_color(g_eff_fg);
+		} else {
+			if (attr & ATTR_INVERSE)
+				FillRect(&cell_r, &qd.dkGray);
+			else
+				FillRect(&cell_r, &qd.ltGray);
+		}
 		break;
 
 	case GLYPH_SHADE_MEDIUM:
 		/* Medium shade ~50% fill */
-		FillRect(&cell_r, &qd.gray);
+		if (g_has_color_qd) {
+			/* Solid blend: 50% fg + 50% bg */
+			RGBColor frgb, brgb, blend;
+			color_get_rgb(g_eff_fg, &frgb);
+			color_get_rgb(g_eff_bg, &brgb);
+			blend.red   = brgb.red   + (frgb.red   - brgb.red)   / 2;
+			blend.green = brgb.green + (frgb.green - brgb.green) / 2;
+			blend.blue  = brgb.blue  + (frgb.blue  - brgb.blue)  / 2;
+			RGBForeColor(&blend);
+			PaintRect(&cell_r);
+			set_fg_color(g_eff_fg);
+		} else {
+			FillRect(&cell_r, &qd.gray);
+		}
 		break;
 
 	case GLYPH_SHADE_DARK:
 		/* Dark shade ~75% fill */
-		if (attr & ATTR_INVERSE)
-			FillRect(&cell_r, &qd.ltGray);
-		else
-			FillRect(&cell_r, &qd.dkGray);
+		if (g_has_color_qd) {
+			/* Solid blend: 75% fg + 25% bg */
+			RGBColor frgb, brgb, blend;
+			color_get_rgb(g_eff_fg, &frgb);
+			color_get_rgb(g_eff_bg, &brgb);
+			blend.red   = frgb.red   - (frgb.red   - brgb.red)   / 4;
+			blend.green = frgb.green - (frgb.green - brgb.green) / 4;
+			blend.blue  = frgb.blue  - (frgb.blue  - brgb.blue)  / 4;
+			RGBForeColor(&blend);
+			PaintRect(&cell_r);
+			set_fg_color(g_eff_fg);
+		} else {
+			if (attr & ATTR_INVERSE)
+				FillRect(&cell_r, &qd.ltGray);
+			else
+				FillRect(&cell_r, &qd.dkGray);
+		}
 		break;
 
 	/* --- Outline triangles --- */
@@ -1613,11 +1786,11 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			small_size = g_font_size * 3 / 5;
 			if (small_size < 6) small_size = 6;
 			TextSize(small_size);
-			if (attr & ATTR_INVERSE)
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 				TextMode(srcBic);
 			MoveTo(x + 1, y + small_size);
 			DrawChar(digit);
-			if (attr & ATTR_INVERSE)
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 				TextMode(srcOr);
 			TextSize(g_font_size);
 		}
@@ -1638,26 +1811,808 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 			small_size = g_font_size * 3 / 5;
 			if (small_size < 6) small_size = 6;
 			TextSize(small_size);
-			if (attr & ATTR_INVERSE)
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 				TextMode(srcBic);
 			MoveTo(x + 1, bottom - 1);
 			DrawChar(digit);
-			if (attr & ATTR_INVERSE)
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+				TextMode(srcOr);
+			TextSize(g_font_size);
+		}
+		break;
+
+	/* ================================================================
+	 * CP437 double-line box drawing
+	 *
+	 * Double lines drawn as two parallel lines offset ±1px from center.
+	 * For mixed single/double: single through center, double offset ±1.
+	 * ================================================================ */
+
+	case GLYPH_BOX2_V:
+		/* ║ double vertical */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX2_H:
+		/* ═ double horizontal */
+		PenSize(1, 1);
+		MoveTo(x, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		break;
+
+	case GLYPH_BOX2_DR:
+		/* ╔ double down+right */
+		PenSize(1, 1);
+		MoveTo(cx - 1, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		MoveTo(cx - 1, cy - 1);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(cx + 1, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX2_DL:
+		/* ╗ double down+left */
+		PenSize(1, 1);
+		MoveTo(x, cy - 1);
+		LineTo(cx + 1, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx - 1, cy + 1);
+		MoveTo(cx + 1, cy - 1);
+		LineTo(cx + 1, y + g_cell_height);
+		MoveTo(cx - 1, cy + 1);
+		LineTo(cx - 1, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX2_UR:
+		/* ╚ double up+right */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, cy + 1);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, cy - 1);
+		MoveTo(cx + 1, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(cx - 1, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		break;
+
+	case GLYPH_BOX2_UL:
+		/* ╝ double up+left */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, cy + 1);
+		MoveTo(x, cy - 1);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx + 1, cy + 1);
+		break;
+
+	case GLYPH_BOX2_VR:
+		/* ╠ double vert + double right */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, cy - 1);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(cx + 1, y + g_cell_height);
+		MoveTo(cx + 1, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		break;
+
+	case GLYPH_BOX2_VL:
+		/* ╣ double vert + double left */
+		PenSize(1, 1);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, y + g_cell_height);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(cx - 1, cy + 1);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(x, cy - 1);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx - 1, cy + 1);
+		break;
+
+	case GLYPH_BOX2_DH:
+		/* ╦ double down + double horiz */
+		PenSize(1, 1);
+		MoveTo(x, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx - 1, cy + 1);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		MoveTo(cx - 1, cy + 1);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(cx + 1, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX2_UH:
+		/* ╩ double up + double horiz */
+		PenSize(1, 1);
+		MoveTo(x, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		MoveTo(x, cy - 1);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(cx + 1, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, cy - 1);
+		break;
+
+	case GLYPH_BOX2_VH:
+		/* ╬ double cross */
+		PenSize(1, 1);
+		/* Outer vertical lines with gaps */
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(cx - 1, cy + 1);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, cy - 1);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(cx + 1, y + g_cell_height);
+		/* Outer horizontal lines with gaps */
+		MoveTo(x, cy - 1);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(cx + 1, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx - 1, cy + 1);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		break;
+
+	/* --- Mixed single/double box junctions --- */
+
+	case GLYPH_BOX_sVdL:
+		/* ╡ single vert, double left */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, y + g_cell_height);
+		MoveTo(x, cy - 1);
+		LineTo(cx, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx, cy + 1);
+		break;
+
+	case GLYPH_BOX_dVsL:
+		/* ╢ double vert, single left */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, y + g_cell_height);
+		MoveTo(x, cy);
+		LineTo(cx - 1, cy);
+		break;
+
+	case GLYPH_BOX_dDsL:
+		/* ╖ double down, single left */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(cx + 1, cy);
+		MoveTo(cx - 1, cy);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, cy);
+		LineTo(cx + 1, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_sDdL:
+		/* ╕ single down, double left */
+		PenSize(1, 1);
+		MoveTo(x, cy - 1);
+		LineTo(cx, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx, cy + 1);
+		MoveTo(cx, cy - 1);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_dUsL:
+		/* ╜ double up, single left */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, cy);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, cy);
+		MoveTo(x, cy);
+		LineTo(cx + 1, cy);
+		break;
+
+	case GLYPH_BOX_sUdL:
+		/* ╛ single up, double left */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, cy + 1);
+		MoveTo(x, cy - 1);
+		LineTo(cx, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx, cy + 1);
+		break;
+
+	case GLYPH_BOX_sVdR:
+		/* ╞ single vert, double right */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, y + g_cell_height);
+		MoveTo(cx, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(cx, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		break;
+
+	case GLYPH_BOX_dVsR:
+		/* ╟ double vert, single right */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, y + g_cell_height);
+		MoveTo(cx + 1, cy);
+		LineTo(x + g_cell_width, cy);
+		break;
+
+	case GLYPH_BOX_dHsU:
+		/* ╧ double horiz, single up */
+		PenSize(1, 1);
+		MoveTo(x, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		MoveTo(cx, y);
+		LineTo(cx, cy - 1);
+		break;
+
+	case GLYPH_BOX_sHdU:
+		/* ╨ single horiz, double up */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(x + g_cell_width, cy);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, cy);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, cy);
+		break;
+
+	case GLYPH_BOX_dHsD:
+		/* ╤ double horiz, single down */
+		PenSize(1, 1);
+		MoveTo(x, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		MoveTo(cx, cy + 1);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_sHdD:
+		/* ╥ single horiz, double down */
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(x + g_cell_width, cy);
+		MoveTo(cx - 1, cy);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, cy);
+		LineTo(cx + 1, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_dUsR:
+		/* ╙ double up, single right */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, cy);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, cy);
+		MoveTo(cx - 1, cy);
+		LineTo(x + g_cell_width, cy);
+		break;
+
+	case GLYPH_BOX_sUdR:
+		/* ╘ single up, double right */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, cy - 1);
+		MoveTo(cx, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(cx, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		break;
+
+	case GLYPH_BOX_sDdR:
+		/* ╒ single down, double right */
+		PenSize(1, 1);
+		MoveTo(cx, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(cx, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		MoveTo(cx, cy + 1);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_dDsR:
+		/* ╓ double down, single right */
+		PenSize(1, 1);
+		MoveTo(cx - 1, cy);
+		LineTo(x + g_cell_width, cy);
+		MoveTo(cx - 1, cy);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, cy);
+		LineTo(cx + 1, y + g_cell_height);
+		break;
+
+	case GLYPH_BOX_dVsVH:
+		/* ╫ double vert, single horiz cross */
+		PenSize(1, 1);
+		MoveTo(cx - 1, y);
+		LineTo(cx - 1, y + g_cell_height);
+		MoveTo(cx + 1, y);
+		LineTo(cx + 1, y + g_cell_height);
+		MoveTo(x, cy);
+		LineTo(cx - 1, cy);
+		MoveTo(cx + 1, cy);
+		LineTo(x + g_cell_width, cy);
+		break;
+
+	case GLYPH_BOX_sVdVH:
+		/* ╪ single vert, double horiz cross */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, y + g_cell_height);
+		MoveTo(x, cy - 1);
+		LineTo(cx, cy - 1);
+		MoveTo(cx, cy - 1);
+		LineTo(x + g_cell_width, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(cx, cy + 1);
+		MoveTo(cx, cy + 1);
+		LineTo(x + g_cell_width, cy + 1);
+		break;
+
+	/* ================================================================
+	 * CP437 symbol glyphs
+	 * ================================================================ */
+
+	case GLYPH_SMILEY:
+		/* ☺ white smiley face */
+		PenSize(1, 1);
+		SetRect(&r, x + 1, y + 1, right, bottom - 1);
+		FrameOval(&r);
+		/* Eyes */
+		MoveTo(cx - 1, cy - 1);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(cx + 1, cy - 1);
+		LineTo(cx + 1, cy - 1);
+		/* Mouth: small arc approximation */
+		MoveTo(cx - 1, cy + 1);
+		LineTo(cx - 1, cy + 1);
+		MoveTo(cx, cy + 2);
+		LineTo(cx, cy + 2);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(cx + 1, cy + 1);
+		break;
+
+	case GLYPH_SMILEY_INV:
+		/* ☻ black smiley face (filled circle, white features) */
+		SetRect(&r, x + 1, y + 1, right, bottom - 1);
+		PaintOval(&r);
+		PenMode(patBic);
+		/* Eyes */
+		MoveTo(cx - 1, cy - 1);
+		LineTo(cx - 1, cy - 1);
+		MoveTo(cx + 1, cy - 1);
+		LineTo(cx + 1, cy - 1);
+		/* Mouth */
+		MoveTo(cx - 1, cy + 1);
+		LineTo(cx - 1, cy + 1);
+		MoveTo(cx, cy + 2);
+		LineTo(cx, cy + 2);
+		MoveTo(cx + 1, cy + 1);
+		LineTo(cx + 1, cy + 1);
+		PenMode(patCopy);
+		break;
+
+	case GLYPH_INV_BULLET:
+		/* ◘ inverse bullet: filled rect + white circle */
+		PaintRect(&cell_r);
+		PenMode(patBic);
+		SetRect(&r, x + 1, y + 2, right, bottom - 1);
+		PaintOval(&r);
+		PenMode(patCopy);
+		break;
+
+	case GLYPH_INV_CIRCLE:
+		/* ◙ inverse circle: filled circle + white circle inside */
+		SetRect(&r, x + 1, y + 1, right, bottom - 1);
+		PaintOval(&r);
+		PenMode(patBic);
+		SetRect(&r, x + 2, y + 3, right - 1, bottom - 2);
+		PaintOval(&r);
+		PenMode(patCopy);
+		break;
+
+	case GLYPH_MALE:
+		/* ♂ male sign: circle + arrow up-right */
+		PenSize(1, 1);
+		SetRect(&r, x + 1, cy - 1, cx + 1, bottom - 1);
+		FrameOval(&r);
+		MoveTo(cx, cy - 2);
+		LineTo(right - 1, y + 1);
+		MoveTo(right - 1, y + 1);
+		LineTo(right - 3, y + 1);
+		MoveTo(right - 1, y + 1);
+		LineTo(right - 1, y + 3);
+		break;
+
+	case GLYPH_FEMALE:
+		/* ♀ female sign: circle + cross below */
+		PenSize(1, 1);
+		SetRect(&r, x + 1, y + 1, right - 1, cy + 1);
+		FrameOval(&r);
+		MoveTo(cx, cy + 1);
+		LineTo(cx, bottom - 1);
+		MoveTo(cx - 1, cy + 3);
+		LineTo(cx + 1, cy + 3);
+		break;
+
+	case GLYPH_SUN:
+		/* ☼ sun: circle + radiating lines */
+		PenSize(1, 1);
+		SetRect(&r, cx - 2, cy - 2, cx + 3, cy + 3);
+		FrameOval(&r);
+		/* Rays */
+		MoveTo(cx, y + 1);
+		LineTo(cx, cy - 3);
+		MoveTo(cx, cy + 3);
+		LineTo(cx, bottom - 1);
+		MoveTo(x + 1, cy);
+		LineTo(cx - 3, cy);
+		MoveTo(cx + 3, cy);
+		LineTo(right - 1, cy);
+		break;
+
+	case GLYPH_ARROW_UPDOWN:
+		/* ↕ up-down arrow */
+		PenSize(1, 1);
+		MoveTo(cx, y + 1);
+		LineTo(cx, bottom - 1);
+		/* Up head */
+		MoveTo(cx, y + 1);
+		LineTo(cx - w4, y + h4 + 1);
+		MoveTo(cx, y + 1);
+		LineTo(cx + w4, y + h4 + 1);
+		/* Down head */
+		MoveTo(cx, bottom - 1);
+		LineTo(cx - w4, bottom - h4 - 1);
+		MoveTo(cx, bottom - 1);
+		LineTo(cx + w4, bottom - h4 - 1);
+		break;
+
+	case GLYPH_BAR_H:
+		/* ▬ horizontal bar (half-height rectangle) */
+		SetRect(&r, x + 1, cy - 1, right, cy + 2);
+		PaintRect(&r);
+		break;
+
+	case GLYPH_ARROW_UPDOWN_BASE:
+		/* ↨ up-down arrow with base line */
+		PenSize(1, 1);
+		MoveTo(cx, y + 1);
+		LineTo(cx, bottom - 2);
+		/* Up head */
+		MoveTo(cx, y + 1);
+		LineTo(cx - w4, y + h4 + 1);
+		MoveTo(cx, y + 1);
+		LineTo(cx + w4, y + h4 + 1);
+		/* Down head */
+		MoveTo(cx, bottom - 2);
+		LineTo(cx - w4, bottom - h4 - 2);
+		MoveTo(cx, bottom - 2);
+		LineTo(cx + w4, bottom - h4 - 2);
+		/* Base line */
+		MoveTo(x + 1, bottom - 1);
+		LineTo(right - 1, bottom - 1);
+		break;
+
+	case GLYPH_RIGHT_ANGLE:
+		/* ∟ right angle */
+		PenSize(1, 1);
+		MoveTo(x + 1, y + 2);
+		LineTo(x + 1, bottom - 1);
+		LineTo(right - 1, bottom - 1);
+		break;
+
+	case GLYPH_ARROW_LEFTRIGHT:
+		/* ↔ left-right arrow */
+		PenSize(1, 1);
+		MoveTo(x + 1, cy);
+		LineTo(right - 1, cy);
+		/* Left head */
+		MoveTo(x + 1, cy);
+		LineTo(x + w4 + 1, cy - h4);
+		MoveTo(x + 1, cy);
+		LineTo(x + w4 + 1, cy + h4);
+		/* Right head */
+		MoveTo(right - 1, cy);
+		LineTo(right - w4 - 1, cy - h4);
+		MoveTo(right - 1, cy);
+		LineTo(right - w4 - 1, cy + h4);
+		break;
+
+	case GLYPH_HOUSE:
+		/* ⌂ house: triangle roof + rectangle body */
+		PenSize(1, 1);
+		/* Roof */
+		MoveTo(cx, y + 1);
+		LineTo(right - 1, cy);
+		LineTo(x + 1, cy);
+		LineTo(cx, y + 1);
+		/* Body */
+		SetRect(&r, x + 2, cy, right - 1, bottom - 1);
+		FrameRect(&r);
+		break;
+
+	/* ================================================================
+	 * CP437 math/Greek glyphs
+	 * ================================================================ */
+
+	case GLYPH_REVERSED_NOT:
+		/* ⌐ reversed not sign: horizontal + descender on left */
+		PenSize(1, 1);
+		MoveTo(x + 1, cy);
+		LineTo(right - 1, cy);
+		MoveTo(x + 1, cy);
+		LineTo(x + 1, cy + h4 + 1);
+		break;
+
+	case GLYPH_HALF:
+		/* ½ fraction one-half */
+		{
+			short small_size;
+			small_size = g_font_size * 3 / 5;
+			if (small_size < 6) small_size = 6;
+			TextSize(small_size);
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+				TextMode(srcBic);
+			MoveTo(x, y + small_size);
+			DrawChar('1');
+			PenSize(1, 1);
+			MoveTo(x + 1, bottom - 2);
+			LineTo(right - 1, y + 2);
+			MoveTo(cx, bottom - 1);
+			DrawChar('2');
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+				TextMode(srcOr);
+			TextSize(g_font_size);
+		}
+		break;
+
+	case GLYPH_QUARTER:
+		/* ¼ fraction one-quarter */
+		{
+			short small_size;
+			small_size = g_font_size * 3 / 5;
+			if (small_size < 6) small_size = 6;
+			TextSize(small_size);
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+				TextMode(srcBic);
+			MoveTo(x, y + small_size);
+			DrawChar('1');
+			PenSize(1, 1);
+			MoveTo(x + 1, bottom - 2);
+			LineTo(right - 1, y + 2);
+			MoveTo(cx, bottom - 1);
+			DrawChar('4');
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+				TextMode(srcOr);
+			TextSize(g_font_size);
+		}
+		break;
+
+	case GLYPH_GAMMA:
+		/* Γ Greek capital gamma: L-shape (top + left) */
+		PenSize(1, 1);
+		MoveTo(x + 1, y + 2);
+		LineTo(right - 1, y + 2);
+		MoveTo(x + 1, y + 2);
+		LineTo(x + 1, bottom - 1);
+		break;
+
+	case GLYPH_PHI_UC:
+		/* Φ Greek capital phi: circle + vertical line */
+		PenSize(1, 1);
+		SetRect(&r, x + 1, cy - 2, right - 1, cy + 3);
+		FrameOval(&r);
+		MoveTo(cx, y + 1);
+		LineTo(cx, bottom - 1);
+		break;
+
+	case GLYPH_THETA:
+		/* Θ Greek capital theta: circle + horizontal bar */
+		PenSize(1, 1);
+		SetRect(&r, x + 1, y + 1, right - 1, bottom - 1);
+		FrameOval(&r);
+		MoveTo(x + 2, cy);
+		LineTo(right - 2, cy);
+		break;
+
+	case GLYPH_DELTA_LC:
+		/* δ Greek lowercase delta: rounded shape */
+		PenSize(1, 1);
+		SetRect(&r, x + 1, cy - 1, right - 1, bottom - 1);
+		FrameOval(&r);
+		MoveTo(right - 2, cy - 1);
+		LineTo(cx, y + 1);
+		break;
+
+	case GLYPH_INFINITY:
+		/* ∞ infinity: figure-eight on its side */
+		PenSize(1, 1);
+		SetRect(&r, x + 1, cy - 2, cx, cy + 3);
+		FrameOval(&r);
+		SetRect(&r, cx, cy - 2, right - 1, cy + 3);
+		FrameOval(&r);
+		break;
+
+	case GLYPH_INTERSECT:
+		/* ∩ intersection: inverted U shape */
+		PenSize(1, 1);
+		SetRect(&r, x + 1, y + 2, right - 1, bottom + 2);
+		FrameOval(&r);
+		/* Erase bottom half */
+		SetRect(&r, x + 2, cy, right - 2, bottom);
+		EraseRect(&r);
+		/* Vertical sides */
+		MoveTo(x + 1, cy);
+		LineTo(x + 1, bottom - 1);
+		MoveTo(right - 2, cy);
+		LineTo(right - 2, bottom - 1);
+		break;
+
+	case GLYPH_IDENTICAL:
+		/* ≡ identical: three horizontal lines */
+		PenSize(1, 1);
+		MoveTo(x + 1, cy - 2);
+		LineTo(right - 1, cy - 2);
+		MoveTo(x + 1, cy);
+		LineTo(right - 1, cy);
+		MoveTo(x + 1, cy + 2);
+		LineTo(right - 1, cy + 2);
+		break;
+
+	case GLYPH_INTEGRAL_T:
+		/* ⌠ top half of integral */
+		PenSize(1, 1);
+		MoveTo(cx + 1, y + 1);
+		LineTo(cx, y + 2);
+		LineTo(cx, y + g_cell_height);
+		break;
+
+	case GLYPH_INTEGRAL_B:
+		/* ⌡ bottom half of integral */
+		PenSize(1, 1);
+		MoveTo(cx, y);
+		LineTo(cx, bottom - 2);
+		LineTo(cx - 1, bottom - 1);
+		break;
+
+	case GLYPH_APPROX:
+		/* ≈ approximately equal: two tilde curves */
+		PenSize(1, 1);
+		/* Upper tilde */
+		MoveTo(x + 1, cy - 1);
+		LineTo(cx - 1, cy - 2);
+		LineTo(cx + 1, cy - 1);
+		LineTo(right - 1, cy - 2);
+		/* Lower tilde */
+		MoveTo(x + 1, cy + 2);
+		LineTo(cx - 1, cy + 1);
+		LineTo(cx + 1, cy + 2);
+		LineTo(right - 1, cy + 1);
+		break;
+
+	case GLYPH_SQRT:
+		/* √ square root: radical sign */
+		PenSize(1, 1);
+		MoveTo(x + 1, cy);
+		LineTo(x + 2, cy);
+		LineTo(cx - 1, bottom - 1);
+		LineTo(right - 1, y + 1);
+		break;
+
+	case GLYPH_SUPER_N:
+		/* ⁿ superscript n */
+		{
+			short small_size;
+			small_size = g_font_size * 3 / 5;
+			if (small_size < 6) small_size = 6;
+			TextSize(small_size);
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
+				TextMode(srcBic);
+			MoveTo(x + 1, y + small_size);
+			DrawChar('n');
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 				TextMode(srcOr);
 			TextSize(g_font_size);
 		}
 		break;
 
 	default:
-		/* Unknown primitive: draw ? */
-		{
+		if (glyph_id >= GLYPH_SEXTANT_BASE &&
+		    glyph_id < GLYPH_SEXTANT_BASE + GLYPH_SEXTANT_COUNT) {
+			/* Sextant: 2x3 grid of filled sub-cells */
+			unsigned char idx, pat;
+			short cw, rh, rx, ry1, ry2;
+
+			idx = glyph_id - GLYPH_SEXTANT_BASE;
+			/* Unpack stored index (0-59) to 6-bit pattern */
+			/* Skipped patterns: 0 (empty), 21 (left half),
+			 * 42 (right half), 63 (full block) */
+			if (idx < 20)
+				pat = idx + 1;
+			else if (idx < 40)
+				pat = idx + 2;
+			else
+				pat = idx + 3;
+
+			cw = g_cell_width / 2;
+			rh = g_cell_height / 3;
+			rx = x + cw;
+			ry1 = y + rh;
+			ry2 = y + rh + rh;
+
+			if (pat & 0x01) {
+				SetRect(&r, x, y, rx, ry1);
+				PaintRect(&r);
+			}
+			if (pat & 0x02) {
+				SetRect(&r, rx, y, x + g_cell_width, ry1);
+				PaintRect(&r);
+			}
+			if (pat & 0x04) {
+				SetRect(&r, x, ry1, rx, ry2);
+				PaintRect(&r);
+			}
+			if (pat & 0x08) {
+				SetRect(&r, rx, ry1, x + g_cell_width, ry2);
+				PaintRect(&r);
+			}
+			if (pat & 0x10) {
+				SetRect(&r, x, ry2, rx, y + g_cell_height);
+				PaintRect(&r);
+			}
+			if (pat & 0x20) {
+				SetRect(&r, rx, ry2,
+				    x + g_cell_width, y + g_cell_height);
+				PaintRect(&r);
+			}
+		} else {
+			/* Unknown primitive: draw ? */
 			short bl = y + g_cell_baseline;
 
-			if (attr & ATTR_INVERSE)
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 				TextMode(srcBic);
 			MoveTo(x, bl);
 			DrawChar('?');
-			if (attr & ATTR_INVERSE)
+			if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 				TextMode(srcOr);
 		}
 		break;
@@ -1692,8 +2647,11 @@ draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	cell2_w = g_cell_width * 2;
 	SetRect(&cell_r, x, y, x + cell2_w, y + g_cell_height);
 
-	/* Inverse: paint 2-cell area black */
-	if (attr & ATTR_INVERSE)
+	/*
+	 * Inverse: on monochrome, paint 2-cell area black and blit in
+	 * white.  On color, draw_row already swapped fg/bg.
+	 */
+	if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 		PaintRect(&cell_r);
 
 	/* Build source BitMap from glyph data */
@@ -1709,10 +2667,11 @@ draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	dy = y + (g_cell_height - bm->height) / 2;
 	SetRect(&dst_r, dx, dy, dx + bm->width, dy + bm->height);
 
-	/* Blit: srcOr for normal, srcBic for inverse (white on black) */
+	/* Blit: srcOr for normal, srcBic for inverse on monochrome */
 	CopyBits(&src_bits, &qd.thePort->portBits,
 	    &src_r, &dst_r,
-	    (attr & ATTR_INVERSE) ? srcBic : srcOr, NULL);
+	    ((attr & ATTR_INVERSE) && !g_has_color_qd) ? srcBic : srcOr,
+	    NULL);
 }
 
 /*
@@ -1740,8 +2699,11 @@ draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
-	/* Inverse: paint cell black, draw dots in white */
-	if (attr & ATTR_INVERSE) {
+	/*
+	 * Inverse: on monochrome, paint cell black and draw in white.
+	 * On color, draw_row already swapped fg/bg — no double-inverse.
+	 */
+	if ((attr & ATTR_INVERSE) && !g_has_color_qd) {
 		PaintRect(&cell_r);
 		PenMode(patBic);
 	}
@@ -1780,7 +2742,7 @@ draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 		}
 	}
 
-	if (attr & ATTR_INVERSE)
+	if ((attr & ATTR_INVERSE) && !g_has_color_qd)
 		PenMode(patCopy);
 	PenNormal();
 }

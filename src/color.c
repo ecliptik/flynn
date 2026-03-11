@@ -168,3 +168,22 @@ color_nearest_256(unsigned char r, unsigned char g, unsigned char b)
 	return (gray_dist < cube_dist) ? gray_idx :
 	    (unsigned char)cube_idx;
 }
+
+/*
+ * color_dim - return dimmed version of a palette color
+ *
+ * Halves each RGB component and maps to nearest 256-color index.
+ * Used by SGR 2 (dim/faint) to reduce color intensity.
+ */
+unsigned char
+color_dim(unsigned char idx)
+{
+	RGBColor rgb;
+	unsigned char r, g, b;
+
+	color_get_rgb(idx, &rgb);
+	r = (unsigned char)(rgb.red / 257 / 2);
+	g = (unsigned char)(rgb.green / 257 / 2);
+	b = (unsigned char)(rgb.blue / 257 / 2);
+	return color_nearest_256(r, g, b);
+}

@@ -17,6 +17,7 @@ add_application(Flynn
     src/dns.c
     src/glyphs.c
     src/color.c
+    src/cp437.c
     src/macutil.c
     src/sysutil.c
     src/settings.c

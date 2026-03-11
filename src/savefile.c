@@ -31,14 +31,14 @@ cell_to_char(TermCell *cell)
 {
 	if (cell->ch == 0)
 		return ' ';
-	if ((cell->attr & ATTR_GLYPH) &&
+	if (CELL_IS_GLYPH(cell->attr) &&
 	    cell->ch == GLYPH_WIDE_SPACER)
 		return ' ';
-	if (cell->attr & ATTR_GLYPH) {
+	if (CELL_IS_GLYPH(cell->attr)) {
 		const GlyphInfo *gi = glyph_get_info(cell->ch);
 		return gi ? gi->copy_char : '?';
 	}
-	if (cell->attr & ATTR_BRAILLE)
+	if (CELL_IS_BRAILLE(cell->attr))
 		return '.';
 	return cell->ch;
 }

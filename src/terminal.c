@@ -22,6 +22,7 @@
 #include "terminal.h"
 #include "color.h"
 #include "glyphs.h"
+#include "cp437.h"
 
 /* Forward declarations for internal functions */
 static void term_clear_region(Terminal *term, short r1, short c1,
@@ -41,6 +42,7 @@ static void term_execute_csi(Terminal *term, unsigned char cmd);
 static void term_dec_set_mode(Terminal *term);
 static void term_dec_reset_mode(Terminal *term);
 static void term_set_attr(Terminal *term, short param);
+static void term_put_cp437(Terminal *term, unsigned char byte);
 static void term_process_osc(Terminal *term, unsigned char ch);
 static void term_finish_osc(Terminal *term);
 static void term_switch_to_alt(Terminal *term);
@@ -132,6 +134,7 @@ terminal_init(Terminal *term)
 	/* Color state */
 	term->cur_fg = COLOR_DEFAULT;
 	term->cur_bg = COLOR_DEFAULT;
+	term->pre_dim_fg = COLOR_DEFAULT;
 	term->alt_cur_fg = COLOR_DEFAULT;
 	term->alt_cur_bg = COLOR_DEFAULT;
 
@@ -203,6 +206,39 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 
 		switch (term->parse_state) {
 		case PARSE_NORMAL:
+			/* CP437/ANSI-BBS mode: raw byte interpretation */
+			if (term->cp437_mode) {
+				if (ch == 0x1B) {
+					term->parse_state = PARSE_ESC;
+				} else if (ch == '\r') {
+					term_carriage_return(term);
+				} else if (ch == '\n') {
+					term_newline(term);
+				} else if (ch == '\b') {
+					if (term->cur_col > 0) {
+						term->cur_col--;
+						term->wrap_pending = 0;
+					}
+				} else if (ch == '\t') {
+					term->wrap_pending = 0;
+					{
+						short c;
+						c = term->cur_col + 1;
+						while (c < term->active_cols &&
+						    !term->tab_stops[c])
+							c++;
+						if (c >= term->active_cols)
+							c = term->active_cols - 1;
+						term->cur_col = c;
+					}
+				} else if (ch == 0x07) {
+					SysBeep(5);
+				} else {
+					term_put_cp437(term, ch);
+				}
+				break;
+			}
+
 			/*
 			 * Fast path first: printable ASCII (0x20-0x7E)
 			 * is by far the most common case in terminal
@@ -210,6 +246,14 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 			 * comparisons per character on the 68000.
 			 */
 			if (ch >= 0x20 && ch < 0x7F) {
+				/* Flush incomplete UTF-8 as CP437 */
+				if (term->utf8_expect > 0) {
+					short j;
+					for (j = 0; j < term->utf8_len; j++)
+						term_put_cp437(term,
+						    term->utf8_buf[j]);
+					term->utf8_expect = 0;
+				}
 				/* Inline fast path: ASCII, no wrap, standard charset */
 				if (!term->wrap_pending &&
 				    term->gl_charset == 0 &&
@@ -240,9 +284,24 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				}
 			} else if (ch == 0x1B) {
 				/* ESC */
-				term->utf8_expect = 0;
+				if (term->utf8_expect > 0) {
+					/* Flush incomplete UTF-8 as CP437 */
+					short j;
+					for (j = 0; j < term->utf8_len; j++)
+						term_put_cp437(term,
+						    term->utf8_buf[j]);
+					term->utf8_expect = 0;
+				}
 				term->parse_state = PARSE_ESC;
 			} else if (ch < 0x20) {
+				/* Flush incomplete UTF-8 as CP437 */
+				if (term->utf8_expect > 0) {
+					short j;
+					for (j = 0; j < term->utf8_len; j++)
+						term_put_cp437(term,
+						    term->utf8_buf[j]);
+					term->utf8_expect = 0;
+				}
 				/* C0 control characters */
 				switch (ch) {
 				case '\r':
@@ -299,7 +358,21 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					if (term->utf8_len == term->utf8_expect) {
 						long cp = utf8_decode(term->utf8_buf,
 						    term->utf8_expect);
-						term_put_unicode(term, cp);
+						/* CP437 fallback: 2-byte UTF-8 decoding
+						 * to U+0100-U+07FF with no glyph is
+						 * likely CP437 bytes misinterpreted.
+						 * Handles servers sending raw CP437
+						 * despite xterm-256color TTYPE. */
+						if (term->utf8_expect == 2 &&
+						    cp > 0xFF && cp < 0x800 &&
+						    glyph_lookup(cp) < 0) {
+							term_put_cp437(term,
+							    term->utf8_buf[0]);
+							term_put_cp437(term,
+							    term->utf8_buf[1]);
+						} else {
+							term_put_unicode(term, cp);
+						}
 						term->utf8_expect = 0;
 					}
 				} else if (ch == 0x84) {
@@ -339,8 +412,16 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					/* Other C1 codes: ignore */
 				} else if (ch >= 0xC0) {
 					/* UTF-8 start byte: begin new sequence.
-					 * If mid-sequence, abandon incomplete
-					 * one and start fresh (error recovery). */
+					 * If mid-sequence, flush incomplete
+					 * bytes as CP437 (handles servers that
+					 * send raw CP437 with xterm TTYPE). */
+					if (term->utf8_expect > 0) {
+						short j;
+						for (j = 0; j < term->utf8_len;
+						    j++)
+							term_put_cp437(term,
+							    term->utf8_buf[j]);
+					}
 					term->utf8_expect = 0;
 					if (ch < 0xE0) {
 						term->utf8_expect = 2;
@@ -352,11 +433,17 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					if (term->utf8_expect) {
 						term->utf8_buf[0] = ch;
 						term->utf8_len = 1;
+					} else {
+						/* 0xF8-0xFF: invalid UTF-8
+						 * start byte, treat as CP437
+						 * (e.g. 0xFE = filled square)
+						 */
+						term_put_cp437(term, ch);
 					}
 				} else if (ch >= 0xA0) {
-					/* Stray continuation without start */
+					/* Stray continuation: likely CP437 */
 					term->utf8_expect = 0;
-					term_put_char(term, '?');
+					term_put_cp437(term, ch);
 				}
 			}
 			break;
@@ -395,6 +482,7 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 			break;
 		}
 	}
+
 }
 
 /*
@@ -817,7 +905,7 @@ term_put_char(Terminal *term, unsigned char ch)
 	active_set = (term->gl_charset == 0) ?
 	    term->g0_charset : term->g1_charset;
 	if (active_set == '0' && ch >= 0x60 && ch <= 0x7E)
-		attr |= ATTR_DEC_GRAPHICS;
+		attr |= CELL_TYPE_DEC;
 
 	/* Insert mode: shift line right before placing character */
 	if (term->insert_mode) {
@@ -866,7 +954,7 @@ term_put_char(Terminal *term, unsigned char ch)
  * term_put_glyph - place a glyph cell (no charset translation)
  *
  * Like term_put_char but writes ch and attr directly.  Used for
- * ATTR_GLYPH and ATTR_BRAILLE cells.  For wide glyphs, places the
+ * CELL_TYPE_GLYPH and CELL_TYPE_BRAILLE cells.  For wide glyphs, places the
  * glyph in the first cell and GLYPH_WIDE_SPACER in the second.
  */
 static void
@@ -877,7 +965,7 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 	short wide;
 	short c;
 
-	wide = (attr_flag == ATTR_GLYPH) ? glyph_is_wide(glyph_id) : 0;
+	wide = (attr_flag == CELL_TYPE_GLYPH) ? glyph_is_wide(glyph_id) : 0;
 
 	/* Wide glyph at last column: place space and wrap first */
 	if (wide && term->cur_col >= term->active_cols - 1) {
@@ -971,6 +1059,71 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 	} else {
 		term->wrap_pending = 1;
 	}
+}
+
+/*
+ * term_put_cp437 - place a CP437 character, bypassing UTF-8 decoder
+ *
+ * Looks up the byte in the CP437 table and stores the appropriate
+ * ch + attr.  For ASCII/MACROMAN, stores as normal text.  For GLYPH,
+ * stores with CELL_TYPE_GLYPH.  For SPACE, stores space.
+ */
+static void
+term_put_cp437(Terminal *term, unsigned char byte)
+{
+	const CP437Entry *e;
+	unsigned char ch, attr;
+
+	e = &cp437_table[byte];
+
+	switch (e->method) {
+	case CP437_GLYPH:
+		term_put_glyph(term, e->value, CELL_TYPE_GLYPH);
+		return;
+	case CP437_MACROMAN:
+		ch = e->value;
+		break;
+	case CP437_ASCII:
+		ch = e->value;
+		break;
+	case CP437_SPACE:
+	default:
+		ch = ' ';
+		break;
+	}
+
+	/* Store as normal text cell (reuse term_put_char logic) */
+	if (term->wrap_pending) {
+		if (term->autowrap) {
+			term->wrap_pending = 0;
+			term_carriage_return(term);
+			term_newline(term);
+		} else {
+			term->wrap_pending = 0;
+			term->cur_col = term->active_cols - 1;
+		}
+	}
+
+	attr = term->cur_attr;
+	if (term->cur_fg != COLOR_DEFAULT || term->cur_bg != COLOR_DEFAULT)
+		attr |= ATTR_HAS_COLOR;
+
+	term->screen[term->cur_row][term->cur_col].ch = ch;
+	term->screen[term->cur_row][term->cur_col].attr = attr;
+
+	if (term->has_color && term->screen_color) {
+		CellColor *cc = &term->screen_color[
+		    term->cur_row * TERM_COLS + term->cur_col];
+		cc->fg = term->cur_fg;
+		cc->bg = term->cur_bg;
+	}
+
+	term_dirty_row(term, term->cur_row);
+
+	if (term->cur_col < term->active_cols - 1)
+		term->cur_col++;
+	else
+		term->wrap_pending = 1;
 }
 
 /*
@@ -1860,12 +2013,22 @@ term_set_attr(Terminal *term, short param)
 		term->cur_attr |= ATTR_BOLD;
 		break;
 	case 2:
-		/* Dim - on monochrome, clear bold */
+		/* Dim/faint */
 		term->cur_attr &= ~ATTR_BOLD;
+		if (g_has_color_qd) {
+			unsigned char dimmed;
+			term->pre_dim_fg = term->cur_fg;
+			if (term->cur_fg == COLOR_DEFAULT)
+				dimmed = 8;	/* bright black (gray) */
+			else
+				dimmed = color_dim(term->cur_fg);
+			term->cur_fg = dimmed;
+			term->cur_attr |= ATTR_HAS_COLOR;
+		}
 		break;
 	case 3:
-		/* Italic - map to underline on monochrome */
-		term->cur_attr |= ATTR_UNDERLINE;
+		/* Italic */
+		term->cur_attr |= ATTR_ITALIC;
 		break;
 	case 4:
 		/* Underline */
@@ -1873,20 +2036,35 @@ term_set_attr(Terminal *term, short param)
 		break;
 	case 5:
 	case 6:
-		/* Blink / rapid blink - map to bold on monochrome */
+		/* Blink / rapid blink */
 		term->cur_attr |= ATTR_BOLD;
+		if (g_has_color_qd) {
+			/* DOS-style: bright background */
+			if (term->cur_bg != COLOR_DEFAULT &&
+			    term->cur_bg < 8)
+				term->cur_bg += 8;
+			term->cur_attr |= ATTR_HAS_COLOR;
+		}
 		break;
 	case 7:
 		/* Inverse / reverse video */
 		term->cur_attr |= ATTR_INVERSE;
 		break;
+	case 9:
+		/* Strikethrough */
+		term->cur_attr |= ATTR_STRIKETHROUGH;
+		break;
 	case 22:
 		/* Normal intensity (un-bold, un-dim) */
 		term->cur_attr &= ~ATTR_BOLD;
+		if (g_has_color_qd && term->pre_dim_fg != COLOR_DEFAULT) {
+			term->cur_fg = term->pre_dim_fg;
+			term->pre_dim_fg = COLOR_DEFAULT;
+		}
 		break;
 	case 23:
-		/* Not italic - clear underline (since we mapped italic there) */
-		term->cur_attr &= ~ATTR_UNDERLINE;
+		/* Not italic */
+		term->cur_attr &= ~ATTR_ITALIC;
 		break;
 	case 24:
 		/* Not underlined */
@@ -1899,6 +2077,10 @@ term_set_attr(Terminal *term, short param)
 	case 27:
 		/* Not inverse */
 		term->cur_attr &= ~ATTR_INVERSE;
+		break;
+	case 29:
+		/* Not strikethrough */
+		term->cur_attr &= ~ATTR_STRIKETHROUGH;
 		break;
 	case 39:
 		/* Default foreground */
@@ -2146,20 +2328,14 @@ utf8_decode(unsigned char *buf, short len)
 static unsigned char
 boxdraw_to_dec(unsigned short cp)
 {
+	/*
+	 * Only heavy variants remain here — light and double-line
+	 * box drawing are now handled by glyph tables in glyphs.c,
+	 * and block elements by block_element_glyphs[].
+	 * glyph_lookup() is called first in term_put_unicode().
+	 */
 	switch (cp) {
-	/* Light box-drawing */
-	case 0x2500: return 'q';	/* horizontal */
-	case 0x2502: return 'x';	/* vertical */
-	case 0x250C: return 'l';	/* upper-left */
-	case 0x2510: return 'k';	/* upper-right */
-	case 0x2514: return 'm';	/* lower-left */
-	case 0x2518: return 'j';	/* lower-right */
-	case 0x251C: return 't';	/* left tee */
-	case 0x2524: return 'u';	/* right tee */
-	case 0x252C: return 'w';	/* top tee */
-	case 0x2534: return 'v';	/* bottom tee */
-	case 0x253C: return 'n';	/* crossing */
-	/* Heavy variants */
+	/* Heavy variants (GLYPH_NONE in box_drawing_glyphs[]) */
 	case 0x2501: return 'q';
 	case 0x2503: return 'x';
 	case 0x250F: return 'l';
@@ -2171,22 +2347,6 @@ boxdraw_to_dec(unsigned short cp)
 	case 0x2533: return 'w';
 	case 0x253B: return 'v';
 	case 0x254B: return 'n';
-	/* Double-line variants */
-	case 0x2550: return 'q';
-	case 0x2551: return 'x';
-	case 0x2554: return 'l';
-	case 0x2557: return 'k';
-	case 0x255A: return 'm';
-	case 0x255D: return 'j';
-	case 0x2560: return 't';
-	case 0x2563: return 'u';
-	case 0x2566: return 'w';
-	case 0x2569: return 'v';
-	case 0x256C: return 'n';
-	/* Block elements */
-	case 0x2588: return 'a';	/* full block -> checkerboard */
-	case 0x2592: return 'a';	/* medium shade -> checkerboard */
-	case 0x25C6: return '`';	/* diamond */
 	default:     return 0;
 	}
 }
@@ -2242,10 +2402,7 @@ unicode_symbol_to_macroman(unsigned short cp)
 	case 0x2265: return 0xB3;	/* greater or equal */
 	case 0x03C0: return 0xB9;	/* pi */
 	case 0x2206: return 0xC6;	/* delta */
-	case 0x221A: return 0xC3;	/* square root */
 	case 0x2219: return 0xE1;	/* bullet operator -> middle dot */
-	case 0x221E: return 0xB0;	/* infinity */
-	case 0x2248: return 0xC5;	/* almost equal */
 	case 0x22C5: return 0xE1;	/* dot operator -> middle dot */
 	case 0x0387: return 0xE1;	/* greek ano teleia -> middle dot */
 	case 0x2027: return 0xE1;	/* hyphenation point -> middle dot */
@@ -2283,7 +2440,7 @@ term_put_unicode(Terminal *term, long cp)
 	/* Braille patterns: U+2800-U+28FF */
 	if (cp >= 0x2800 && cp <= 0x28FF) {
 		term_put_glyph(term, (unsigned char)(cp & 0xFF),
-		    ATTR_BRAILLE);
+		    CELL_TYPE_BRAILLE);
 		return;
 	}
 
@@ -2294,8 +2451,8 @@ term_put_unicode(Terminal *term, long cp)
 		glyph_id = glyph_lookup(cp);
 		if (glyph_id >= 0) {
 			term_put_glyph(term, (unsigned char)glyph_id,
-			    ATTR_GLYPH);
-			if (cp >= 0x1F000 || glyph_id >= GLYPH_EMOJI_BASE)
+			    CELL_TYPE_GLYPH);
+			if (glyph_id >= GLYPH_EMOJI_BASE)
 				term->last_was_emoji = 1;
 			return;
 		}
@@ -2328,21 +2485,6 @@ term_put_unicode(Terminal *term, long cp)
 		return;
 	}
 
-	/* Block elements outside 2500-257F range */
-	if (cp == 0x2588 || cp == 0x2592 || cp == 0x25C6) {
-		ch = boxdraw_to_dec((unsigned short)cp);
-		if (ch) {
-			unsigned char save_g0 = term->g0_charset;
-			unsigned char save_gl = term->gl_charset;
-			term->g0_charset = '0';
-			term->gl_charset = 0;
-			term_put_char(term, ch);
-			term->g0_charset = save_g0;
-			term->gl_charset = save_gl;
-			return;
-		}
-	}
-
 	/* Unicode spaces -> regular ASCII space */
 	if ((cp >= 0x2000 && cp <= 0x200A) ||	/* en/em/thin/hair space */
 	    cp == 0x205F ||			/* medium math space */
@@ -2359,6 +2501,12 @@ term_put_unicode(Terminal *term, long cp)
 			term_put_char(term, ch);
 			return;
 		}
+	}
+
+	/* Legacy Computing (U+1FB00-U+1FBFF): single-width fallback */
+	if (cp >= 0x1FB00L && cp <= 0x1FBFFL) {
+		term_put_char(term, '?');
+		return;
 	}
 
 	/* Wide characters (CJK, emoji): two-cell placeholder */

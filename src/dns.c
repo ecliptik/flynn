@@ -1,9 +1,10 @@
 /*
- * dns.c - Custom DNS resolver using MacTCP UDP
+ * dns.c - Custom DNS resolver using MacTCP
  *
  * Bypasses the broken dnrp code resource by implementing
- * DNS A-record lookups directly over UDP port 53.
- * Uses 1.1.1.1 (Cloudflare) as the DNS server.
+ * DNS A-record lookups directly over port 53.
+ * Tries UDP first, falls back to TCP if UDP fails.
+ * Uses 1.1.1.1 (Cloudflare) as the default DNS server.
  */
 
 #include <OSUtils.h>
@@ -12,10 +13,12 @@
 #include "tcp.h"
 #include "dns.h"
 
-#define DNS_BUF_SIZE     512   /* max UDP DNS message */
+#define DNS_BUF_SIZE     512   /* max DNS message */
 #define DNS_UDP_BUF     4096   /* UDP stream receive buffer */
-#define DNS_RETRY_COUNT    2   /* send attempts */
-#define DNS_TIMEOUT        5   /* seconds per attempt */
+#define DNS_TCP_BUF     4096   /* TCP stream receive buffer */
+#define DNS_RETRY_COUNT    2   /* UDP send attempts */
+#define DNS_TIMEOUT        5   /* seconds per UDP attempt */
+#define DNS_TCP_TIMEOUT   15   /* seconds for TCP connect+response */
 #define DNS_PORT          53
 #define MAX_DNS_RECORDS   64  /* cap qdcount/ancount from response */
 
@@ -203,6 +206,96 @@ dns_parse_response(const unsigned char *pkt, short pktlen,
 	return DNS_ERR_NXDOMAIN;
 }
 
+/*
+ * DNS over TCP fallback.
+ * Same wire format as UDP but with 2-byte length prefix.
+ * Used when UDP fails (e.g., NAT doesn't forward UDP).
+ */
+static short
+dns_resolve_tcp(const char *hostname, ip_addr *ip, ip_addr dns_server,
+    unsigned char *query, short query_len, unsigned short txn_id)
+{
+	TCPiopb pb;
+	StreamPtr stream;
+	Ptr tcp_buf;
+	OSErr err;
+	short result;
+	unsigned char send_buf[2 + DNS_BUF_SIZE];
+	unsigned char recv_buf[2 + DNS_BUF_SIZE];
+	unsigned short rcv_len, msg_len;
+	wdsEntry wds[2];
+	ip_addr local_ip;
+	tcp_port local_port;
+
+	tcp_buf = NewPtr(DNS_TCP_BUF);
+	if (!tcp_buf)
+		return DNS_ERR_NETWORK;
+
+	stream = 0;
+	err = _TCPCreate(&pb, &stream, tcp_buf, DNS_TCP_BUF,
+	    0L, 0L, 0L, false);
+	if (err != noErr) {
+		DisposePtr(tcp_buf);
+		return DNS_ERR_NETWORK;
+	}
+
+	/* Connect to DNS server port 53 */
+	local_ip = 0;
+	local_port = 0;
+	err = _TCPActiveOpen(&pb, stream, dns_server, DNS_PORT,
+	    &local_ip, &local_port, 0L, 0L, false);
+	if (err != noErr) {
+		_TCPRelease(&pb, stream, 0L, 0L, false);
+		DisposePtr(tcp_buf);
+		return DNS_ERR_NETWORK;
+	}
+
+	/* Prepend 2-byte length to DNS query (TCP framing) */
+	send_buf[0] = (query_len >> 8) & 0xFF;
+	send_buf[1] = query_len & 0xFF;
+	memcpy(send_buf + 2, query, query_len);
+
+	memset(&wds, 0, sizeof(wds));
+	wds[0].ptr = (Ptr)send_buf;
+	wds[0].length = query_len + 2;
+
+	err = _TCPSend(&pb, stream, wds, 0L, 0L, false);
+	if (err != noErr) {
+		_TCPClose(&pb, stream, 0L, 0L, false);
+		_TCPRelease(&pb, stream, 0L, 0L, false);
+		DisposePtr(tcp_buf);
+		return DNS_ERR_NETWORK;
+	}
+
+	/* Receive response with timeout */
+	result = DNS_ERR_TIMEOUT;
+
+	/* First read the 2-byte length prefix */
+	rcv_len = 2;
+	err = _TCPRcv(&pb, stream, (Ptr)recv_buf, &rcv_len,
+	    0L, 0L, false);
+	if (err == noErr && rcv_len == 2) {
+		msg_len = ((unsigned short)recv_buf[0] << 8) | recv_buf[1];
+		if (msg_len > DNS_BUF_SIZE)
+			msg_len = DNS_BUF_SIZE;
+
+		/* Read the DNS message body */
+		rcv_len = msg_len;
+		err = _TCPRcv(&pb, stream, (Ptr)(recv_buf + 2), &rcv_len,
+		    0L, 0L, false);
+		if (err == noErr && rcv_len > 0) {
+			result = dns_parse_response(recv_buf + 2,
+			    rcv_len, txn_id, ip);
+		}
+	}
+
+	_TCPClose(&pb, stream, 0L, 0L, false);
+	_TCPRelease(&pb, stream, 0L, 0L, false);
+	DisposePtr(tcp_buf);
+
+	return result;
+}
+
 short
 dns_resolve(const char *hostname, ip_addr *ip, ip_addr dns_server)
 {
@@ -265,14 +358,10 @@ dns_resolve(const char *hostname, ip_addr *ip, ip_addr dns_server)
 			break;
 		}
 
-		/* Validate response came from expected DNS server */
-		if (pb.csParam.receive.remoteHost != dns_server ||
-		    pb.csParam.receive.remotePort != DNS_PORT) {
-			/* Response from unexpected source, ignore */
-			_UDPBfrReturn(&pb, stream, pb.csParam.receive.rcvBuff,
-			    0L, 0L, false);
-			continue;
-		}
+		/* Note: no source IP validation here — NAT gateways
+		 * (e.g., Snow emulator) may rewrite the source address.
+		 * The txn_id match in dns_parse_response() authenticates
+		 * the response instead. */
 
 		/* Parse the response */
 		result = dns_parse_response(
@@ -290,6 +379,14 @@ dns_resolve(const char *hostname, ip_addr *ip, ip_addr dns_server)
 
 	_UDPRelease(&pb, stream, 0L, 0L, false);
 	DisposePtr(udp_buf);
+
+	/* If UDP failed with timeout, try TCP as fallback.
+	 * Some NAT implementations (e.g., Snow emulator) don't
+	 * forward UDP but handle TCP fine. */
+	if (result == DNS_ERR_TIMEOUT) {
+		result = dns_resolve_tcp(hostname, ip, dns_server,
+		    query, query_len, txn_id);
+	}
 
 	return result;
 }

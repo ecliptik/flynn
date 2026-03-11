@@ -60,6 +60,7 @@ resource 'MENU' (131, "Options") {
 		"  VT220", noIcon, noKey, noMark, plain;
 		"  VT100", noIcon, noKey, noMark, plain;
 		"  xterm-256color", noIcon, noKey, noMark, plain;
+		"  ANSI-BBS", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Networking", noIcon, noKey, noMark, plain;
 		"  DNS Server\311", noIcon, noKey, noMark, plain;
