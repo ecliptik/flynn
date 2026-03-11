@@ -61,6 +61,23 @@ static unsigned char unicode_symbol_to_macroman(unsigned short cp);
 #include <OSUtils.h>
 
 /*
+ * term_flush_response - immediately send pending response via connection.
+ * Called after writing to term->response/response_len.  If a connection
+ * is active, sends the data right away and resets response_len.  This
+ * prevents multiple responses within a single terminal_process() call
+ * from overwriting each other.
+ */
+static void
+term_flush_response(Terminal *term)
+{
+	if (term->response_len > 0 && term->resp_conn) {
+		conn_send((Connection *)term->resp_conn,
+		    term->response, term->response_len);
+		term->response_len = 0;
+	}
+}
+
+/*
  * terminal_init - set up terminal to power-on defaults
  */
 void
