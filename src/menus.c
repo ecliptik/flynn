@@ -47,6 +47,11 @@ extern void session_load_font(Session *s);
 extern void do_font_change(short font_id, short font_size);
 extern void do_window_resize(Session *s, short width, short height);
 
+/* Map menu item (1-5) to internal ttype index (0-4) */
+static const short ttype_from_menu[] = { 0, 3, 2, 1, 4 };
+/* Map internal ttype index (0-4) to menu item (1-5) */
+static const short ttype_to_menu[] = { 1, 4, 3, 2, 5 };
+
 void
 init_menus(void)
 {
@@ -254,16 +259,11 @@ update_prefs_menu(void)
 
 	/* Terminal Type submenu checkmarks */
 	if (ttype_submenu) {
-		CheckItem(ttype_submenu, TTYPE_XTERM_ID,
-		    ttype == 0);
-		CheckItem(ttype_submenu, TTYPE_VT220_ID,
-		    ttype == 1);
-		CheckItem(ttype_submenu, TTYPE_VT100_ID,
-		    ttype == 2);
-		CheckItem(ttype_submenu, TTYPE_XTERM256_ID,
-		    ttype == 3);
-		CheckItem(ttype_submenu, TTYPE_ANSI_ID,
-		    ttype == 4);
+		short i;
+
+		for (i = 0; i < 5; i++)
+			CheckItem(ttype_submenu, i + 1,
+			    ttype == ttype_from_menu[i]);
 	}
 
 	/* Options menu checkmarks */
@@ -536,7 +536,7 @@ handle_font_submenu(short item)
 static void
 handle_ttype_submenu(short item)
 {
-	short ttype = item - TTYPE_XTERM_ID;
+	short ttype = ttype_from_menu[item - 1];
 
 	if (active_session)
 		active_session->telnet.preferred_ttype = ttype;

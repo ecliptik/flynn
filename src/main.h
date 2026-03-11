@@ -58,9 +58,9 @@
 /* Terminal Type submenu (MENU 135) items */
 #define TTYPE_MENU_ID       135
 #define TTYPE_XTERM_ID       1
-#define TTYPE_VT220_ID       2
+#define TTYPE_XTERM256_ID    2
 #define TTYPE_VT100_ID       3
-#define TTYPE_XTERM256_ID    4
+#define TTYPE_VT220_ID       4
 #define TTYPE_ANSI_ID        5
 
 /* Favorites submenu (MENU 136) items */

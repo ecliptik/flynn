@@ -355,31 +355,47 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 
 			popup = NewMenu(201, "\p");
 			AppendMenu(popup, "\pxterm");
-			AppendMenu(popup, "\pVT220");
-			AppendMenu(popup, "\pVT100");
 			AppendMenu(popup, "\pxterm-256color");
+			AppendMenu(popup, "\pVT100");
+			AppendMenu(popup, "\pVT220");
 			AppendMenu(popup, "\pANSI-BBS");
 			InsertMenu(popup, -1);
 
-			CheckItem(popup, g_connect_ttype + 1, true);
+			{
+				/* Map internal ttype to menu item */
+				static const short t2m[] =
+				    { 1, 4, 3, 2, 5 };
+				static const short m2t[] =
+				    { 0, 3, 2, 1, 4 };
+				short cur_item;
 
-			popup_pt.h = item_rect.left;
-			popup_pt.v = item_rect.top;
-			LocalToGlobal(&popup_pt);
+				cur_item = (g_connect_ttype >= 0 &&
+				    g_connect_ttype <= 4) ?
+				    t2m[g_connect_ttype] : 1;
+				CheckItem(popup, cur_item, true);
 
-			result = PopUpMenuSelect(popup,
-			    popup_pt.v, popup_pt.h,
-			    g_connect_ttype + 1);
-			choice = LoWord(result);
+				popup_pt.h = item_rect.left;
+				popup_pt.v = item_rect.top;
+				LocalToGlobal(&popup_pt);
 
-			if (choice > 0) {
-				char btn_text[32];
+				result = PopUpMenuSelect(popup,
+				    popup_pt.v, popup_pt.h,
+				    cur_item);
+				choice = LoWord(result);
 
-				g_connect_ttype = choice - 1;
-				ttype_to_str(g_connect_ttype,
-				    btn_text, sizeof(btn_text));
-				bme_set_btn_title(dlg,
-				    DLOG_TTYPE_BTN, btn_text);
+				if (choice > 0) {
+					char btn_text[32];
+
+					g_connect_ttype =
+					    m2t[choice - 1];
+					ttype_to_str(
+					    g_connect_ttype,
+					    btn_text,
+					    sizeof(btn_text));
+					bme_set_btn_title(dlg,
+					    DLOG_TTYPE_BTN,
+					    btn_text);
+				}
 			}
 
 			DeleteMenu(201);
@@ -987,33 +1003,58 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			popup = NewMenu(202, "\p");
 			AppendMenu(popup, "\pDefault");
 			AppendMenu(popup, "\pxterm");
-			AppendMenu(popup, "\pVT220");
-			AppendMenu(popup, "\pVT100");
 			AppendMenu(popup, "\pxterm-256color");
+			AppendMenu(popup, "\pVT100");
+			AppendMenu(popup, "\pVT220");
 			AppendMenu(popup, "\pANSI-BBS");
 			InsertMenu(popup, -1);
 
-			/* Checkmark: -1=Default(1), 0=xterm(2),
-			 * 1=VT220(3), 2=VT100(4), 3=xterm-256(5) */
-			CheckItem(popup, g_bme_ttype + 2, true);
+			{
+				/* Map internal ttype to menu item
+				 * (offset +2 for Default at item 1)
+				 * -1=Default(1), 0=xterm(2),
+				 * 3=xterm-256(3), 2=VT100(4),
+				 * 1=VT220(5), 4=ANSI-BBS(6) */
+				static const short bt2m[] =
+				    { 2, 5, 4, 3, 6 };
+				static const short bm2t[] =
+				    { 0, 3, 2, 1, 4 };
+				short cur_item;
 
-			popup_pt.h = item_rect.left;
-			popup_pt.v = item_rect.top;
-			LocalToGlobal(&popup_pt);
+				if (g_bme_ttype == -1)
+					cur_item = 1;
+				else if (g_bme_ttype >= 0 &&
+				    g_bme_ttype <= 4)
+					cur_item = bt2m[g_bme_ttype];
+				else
+					cur_item = 1;
+				CheckItem(popup, cur_item, true);
 
-			result = PopUpMenuSelect(popup,
-			    popup_pt.v, popup_pt.h,
-			    g_bme_ttype + 2);
-			choice = LoWord(result);
+				popup_pt.h = item_rect.left;
+				popup_pt.v = item_rect.top;
+				LocalToGlobal(&popup_pt);
 
-			if (choice > 0) {
-				char btn_text[32];
+				result = PopUpMenuSelect(popup,
+				    popup_pt.v, popup_pt.h,
+				    cur_item);
+				choice = LoWord(result);
 
-				g_bme_ttype = choice - 2;
-				ttype_to_str(g_bme_ttype,
-				    btn_text, sizeof(btn_text));
-				bme_set_btn_title(dlg,
-				    BME_TTYPE_BTN, btn_text);
+				if (choice > 0) {
+					char btn_text[32];
+
+					if (choice == 1)
+						g_bme_ttype = -1;
+					else
+						g_bme_ttype =
+						    bm2t[choice - 2];
+					ttype_to_str(
+					    g_bme_ttype,
+					    btn_text,
+					    sizeof(btn_text));
+					bme_set_btn_title(dlg,
+					    BME_TTYPE_BTN,
+					    btn_text);
+				}
 			}
 
 			DeleteMenu(202);

@@ -72,9 +72,9 @@ resource 'MENU' (135, "Terminal Type") {
 	135, textMenuProc, allEnabled, enabled, "Terminal Type",
 	{
 		"xterm", noIcon, noKey, noMark, plain;
-		"VT220", noIcon, noKey, noMark, plain;
-		"VT100", noIcon, noKey, noMark, plain;
 		"xterm-256color", noIcon, noKey, noMark, plain;
+		"VT100", noIcon, noKey, noMark, plain;
+		"VT220", noIcon, noKey, noMark, plain;
 		"ANSI-BBS", noIcon, noKey, noMark, plain
 	}
 };
