@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.4] - 2026-03-11
+
+### Fixed
+- Option+Space (Ctrl-Space) not recognized: vkey_to_base table was 48
+  entries, Space at vkey 0x31 (49) fell outside it. Extended table to
+  include Space, enabling Ctrl-Space (0x00) for tmux prefix and similar
+- Option+/ (Ctrl-/) not recognized: added '/' to vkey_to_base table
+  with special case since '/' & 0x1F produces wrong value (0x0F instead
+  of 0x1F)
+
 ## [1.9.3] - 2026-03-11
 
 ### Added

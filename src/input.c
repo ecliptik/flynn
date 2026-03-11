@@ -274,17 +274,23 @@ handle_key_down(Session *s, EventRecord *event)
 	 * Mac OS remaps char codes when Option is held, so use the
 	 * virtual keycode to recover the unmodified base key. */
 	if (event->modifiers & optionKey) {
-		static const char vkey_to_base[48] = {
+		static const char vkey_to_base[50] = {
 			'a','s','d','f','h','g','z','x',   /* 0x00 */
 			'c','v',  0,'b','q','w','e','r',   /* 0x08 */
 			'y','t',  0,  0,  0,  0,  0,  0,   /* 0x10 */
 			  0,  0,  0,  0,  0,  0,']','o',   /* 0x18 */
 			'u','[','i','p',  0,'l','j',  0,   /* 0x20 */
-			'k',  0,'\\', 0,  0,'n','m',  0,   /* 0x28 */
+			'k',  0,'\\', 0,'/','n','m',  0,   /* 0x28 */
+			  0,' ',                            /* 0x30 */
 		};
 
-		if (vkey < 48 && vkey_to_base[vkey]) {
-			key = vkey_to_base[vkey] & 0x1F;
+		if (vkey < 50 && vkey_to_base[vkey]) {
+			/* Ctrl-/ is 0x1F but '/' & 0x1F = 0x0F;
+			 * handle as special case */
+			if (vkey_to_base[vkey] == '/')
+				key = 0x1F;
+			else
+				key = vkey_to_base[vkey] & 0x1F;
 			buffer_key_send(s, &key, 1);
 			return;
 		}
