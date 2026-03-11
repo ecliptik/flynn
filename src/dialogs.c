@@ -254,6 +254,7 @@ session_post_connect(Session *s, short ttype, short bm_index,
 	prefs.host[sizeof(prefs.host) - 1] = '\0';
 	prefs.port = s->conn.port;
 	prefs.terminal_type = ttype;
+	prefs.backspace_bs = (ttype == 4) ? 1 : 0;
 	prefs_save(&prefs);
 
 	/* Track bookmark */
