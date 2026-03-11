@@ -164,6 +164,12 @@ static void
 session_handle_disconnect(Session *sess)
 {
 	GrafPtr save;
+	short was_ttype;
+
+	/* Save session's terminal type before telnet_init() zeroes it.
+	 * Needed to decide whether to restore snapshot (xterm/VT types
+	 * clear screen on logout) or keep current screen (ANSI-BBS). */
+	was_ttype = sess->telnet.preferred_ttype;
 
 	/* Reset only parser/protocol state, NOT screen content.
 	 * terminal_reset() would wipe the screen buffer via
@@ -184,9 +190,9 @@ session_handle_disconnect(Session *sess)
 	/* Restore pre-clear screen content for xterm/VT types, which
 	 * send ESC[2J during logout leaving a blank screen.
 	 * For ANSI (BBS), keep the current screen — we now drain TCP
-	 * data before closing, so goodbye screens are already rendered. */
-	if (sess->terminal.snap_valid &&
-	    sess->telnet.preferred_ttype != 4) {
+	 * data before closing, so goodbye screens are already rendered.
+	 * Use saved ttype since telnet_init() resets to global pref. */
+	if (sess->terminal.snap_valid && was_ttype != 4) {
 		memcpy(sess->terminal.screen, sess->terminal.snap_screen,
 		    sizeof(sess->terminal.screen));
 	}
