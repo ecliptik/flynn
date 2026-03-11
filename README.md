@@ -39,6 +39,7 @@ No build toolchain required — just download and run.
 - **256-color support** on System 7 with Color QuickDraw (zero System 6 impact)
 - **SGR attributes**: bold, italic, underline, dim, strikethrough, blink, inverse
 - **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns** (202 glyphs + 17 emoji)
+- **OSC support**: window title, palette and color queries
 
 **Display & Windowing**
 - **Multiple sessions** (up to 4 simultaneous windows)

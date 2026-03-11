@@ -100,12 +100,16 @@ Features
     and blink (DOS-style bright background on color)
   - Bold-to-bright color promotion for standard
     ANSI/BBS color rendering
-  - Unicode glyph rendering: 160+ QuickDraw primitives
+  - Unicode glyph rendering: 202 QuickDraw primitives
     (arrows, shapes, blocks, triangles, diamonds,
     circles, superscripts, subscripts, card suits,
     double-line box drawing, sextants, fractional
-    blocks), 15 monochrome bitmap emoji, and braille
+    blocks), 17 monochrome bitmap emoji, and braille
     patterns
+  - OSC sequences: window title (OSC 0/2), palette
+    color query (OSC 4), foreground/background color
+    query (OSC 10/11), cursor color (OSC 12/112,
+    no-op on monochrome)
   - Alternate screen buffer for full-screen apps
     (vi, nano, less, tmux)
   - 96-line scrollback buffer with position indicator
@@ -321,11 +325,12 @@ called "Flynn Preferences" in the System Folder.
 Options
 -------
 
-The Options menu contains settings for fonts,
-terminal type, networking, and display mode.
+The Options menu uses hierarchical submenus for
+fonts, terminal type, and bookmarks, with
+additional items for networking and display mode.
 
-  Fonts
-  ~~~~~
+  Fonts (submenu)
+  ~~~~~~~~~~~~~~~
   Monaco 9pt    80 columns x 24 rows (default)
   Monaco 12pt   Larger text, fewer columns/rows
   Courier 10pt  Classic fixed-width alternative
@@ -342,10 +347,10 @@ terminal type, networking, and display mode.
   with the cell grid. Fixed-width fonts (Monaco,
   Courier) may render slightly faster.
 
-  Terminal Type
-  ~~~~~~~~~~~~~
+  Terminal Type (submenu)
+  ~~~~~~~~~~~~~~~~~~~~~~
   Choose the terminal type reported to the server:
-  xterm (default), VT220, VT100, xterm-256color, or
+  xterm (default), xterm-256color, VT100, VT220, or
   ANSI-BBS. The first four use UTF-8 text encoding;
   ANSI-BBS uses raw CP437 byte encoding for correct
   BBS ANSI art rendering. Changes take effect on the
