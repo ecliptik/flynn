@@ -21,6 +21,7 @@
 #include <Memory.h>
 #include <Multiverse.h>
 #include "terminal.h"
+#include "connection.h"
 #include "color.h"
 #include "glyphs.h"
 #include "cp437.h"
@@ -1916,11 +1917,13 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			/* Secondary DA: respond as VT220 */
 			memcpy(term->response, "\033[>1;10;0c", 10);
 			term->response_len = 10;
+			term_flush_response(term);
 		} else if (term->intermediate == 0 ||
 		    term->intermediate == '?') {
 			/* Primary DA: respond as VT220 */
 			memcpy(term->response, "\033[?62;1;6c", 10);
 			term->response_len = 10;
+			term_flush_response(term);
 		}
 		break;
 
@@ -2021,10 +2024,12 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			    term->cur_row + 1, term->cur_col + 1);
 			if (term->response_len >= (short)sizeof(term->response))
 				term->response_len = sizeof(term->response) - 1;
+			term_flush_response(term);
 		} else if (p1 == 5) {
 			/* Status report: OK */
 			memcpy(term->response, "\033[0n", 4);
 			term->response_len = 4;
+			term_flush_response(term);
 		}
 		break;
 
@@ -2032,6 +2037,9 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		/* Unrecognised CSI sequence: silently ignore */
 		break;
 	}
+
+	/* Flush any response (DA, DSR) immediately */
+	term_flush_response(term);
 }
 
 /*
@@ -2192,9 +2200,11 @@ term_process_osc(Terminal *term, unsigned char ch)
 		short i;
 
 		term->osc_param = 0;
-		for (i = 0; i < term->osc_len; i++)
-			term->osc_param = term->osc_param * 10 +
-			    (term->osc_buf[i] - '0');
+		for (i = 0; i < term->osc_len; i++) {
+			if (term->osc_param < 1000)
+				term->osc_param = term->osc_param * 10 +
+				    (term->osc_buf[i] - '0');
+		}
 		term->osc_len = 0;
 		return;
 	}
@@ -2217,94 +2227,6 @@ term_process_osc(Terminal *term, unsigned char ch)
 		term->osc_buf[term->osc_len++] = ch;
 }
 
-/* ----------------------------------------------------------------
- * Base64 encode/decode for OSC 52 clipboard
- * ---------------------------------------------------------------- */
-
-static const char b64_enc[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-/*
- * b64_val - decode a single base64 character, -1 if invalid
- */
-static short
-b64_val(unsigned char ch)
-{
-	if (ch >= 'A' && ch <= 'Z') return ch - 'A';
-	if (ch >= 'a' && ch <= 'z') return ch - 'a' + 26;
-	if (ch >= '0' && ch <= '9') return ch - '0' + 52;
-	if (ch == '+') return 62;
-	if (ch == '/') return 63;
-	return -1;
-}
-
-/*
- * base64_decode - decode base64 data
- * Returns decoded length, or -1 on error.
- */
-static short
-base64_decode(const char *in, short in_len, char *out, short out_max)
-{
-	short i, o;
-	short v0, v1, v2, v3;
-
-	o = 0;
-	for (i = 0; i + 3 < in_len; i += 4) {
-		v0 = b64_val(in[i]);
-		v1 = b64_val(in[i + 1]);
-		if (v0 < 0 || v1 < 0)
-			return -1;
-
-		if (o < out_max)
-			out[o++] = (char)((v0 << 2) | (v1 >> 4));
-
-		if (in[i + 2] == '=')
-			break;
-		v2 = b64_val(in[i + 2]);
-		if (v2 < 0)
-			return -1;
-		if (o < out_max)
-			out[o++] = (char)((v1 << 4) | (v2 >> 2));
-
-		if (in[i + 3] == '=')
-			break;
-		v3 = b64_val(in[i + 3]);
-		if (v3 < 0)
-			return -1;
-		if (o < out_max)
-			out[o++] = (char)((v2 << 6) | v3);
-	}
-	return o;
-}
-
-/*
- * base64_encode - encode data to base64
- * Returns encoded length (not null-terminated).
- */
-static short
-base64_encode(const char *in, short in_len, char *out, short out_max)
-{
-	short i, o;
-	unsigned char a, b, c;
-
-	o = 0;
-	for (i = 0; i < in_len; i += 3) {
-		a = in[i];
-		b = (i + 1 < in_len) ? in[i + 1] : 0;
-		c = (i + 2 < in_len) ? in[i + 2] : 0;
-
-		if (o + 4 > out_max)
-			break;
-
-		out[o++] = b64_enc[a >> 2];
-		out[o++] = b64_enc[((a & 0x03) << 4) | (b >> 4)];
-		out[o++] = (i + 1 < in_len) ?
-		    b64_enc[((b & 0x0F) << 2) | (c >> 6)] : '=';
-		out[o++] = (i + 2 < in_len) ?
-		    b64_enc[c & 0x3F] : '=';
-	}
-	return o;
-}
 
 /*
  * term_finish_osc - execute a completed OSC sequence
@@ -2369,6 +2291,7 @@ term_finish_osc(Terminal *term)
 				    (unsigned)rgb.red,
 				    (unsigned)rgb.green,
 				    (unsigned)rgb.blue);
+				term_flush_response(term);
 			}
 			/* Set (non-"?" payload): silently ignore */
 		}
@@ -2393,6 +2316,7 @@ term_finish_osc(Terminal *term)
 				    sizeof(term->response),
 				    "\033]10;rgb:0000/0000/"
 				    "0000\033\\");
+			term_flush_response(term);
 		}
 		/* Set (non-"?" payload): silently ignore */
 		break;
@@ -2416,6 +2340,7 @@ term_finish_osc(Terminal *term)
 				    sizeof(term->response),
 				    "\033]11;rgb:ffff/ffff/"
 				    "ffff\033\\");
+			term_flush_response(term);
 		}
 		/* Set (non-"?" payload): silently ignore */
 		break;
@@ -2425,77 +2350,13 @@ term_finish_osc(Terminal *term)
 	case 112:
 		/* OSC 112 - reset cursor color: no-op (monochrome XOR) */
 		break;
-	case 52:
-		/*
-		 * OSC 52 - clipboard access
-		 * Format: <selection>;<base64-data>
-		 * selection: c/s/p (all treated as clipboard on Mac)
-		 * payload "?" = query clipboard, else set clipboard
-		 */
-		if (term->osc_len >= 2 && term->osc_buf[1] == ';') {
-			char *payload = &term->osc_buf[2];
-			short plen = term->osc_len - 2;
-
-			if (plen == 1 && payload[0] == '?') {
-				/* Query: read clipboard, base64 encode, reply */
-				Handle h;
-				long offset;
-				long slen;
-
-				h = NewHandle(0);
-				if (h) {
-					slen = GetScrap(h, 'TEXT', &offset);
-					if (slen > 0) {
-						short elen;
-						short hdr;
-
-						if (slen > 384)
-							slen = 384;
-						HLock(h);
-						/* Build response: ESC]52;c;<b64>ESC\ */
-						hdr = 6; /* \033]52;c; */
-						term->response[0] = '\033';
-						term->response[1] = ']';
-						term->response[2] = '5';
-						term->response[3] = '2';
-						term->response[4] = ';';
-						term->response[5] = 'c';
-						term->response[6] = ';';
-						hdr = 7;
-						elen = base64_encode(*h,
-						    (short)slen,
-						    &term->response[hdr],
-						    (short)(sizeof(term->response)
-						    - hdr - 2));
-						term->response[hdr + elen] =
-						    '\033';
-						term->response[hdr + elen + 1] =
-						    '\\';
-						term->response_len =
-						    hdr + elen + 2;
-						HUnlock(h);
-					}
-					DisposeHandle(h);
-				}
-			} else if (plen > 0) {
-				/* Set: decode base64, put on clipboard */
-				char dec_buf[384];
-				short dlen;
-
-				dlen = base64_decode(payload, plen,
-				    dec_buf, (short)sizeof(dec_buf));
-				if (dlen > 0) {
-					ZeroScrap();
-					PutScrap((long)dlen, 'TEXT',
-					    dec_buf);
-				}
-			}
-		}
-		break;
 	default:
 		/* Other OSC sequences: silently discard */
 		break;
 	}
+
+	/* Flush any response (color queries) immediately */
+	term_flush_response(term);
 }
 
 /*
