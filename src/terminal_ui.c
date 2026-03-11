@@ -2676,6 +2676,49 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 		}
 		break;
 
+	case GLYPH_FLOWER:
+		/* ✿ Flower: petals around center dot */
+		PenSize(1, 1);
+		/* Center dot */
+		SetRect(&r, cx - 1, cy - 1, cx + 2, cy + 2);
+		PaintOval(&r);
+		/* Top petal */
+		SetRect(&r, cx - 1, y + 1, cx + 2, cy - 1);
+		PaintOval(&r);
+		/* Bottom petal */
+		SetRect(&r, cx - 1, cy + 2, cx + 2, bottom);
+		PaintOval(&r);
+		/* Left petal */
+		SetRect(&r, x, cy - 1, cx - 1, cy + 2);
+		PaintOval(&r);
+		/* Right petal */
+		SetRect(&r, cx + 2, cy - 1, right + 1, cy + 2);
+		PaintOval(&r);
+		break;
+
+	case GLYPH_SNOWFLAKE:
+		/* ❄ Snowflake: 6 arms with small cross-branches */
+		PenSize(1, 1);
+		/* Vertical arm */
+		MoveTo(cx, y + 1);
+		LineTo(cx, bottom - 1);
+		/* Diagonal arms */
+		MoveTo(x + 1, cy - h4);
+		LineTo(right - 1, cy + h4);
+		MoveTo(x + 1, cy + h4);
+		LineTo(right - 1, cy - h4);
+		/* Cross-branches on vertical arm */
+		MoveTo(cx - 1, y + 3);
+		LineTo(cx + 1, y + 3);
+		MoveTo(cx - 1, bottom - 3);
+		LineTo(cx + 1, bottom - 3);
+		/* Cross-branches on diagonal arms */
+		MoveTo(x + 1, cy);
+		LineTo(x + 2, cy - 1);
+		MoveTo(right - 1, cy);
+		LineTo(right - 2, cy + 1);
+		break;
+
 	default:
 		if (glyph_id >= GLYPH_SEXTANT_BASE &&
 		    glyph_id < GLYPH_SEXTANT_BASE + GLYPH_SEXTANT_COUNT) {

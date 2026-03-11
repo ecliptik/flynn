@@ -299,10 +299,18 @@ static const GlyphMappingBMP glyph_map_bmp[] = {
 	{ 0x2718, GLYPH_CROSS_HEAVY },
 	/* Asterisk spinners and dingbats */
 	{ 0x2722, GLYPH_ASTERISK_FOUR },
+	{ 0x2728, GLYPH_ASTERISK_8 },	/* ✨ sparkles */
 	{ 0x2733, GLYPH_ASTERISK_8 },
 	{ 0x2736, GLYPH_STAR_SIX },
 	{ 0x273B, GLYPH_ASTERISK_TEARDROP },
+	{ 0x273C, GLYPH_ASTERISK_TEARDROP },	/* ✼ open teardrop asterisk */
 	{ 0x273D, GLYPH_ASTERISK_HEAVY },
+	{ 0x273E, GLYPH_FLOWER },	/* ✾ six petalled florette */
+	{ 0x273F, GLYPH_FLOWER },	/* ✿ black florette */
+	{ 0x2740, GLYPH_FLOWER },	/* ❀ white florette */
+	{ 0x2741, GLYPH_FLOWER },	/* ❁ eight petalled florette */
+	{ 0x2744, GLYPH_SNOWFLAKE },	/* ❄ snowflake */
+	{ 0x274B, GLYPH_ASTERISK_HEAVY },	/* ❋ heavy teardrop propeller */
 	{ 0x274C, GLYPH_EMOJI_CROSSMARK },
 	{ 0x2764, GLYPH_EMOJI_HEART },
 	{ 0x276F, GLYPH_CHEVRON_RIGHT },
@@ -318,9 +326,14 @@ static const GlyphMappingBMP glyph_map_bmp[] = {
 
 static const GlyphMappingAstral glyph_map_astral[] = {
 	{ 0x1F310, GLYPH_EMOJI_GLOBE },
+	{ 0x1F31F, GLYPH_EMOJI_STAR },	/* 🌟 glowing star */
+	{ 0x1F338, GLYPH_FLOWER },	/* 🌸 cherry blossom */
+	{ 0x1F33A, GLYPH_FLOWER },	/* 🌺 hibiscus */
+	{ 0x1F33C, GLYPH_FLOWER },	/* 🌼 blossom */
 	{ 0x1F40D, GLYPH_EMOJI_SNAKE },
 	{ 0x1F44D, GLYPH_EMOJI_THUMBSUP },
 	{ 0x1F4A1, GLYPH_EMOJI_BULB },
+	{ 0x1F4AB, GLYPH_EMOJI_STAR },	/* 💫 dizzy */
 	{ 0x1F4C1, GLYPH_EMOJI_FOLDER },
 	{ 0x1F4E6, GLYPH_EMOJI_PACKAGE },
 	{ 0x1F525, GLYPH_EMOJI_FIRE },
@@ -540,6 +553,9 @@ static const GlyphInfo prim_info[] = {
 	/* 0xAF QUAD_UL_LR */      { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
 	/* 0xB0 QUAD_UR_LL */      { GLYPH_CAT_PRIMITIVE, 0, '.', 0 },
 	/* 0xB1 QUAD_UR_LL_LR */   { GLYPH_CAT_PRIMITIVE, 0, '#', 0 },
+	/* Flower and snowflake */
+	/* 0xB2 FLOWER */          { GLYPH_CAT_PRIMITIVE, 0, '*', 0 },
+	/* 0xB3 SNOWFLAKE */       { GLYPH_CAT_PRIMITIVE, 0, '*', 0 },
 };
 
 /* Emoji glyphs: wide (2-cell), drawn with CopyBits */
@@ -807,7 +823,7 @@ static const GlyphBitmap emoji_bitmaps[] = {
 /*
  * glyph_lookup - look up Unicode codepoint in optimized glyph tables
  *
- * Returns glyph index (0x00-0xED) or -1 if not found.
+ * Returns glyph index (0x00-0xFE) or -1 if not found.
  * Caller handles braille (U+2800-U+28FF) separately.
  *
  * Optimization layers (68000 @ 8MHz):
