@@ -391,7 +391,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 
 		/* Bookmark popup menu */
 		if (g_bm_popup) {
-			GetDialogItem(dlg, DLOG_BOOKMARKS,
+			GetDialogItem(dlg, DLOG_FAVORITES,
 			    &item_type, &item_h, &item_rect);
 
 			if (PtInRect(pt, &item_rect)) {
@@ -430,7 +430,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 					/* Update button to
 					   show bookmark name */
 					bme_set_btn_title(dlg,
-					    DLOG_BOOKMARKS,
+					    DLOG_FAVORITES,
 					    bm->name);
 
 					/* Fill host */
@@ -590,14 +590,14 @@ do_connect(void)
 			dlg_set_text(dlg, DLOG_USER_FIELD,
 			    prefill_user);
 
-		/* Hide Bookmarks button if no bookmarks saved */
+		/* Hide Favorites button if no favorites saved */
 		if (prefs.bookmark_count <= 0) {
-			GetDialogItem(dlg, DLOG_BOOKMARKS,
+			GetDialogItem(dlg, DLOG_FAVORITES,
 			    &item_type, &item_h, &item_rect);
-			HideDialogItem(dlg, DLOG_BOOKMARKS);
+			HideDialogItem(dlg, DLOG_FAVORITES);
 		}
 
-		/* Build bookmark popup menu */
+		/* Build favorites popup menu */
 		g_bm_popup = 0L;
 		g_bm_selected = -1;
 		if (prefs.bookmark_count > 0) {
@@ -1115,7 +1115,7 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	long num;
 	char btn_text[32];
 
-	dlg = GetNewDialog(DLOG_BM_EDIT_ID, 0L, (WindowPtr)-1L);
+	dlg = GetNewDialog(DLOG_FAV_EDIT_ID, 0L, (WindowPtr)-1L);
 	if (!dlg)
 		return false;
 
@@ -1253,7 +1253,7 @@ do_bookmarks(void)
 	Rect item_rect;
 	Boolean changed = false;
 
-	dlg = GetNewDialog(DLOG_BOOKMARKS_ID, 0L, (WindowPtr)-1L);
+	dlg = GetNewDialog(DLOG_FAVORITES_ID, 0L, (WindowPtr)-1L);
 	if (!dlg)
 		return;
 

@@ -19,15 +19,15 @@
 /* Apple menu items */
 #define APPLE_MENU_ABOUT_ID 1
 
-/* Session menu items (static base) */
+/* File menu items (fully static) */
 #define FILE_MENU_CONNECT_ID    1
 #define FILE_MENU_DISCONNECT_ID 2
 /* separator = 3 */
 #define FILE_MENU_SAVE_ID       4
 /* separator = 5 */
-#define FILE_MENU_BOOKMARKS_ID  6
-/* dynamic: recent bookmarks, Add Bookmark..., separator, Quit */
-/* Quit is always last item — use CountMItems() */
+#define FILE_MENU_FAVORITES_ID  6   /* Favorites hierarchical submenu */
+/* separator = 7 */
+#define FILE_MENU_QUIT_ID       8
 
 /* Edit menu items */
 #define EDIT_MENU_UNDO_ID   1
@@ -39,27 +39,36 @@
 /* separator = 7 */
 #define EDIT_MENU_SELALL_ID 8
 
-/* Options menu items — organized by section */
-#define PREFS_FONTS_HDR      1   /* disabled section header */
-#define PREFS_FONT9_ID       2   /* Monaco 9 */
-#define PREFS_FONT12_ID      3   /* Monaco 12 */
-#define PREFS_FONT_C10       4   /* Courier 10 */
-#define PREFS_FONT_CH12      5   /* Chicago 12 */
-#define PREFS_FONT_G9        6   /* Geneva 9 */
-#define PREFS_FONT_G10       7   /* Geneva 10 */
-/* separator = 8 */
-#define PREFS_TTYPE_HDR      9   /* disabled section header */
-#define PREFS_XTERM_ID      10
-#define PREFS_VT220_ID      11
-#define PREFS_VT100_ID      12
-#define PREFS_XTERM256_ID   13
-#define PREFS_ANSI_ID       14
-/* separator = 15 */
-#define PREFS_NET_HDR       16   /* disabled section header */
-#define PREFS_DNS_ID        17
-/* separator = 18 */
-#define PREFS_MISC_HDR      19   /* disabled section header */
-#define PREFS_DARK_ID       20
+/* Options menu items (hierarchical submenus for Font and Terminal Type) */
+#define PREFS_FONT_HIER      1   /* Font submenu trigger */
+#define PREFS_TTYPE_HIER     2   /* Terminal Type submenu trigger */
+/* separator = 3 */
+#define PREFS_DNS_ID         4
+#define PREFS_DARK_ID        5
+
+/* Font submenu (MENU 134) items */
+#define FONT_MENU_ID        134
+#define FONT_MONACO9_ID      1
+#define FONT_MONACO12_ID     2
+#define FONT_COURIER10_ID    3
+#define FONT_CHICAGO12_ID    4
+#define FONT_GENEVA9_ID      5
+#define FONT_GENEVA10_ID     6
+
+/* Terminal Type submenu (MENU 135) items */
+#define TTYPE_MENU_ID       135
+#define TTYPE_XTERM_ID       1
+#define TTYPE_VT220_ID       2
+#define TTYPE_VT100_ID       3
+#define TTYPE_XTERM256_ID    4
+#define TTYPE_ANSI_ID        5
+
+/* Favorites submenu (MENU 136) items */
+#define FAVORITES_MENU_ID   136
+#define FAV_MANAGE_ID        1   /* Manage Favorites... */
+#define FAV_ADD_ID           2   /* Add Favorite... */
+/* separator = 3 (added dynamically when bookmarks exist) */
+#define FAV_FIRST_BM         4   /* first bookmark entry */
 
 /* Window menu */
 #define WINDOW_MENU_ID      133
@@ -76,8 +85,8 @@
 
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130
-#define DLOG_BOOKMARKS_ID   131
-#define DLOG_BM_EDIT_ID     132
+#define DLOG_FAVORITES_ID   131
+#define DLOG_FAV_EDIT_ID     132
 #define DLOG_DNS_ID         133
 
 /* Bookmark manager dialog items */

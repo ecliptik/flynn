@@ -28,12 +28,13 @@
 #include "macutil.h"
 #include "menus.h"
 
-/* Number of static items in File menu (before dynamic recent bookmarks) */
-#define FILE_MENU_STATIC_ITEMS  6
+/* Number of static items in Favorites submenu (Manage + Add) */
+#define FAV_STATIC_ITEMS  2
 
 /* Menu handles (private to this module) */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
 static MenuHandle window_menu;
+static MenuHandle font_submenu, ttype_submenu, favorites_submenu;
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -70,12 +71,31 @@ init_menus(void)
 	ctrl_menu = GetMenuHandle(CTRL_MENU_ID);
 	window_menu = GetMenuHandle(WINDOW_MENU_ID);
 
-	/* Disable section header items */
+	/* Load and insert hierarchical submenus */
+	font_submenu = GetMenu(FONT_MENU_ID);
+	if (font_submenu)
+		InsertMenu(font_submenu, -1);
+	ttype_submenu = GetMenu(TTYPE_MENU_ID);
+	if (ttype_submenu)
+		InsertMenu(ttype_submenu, -1);
+	favorites_submenu = GetMenu(FAVORITES_MENU_ID);
+	if (favorites_submenu)
+		InsertMenu(favorites_submenu, -1);
+
+	/* Set hierarchical menu markers (0x1B = hMenuCmd) */
 	if (prefs_menu) {
-		DisableItem(prefs_menu, PREFS_FONTS_HDR);
-		DisableItem(prefs_menu, PREFS_TTYPE_HDR);
-		DisableItem(prefs_menu, PREFS_NET_HDR);
-		DisableItem(prefs_menu, PREFS_MISC_HDR);
+		SetItemCmd(prefs_menu, PREFS_FONT_HIER, 0x1B);
+		SetItemMark(prefs_menu, PREFS_FONT_HIER,
+		    FONT_MENU_ID);
+		SetItemCmd(prefs_menu, PREFS_TTYPE_HIER, 0x1B);
+		SetItemMark(prefs_menu, PREFS_TTYPE_HIER,
+		    TTYPE_MENU_ID);
+	}
+	if (file_menu) {
+		SetItemCmd(file_menu, FILE_MENU_FAVORITES_ID,
+		    0x1B);
+		SetItemMark(file_menu, FILE_MENU_FAVORITES_ID,
+		    FAVORITES_MENU_ID);
 	}
 
 	DrawMenuBar();
@@ -102,19 +122,16 @@ update_menus(void)
 	else
 		DisableItem(file_menu, FILE_MENU_SAVE_ID);
 
-	/* Add Bookmark: dynamic item after recents, enable/disable */
-	{
-		short add_bm_item = FILE_MENU_STATIC_ITEMS +
-		    prefs.recent_count + 1;
-
+	/* Favorites submenu: Add Favorite enable/disable */
+	if (favorites_submenu) {
 		if (active_session &&
 		    active_session->conn.state ==
 		    CONN_STATE_CONNECTED &&
 		    active_session->bookmark_index < 0 &&
 		    prefs.bookmark_count < MAX_BOOKMARKS)
-			EnableItem(file_menu, add_bm_item);
+			EnableItem(favorites_submenu, FAV_ADD_ID);
 		else
-			DisableItem(file_menu, add_bm_item);
+			DisableItem(favorites_submenu, FAV_ADD_ID);
 	}
 
 	/* Edit menu: Copy when selection active, Paste when connected */
@@ -219,28 +236,37 @@ update_prefs_menu(void)
 		ttype = prefs.terminal_type;
 	}
 
-	CheckItem(prefs_menu, PREFS_FONT9_ID,
-	    fid == 4 && fsz == 9);
-	CheckItem(prefs_menu, PREFS_FONT12_ID,
-	    fid == 4 && fsz == 12);
-	CheckItem(prefs_menu, PREFS_FONT_C10,
-	    fid == 22 && fsz == 10);
-	CheckItem(prefs_menu, PREFS_FONT_CH12,
-	    fid == 0 && fsz == 12);
-	CheckItem(prefs_menu, PREFS_FONT_G9,
-	    fid == 3 && fsz == 9);
-	CheckItem(prefs_menu, PREFS_FONT_G10,
-	    fid == 3 && fsz == 10);
-	CheckItem(prefs_menu, PREFS_XTERM_ID,
-	    ttype == 0);
-	CheckItem(prefs_menu, PREFS_VT220_ID,
-	    ttype == 1);
-	CheckItem(prefs_menu, PREFS_VT100_ID,
-	    ttype == 2);
-	CheckItem(prefs_menu, PREFS_XTERM256_ID,
-	    ttype == 3);
-	CheckItem(prefs_menu, PREFS_ANSI_ID,
-	    ttype == 4);
+	/* Font submenu checkmarks */
+	if (font_submenu) {
+		CheckItem(font_submenu, FONT_MONACO9_ID,
+		    fid == 4 && fsz == 9);
+		CheckItem(font_submenu, FONT_MONACO12_ID,
+		    fid == 4 && fsz == 12);
+		CheckItem(font_submenu, FONT_COURIER10_ID,
+		    fid == 22 && fsz == 10);
+		CheckItem(font_submenu, FONT_CHICAGO12_ID,
+		    fid == 0 && fsz == 12);
+		CheckItem(font_submenu, FONT_GENEVA9_ID,
+		    fid == 3 && fsz == 9);
+		CheckItem(font_submenu, FONT_GENEVA10_ID,
+		    fid == 3 && fsz == 10);
+	}
+
+	/* Terminal Type submenu checkmarks */
+	if (ttype_submenu) {
+		CheckItem(ttype_submenu, TTYPE_XTERM_ID,
+		    ttype == 0);
+		CheckItem(ttype_submenu, TTYPE_VT220_ID,
+		    ttype == 1);
+		CheckItem(ttype_submenu, TTYPE_VT100_ID,
+		    ttype == 2);
+		CheckItem(ttype_submenu, TTYPE_XTERM256_ID,
+		    ttype == 3);
+		CheckItem(ttype_submenu, TTYPE_ANSI_ID,
+		    ttype == 4);
+	}
+
+	/* Options menu checkmarks */
 	CheckItem(prefs_menu, PREFS_DARK_ID,
 	    prefs.dark_mode != 0);
 }
@@ -253,44 +279,33 @@ rebuild_file_menu(void)
 	short nlen, ni;
 	const char *name;
 
-	if (!file_menu)
+	if (!favorites_submenu)
 		return;
 
-	/* Remove all dynamic items (after Bookmarks...) */
-	count = CountMItems(file_menu);
-	while (count > FILE_MENU_STATIC_ITEMS) {
-		DeleteMenuItem(file_menu, count);
+	/* Remove all dynamic items (after Manage + Add) */
+	count = CountMItems(favorites_submenu);
+	while (count > FAV_STATIC_ITEMS) {
+		DeleteMenuItem(favorites_submenu, count);
 		count--;
 	}
 
-	/* Add indented recent bookmarks under Bookmarks */
-	if (prefs.recent_count > 0) {
-		for (i = 0; i < prefs.recent_count; i++) {
-			short bm_idx = prefs.recent[i];
+	/* Add separator + all bookmarks */
+	if (prefs.bookmark_count > 0) {
+		AppendMenu(favorites_submenu, "\p(-");
 
-			if (bm_idx < 0 ||
-			    bm_idx >= prefs.bookmark_count)
-				continue;
-
-			name = prefs.bookmarks[bm_idx].name;
+		for (i = 0; i < prefs.bookmark_count; i++) {
+			name = prefs.bookmarks[i].name;
 			nlen = strlen(name);
-			if (nlen > 252) nlen = 252;
-			/* Indent with 2 spaces */
-			item_str[0] = nlen + 2;
-			item_str[1] = ' ';
-			item_str[2] = ' ';
+			if (nlen > 254) nlen = 254;
+			item_str[0] = nlen;
 			for (ni = 0; ni < nlen; ni++)
-				item_str[ni + 3] = name[ni];
-			AppendMenu(file_menu, "\p ");
-			SetMenuItemText(file_menu,
-			    CountMItems(file_menu), item_str);
+				item_str[ni + 1] = name[ni];
+			AppendMenu(favorites_submenu, "\p ");
+			SetMenuItemText(favorites_submenu,
+			    CountMItems(favorites_submenu),
+			    item_str);
 		}
 	}
-
-	/* Add Bookmark + Separator + Quit */
-	AppendMenu(file_menu, "\pAdd Bookmark\311");
-	AppendMenu(file_menu, "\p(-");
-	AppendMenu(file_menu, "\pQuit/Q");
 }
 
 void
@@ -379,53 +394,50 @@ handle_file_menu(short item)
 	case FILE_MENU_SAVE_ID:
 		do_save_session();
 		break;
-	case FILE_MENU_BOOKMARKS_ID:
+	case FILE_MENU_QUIT_ID:
+		if (session_any_connected()) {
+			ParamText(
+			    "\pDisconnect all "
+			    "sessions and quit?",
+			    "\p", "\p", "\p");
+			if (CautionAlert(128, 0L) != 1)
+				break;
+		}
+		{
+			short si;
+			Session *sess;
+
+			for (si = MAX_SESSIONS - 1;
+			    si >= 0; si--) {
+				sess = session_get(si);
+				if (sess)
+					session_destroy(sess);
+			}
+		}
+		active_session = 0L;
+		running = false;
+		break;
+	}
+}
+
+static void
+handle_favorites_submenu(short item)
+{
+	switch (item) {
+	case FAV_MANAGE_ID:
 		do_bookmarks();
 		break;
+	case FAV_ADD_ID:
+		do_save_as_bookmark();
+		break;
 	default: {
-		short add_bm_item = FILE_MENU_STATIC_ITEMS +
-		    prefs.recent_count + 1;
+		/* Bookmark entry: item 4+ maps to bookmark index */
+		short bm_idx = item - FAV_FIRST_BM;
 
-		/* Quit is always last item */
-		if (item == CountMItems(file_menu)) {
-			if (session_any_connected()) {
-				ParamText(
-				    "\pDisconnect all "
-				    "sessions and quit?",
-				    "\p", "\p", "\p");
-				if (CautionAlert(128, 0L) != 1)
-					break;
-			}
-			{
-				short si;
-				Session *sess;
-
-				for (si = MAX_SESSIONS - 1;
-				    si >= 0; si--) {
-					sess = session_get(si);
-					if (sess)
-						session_destroy(sess);
-				}
-			}
-			active_session = 0L;
-			running = false;
-		} else if (item == add_bm_item) {
-			do_save_as_bookmark();
-		} else if (item > FILE_MENU_STATIC_ITEMS
-		    && item < add_bm_item
-		    && prefs.recent_count > 0) {
-			/* Recent bookmark click */
-			short ri = item -
-			    FILE_MENU_STATIC_ITEMS - 1;
-
-			if (ri >= 0 &&
-			    ri < prefs.recent_count) {
-				short bm_idx = prefs.recent[ri];
-
-				if (bm_idx >= 0 &&
-				    bm_idx < prefs.bookmark_count)
-					do_connect_bookmark(bm_idx);
-			}
+		if (bm_idx >= 0 &&
+		    bm_idx < prefs.bookmark_count) {
+			add_recent_bookmark(bm_idx);
+			do_connect_bookmark(bm_idx);
 		}
 		break;
 	}
@@ -497,59 +509,65 @@ handle_ctrl_menu(short item)
 }
 
 static void
+handle_font_submenu(short item)
+{
+	switch (item) {
+	case FONT_MONACO9_ID:
+		do_font_change(4, 9);
+		break;
+	case FONT_MONACO12_ID:
+		do_font_change(4, 12);
+		break;
+	case FONT_COURIER10_ID:
+		do_font_change(22, 10);
+		break;
+	case FONT_CHICAGO12_ID:
+		do_font_change(0, 12);
+		break;
+	case FONT_GENEVA9_ID:
+		do_font_change(3, 9);
+		break;
+	case FONT_GENEVA10_ID:
+		do_font_change(3, 10);
+		break;
+	}
+}
+
+static void
+handle_ttype_submenu(short item)
+{
+	short ttype = item - TTYPE_XTERM_ID;
+
+	if (active_session)
+		active_session->telnet.preferred_ttype = ttype;
+	/* Auto-save to originating bookmark */
+	if (active_session &&
+	    active_session->bookmark_index >= 0 &&
+	    active_session->bookmark_index <
+	    prefs.bookmark_count) {
+		prefs.bookmarks[
+		    active_session->bookmark_index
+		    ].terminal_type = ttype;
+	}
+	/* Also update global default */
+	prefs.terminal_type = ttype;
+	prefs_save(&prefs);
+	update_prefs_menu();
+	if (active_session &&
+	    active_session->conn.state ==
+	    CONN_STATE_CONNECTED) {
+		ParamText(
+		    "\pTerminal type change takes "
+		    "effect on next connection.",
+		    "\p", "\p", "\p");
+		NoteAlert(128, 0L);
+	}
+}
+
+static void
 handle_prefs_menu(short item)
 {
 	switch (item) {
-	case PREFS_FONT9_ID:
-		do_font_change(4, 9);
-		break;
-	case PREFS_FONT12_ID:
-		do_font_change(4, 12);
-		break;
-	case PREFS_FONT_C10:
-		do_font_change(22, 10);
-		break;
-	case PREFS_FONT_CH12:
-		do_font_change(0, 12);
-		break;
-	case PREFS_FONT_G9:
-		do_font_change(3, 9);
-		break;
-	case PREFS_FONT_G10:
-		do_font_change(3, 10);
-		break;
-	case PREFS_XTERM_ID:
-	case PREFS_VT220_ID:
-	case PREFS_VT100_ID:
-	case PREFS_XTERM256_ID:
-	case PREFS_ANSI_ID:
-		if (active_session)
-			active_session->telnet.preferred_ttype =
-			    item - PREFS_XTERM_ID;
-		/* Auto-save to originating bookmark */
-		if (active_session &&
-		    active_session->bookmark_index >= 0 &&
-		    active_session->bookmark_index <
-		    prefs.bookmark_count) {
-			prefs.bookmarks[
-			    active_session->bookmark_index
-			    ].terminal_type =
-			    item - PREFS_XTERM_ID;
-		}
-		/* Also update global default */
-		prefs.terminal_type = item - PREFS_XTERM_ID;
-		prefs_save(&prefs);
-		update_prefs_menu();
-		if (active_session &&
-		    active_session->conn.state ==
-		    CONN_STATE_CONNECTED) {
-			ParamText(
-			    "\pTerminal type change takes "
-			    "effect on next connection.",
-			    "\p", "\p", "\p");
-			NoteAlert(128, 0L);
-		}
-		break;
 	case PREFS_DARK_ID:
 		prefs.dark_mode = !prefs.dark_mode;
 		term_ui_set_dark_mode(prefs.dark_mode);
@@ -630,6 +648,15 @@ handle_menu(long menu_id)
 		break;
 	case PREFS_MENU_ID:
 		handle_prefs_menu(item);
+		break;
+	case FONT_MENU_ID:
+		handle_font_submenu(item);
+		break;
+	case TTYPE_MENU_ID:
+		handle_ttype_submenu(item);
+		break;
+	case FAVORITES_MENU_ID:
+		handle_favorites_submenu(item);
 		break;
 	case WINDOW_MENU_ID:
 		handle_window_menu(item);

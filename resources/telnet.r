@@ -25,8 +25,9 @@ resource 'MENU' (129, "File") {
 		"-", noIcon, noKey, noMark, plain;
 		"Save Contents\311", noIcon, "S", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Bookmarks\311", noIcon, "B", noMark, plain
-		/* Recent bookmarks + Add Bookmark + separator + Quit added dynamically */
+		"Favorites", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Quit", noIcon, "Q", noMark, plain
 	}
 };
 
@@ -47,26 +48,43 @@ resource 'MENU' (130, "Edit") {
 resource 'MENU' (131, "Options") {
 	131, textMenuProc, allEnabled, enabled, "Options",
 	{
-		"Fonts", noIcon, noKey, noMark, plain;
-		"  Monaco 9", noIcon, noKey, noMark, plain;
-		"  Monaco 12", noIcon, noKey, noMark, plain;
-		"  Courier 10", noIcon, noKey, noMark, plain;
-		"  Chicago 12", noIcon, noKey, noMark, plain;
-		"  Geneva 9", noIcon, noKey, noMark, plain;
-		"  Geneva 10", noIcon, noKey, noMark, plain;
-		"-", noIcon, noKey, noMark, plain;
+		"Font", noIcon, noKey, noMark, plain;
 		"Terminal Type", noIcon, noKey, noMark, plain;
-		"  xterm", noIcon, noKey, noMark, plain;
-		"  VT220", noIcon, noKey, noMark, plain;
-		"  VT100", noIcon, noKey, noMark, plain;
-		"  xterm-256color", noIcon, noKey, noMark, plain;
-		"  ANSI-BBS", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Networking", noIcon, noKey, noMark, plain;
-		"  DNS Server\311", noIcon, noKey, noMark, plain;
-		"-", noIcon, noKey, noMark, plain;
-		"Misc", noIcon, noKey, noMark, plain;
-		"  Dark Mode", noIcon, noKey, noMark, plain
+		"DNS Server\311", noIcon, noKey, noMark, plain;
+		"Dark Mode", noIcon, noKey, noMark, plain
+	}
+};
+
+resource 'MENU' (134, "Font") {
+	134, textMenuProc, allEnabled, enabled, "Font",
+	{
+		"Monaco 9", noIcon, noKey, noMark, plain;
+		"Monaco 12", noIcon, noKey, noMark, plain;
+		"Courier 10", noIcon, noKey, noMark, plain;
+		"Chicago 12", noIcon, noKey, noMark, plain;
+		"Geneva 9", noIcon, noKey, noMark, plain;
+		"Geneva 10", noIcon, noKey, noMark, plain
+	}
+};
+
+resource 'MENU' (135, "Terminal Type") {
+	135, textMenuProc, allEnabled, enabled, "Terminal Type",
+	{
+		"xterm", noIcon, noKey, noMark, plain;
+		"VT220", noIcon, noKey, noMark, plain;
+		"VT100", noIcon, noKey, noMark, plain;
+		"xterm-256color", noIcon, noKey, noMark, plain;
+		"ANSI-BBS", noIcon, noKey, noMark, plain
+	}
+};
+
+resource 'MENU' (136, "Favorites") {
+	136, textMenuProc, allEnabled, enabled, "Favorites",
+	{
+		"Manage Favorites\311", noIcon, "B", noMark, plain;
+		"Add Favorite\311", noIcon, noKey, noMark, plain
+		/* Separator + bookmark entries added dynamically */
 	}
 };
 
@@ -139,9 +157,9 @@ resource 'DITL' (129, "Connect") {
 		{75, 90, 91, 235},
 		EditText { enabled, "" };
 
-		/* 10: Bookmarks popup */
+		/* 10: Favorites popup */
 		{155, 15, 175, 145},
-		Button { enabled, "Bookmarks" };
+		Button { enabled, "Favorites" };
 
 		/* 11: Terminal label */
 		{105, 15, 121, 85},
@@ -234,19 +252,19 @@ resource 'DITL' (128, "Alert") {
 	}
 };
 
-/* Bookmark manager dialog */
-resource 'DLOG' (131, "Bookmarks") {
+/* Favorites manager dialog */
+resource 'DLOG' (131, "Favorites") {
 	{40, 60, 290, 430},
 	dBoxProc,
 	visible,
 	noGoAway,
 	0x0,
 	131,
-	"Bookmarks",
+	"Favorites",
 	noAutoCenter
 };
 
-resource 'DITL' (131, "Bookmarks") {
+resource 'DITL' (131, "Favorites") {
 	{
 		/* Done button */
 		{220, 280, 240, 350},
@@ -270,7 +288,7 @@ resource 'DITL' (131, "Bookmarks") {
 
 		/* Label */
 		{5, 15, 21, 120},
-		StaticText { disabled, "Bookmarks:" };
+		StaticText { disabled, "Favorites:" };
 
 		/* List area (UserItem) */
 		{25, 15, 210, 265},
@@ -282,19 +300,19 @@ resource 'DITL' (131, "Bookmarks") {
 	}
 };
 
-/* Bookmark add/edit dialog */
-resource 'DLOG' (132, "Edit Bookmark") {
+/* Favorite add/edit dialog */
+resource 'DLOG' (132, "Edit Favorite") {
 	{40, 90, 310, 420},
 	dBoxProc,
 	visible,
 	noGoAway,
 	0x0,
 	132,
-	"Edit Bookmark",
+	"Edit Favorite",
 	noAutoCenter
 };
 
-resource 'DITL' (132, "Edit Bookmark") {
+resource 'DITL' (132, "Edit Favorite") {
 	{
 		/* 1: OK button */
 		{235, 245, 255, 315},
