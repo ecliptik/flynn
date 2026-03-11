@@ -38,7 +38,7 @@ extern void rebuild_file_menu(void);
 extern void add_recent_bookmark(short index);
 
 /* Status window dimensions (centered on 512x342 screen) */
-#define STATUS_WIN_W   240
+#define STATUS_WIN_W   320
 #define STATUS_WIN_H    40
 
 /* Bookmark popup menu, shared with dialog filter */
@@ -736,11 +736,11 @@ do_connect(void)
 
 				if (ip2long(s->conn.host) != 0)
 					snprintf(smsg, sizeof(smsg),
-					    "Connecting to %.40s\311",
+					    "Connecting to %.50s\311",
 					    s->conn.host);
 				else
 					snprintf(smsg, sizeof(smsg),
-					    "Resolving %.40s\311",
+					    "Resolving %.50s\311",
 					    s->conn.host);
 				sw = conn_status_show(smsg);
 				connected = conn_connect(
@@ -851,7 +851,7 @@ do_connect_bookmark(short index)
 		Boolean ok;
 		short ttype;
 
-		snprintf(smsg, sizeof(smsg), "Resolving %.40s\311",
+		snprintf(smsg, sizeof(smsg), "Resolving %.50s\311",
 		    bm->host);
 		sw = conn_status_show(smsg);
 		ok = conn_connect(&s->conn, bm->host, bm->port, sw);

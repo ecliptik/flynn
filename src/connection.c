@@ -147,7 +147,7 @@ conn_resolve_host(Connection *conn, WindowPtr status_win)
 	} else {
 		/* Show DNS resolution status */
 		snprintf(status_msg, sizeof(status_msg),
-		    "Resolving %.40s\311", conn->host);
+		    "Resolving %.50s\311", conn->host);
 		conn_status_update(status_win, status_msg);
 
 		/* DNS lookup via UDP */
@@ -200,7 +200,7 @@ conn_connect(Connection *conn, const char *host, short port,
 
 	/* Show TCP connect status */
 	snprintf(status_msg, sizeof(status_msg),
-	    "Connecting to %.40s\311", conn->host);
+	    "Connecting to %.50s\311", conn->host);
 	conn_status_update(status_win, status_msg);
 
 	/* Allocate receive buffer */
