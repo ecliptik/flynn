@@ -49,6 +49,7 @@ prefs_defaults(FlynnPrefs *prefs)
 	prefs->font_size = 9;
 	prefs->terminal_type = 0;	/* xterm */
 	prefs->dark_mode = 0;		/* light */
+	prefs->backspace_bs = 0;	/* DEL (0x7F) for xterm */
 	strncpy(prefs->dns_server, "1.1.1.1", sizeof(prefs->dns_server) - 1);
 	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 }
@@ -181,6 +182,14 @@ prefs_load(FlynnPrefs *prefs)
 			for (i = 0; i < MAX_RECENT; i++)
 				prefs->recent[i] = -1;
 		}
+		/* fall through to v8→v9 migration */
+		prefs->version = 8;
+	}
+
+	if (prefs->version == 8) {
+		/* v8→v9 migration: add backspace_bs */
+		prefs->backspace_bs =
+		    (prefs->terminal_type == 4) ? 1 : 0;
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

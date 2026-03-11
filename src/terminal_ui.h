@@ -80,7 +80,6 @@ void  term_ui_sel_finalize(void);
 short term_ui_sel_active(void);
 void  term_ui_sel_get_range(short *start_row, short *start_col,
 	    short *end_row, short *end_col);
-short term_ui_sel_contains(short row, short col);
 short term_ui_sel_check_double_click(unsigned long when, short row, short col);
 void  term_ui_sel_dirty_rows(Terminal *term, short old_extent_row,
 	    short new_extent_row);

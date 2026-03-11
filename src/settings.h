@@ -5,7 +5,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	8
+#define PREFS_VERSION	9
 #define MAX_BOOKMARKS	8
 #define MAX_RECENT	5
 
@@ -29,6 +29,7 @@ typedef struct {
 	short		font_size;
 	short		terminal_type;	/* 0=xterm, 1=VT220, 2=VT100, 3=xterm-256color, 4=ansi */
 	unsigned char	dark_mode;	/* 0=light, 1=dark */
+	unsigned char	backspace_bs;	/* 1=BS(0x08), 0=DEL(0x7F) */
 	char		dns_server[16];	/* IP address, default "1.1.1.1" */
 	char		username[64];	/* auto-login username, empty = disabled */
 	short		recent[MAX_RECENT];	/* recently used bookmark indices */

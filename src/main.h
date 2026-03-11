@@ -45,6 +45,7 @@
 /* separator = 3 */
 #define PREFS_DNS_ID         4
 #define PREFS_DARK_ID        5
+#define PREFS_BKSP_DEL_ID    6
 
 /* Font submenu (MENU 134) items */
 #define FONT_MENU_ID        134
@@ -77,11 +78,13 @@
 /* Control menu items */
 #define CTRL_MENU_CTRLC     1
 #define CTRL_MENU_CTRLD     2
-#define CTRL_MENU_CTRLL     3
-#define CTRL_MENU_CTRLZ     4
-/* separator = 5 */
-#define CTRL_MENU_BREAK     6
-#define CTRL_MENU_ESC       7
+#define CTRL_MENU_CTRLH     3
+#define CTRL_MENU_CTRLL     4
+#define CTRL_MENU_CTRLX     5
+#define CTRL_MENU_CTRLZ     6
+/* separator = 7 */
+#define CTRL_MENU_BREAK     8
+#define CTRL_MENU_ESC       9
 
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130
@@ -123,10 +126,6 @@
 /* Minimum window size in grid cells */
 #define MIN_WIN_COLS        20
 #define MIN_WIN_ROWS         5
-
-/* Application creator and type */
-#define APP_CREATOR         'FLYN'
-#define APP_TYPE            'APPL'
 
 /* Font preset table for bookmark font cycling */
 typedef struct {

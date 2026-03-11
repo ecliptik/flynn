@@ -50,7 +50,6 @@ typedef struct {
 	Ptr         rcv_buf;
 	char        read_buf[TCP_READ_BUFSIZ];
 	short       read_len;
-	short       idle_skip;	/* polling skip counter */
 	char        host[256];
 	short       port;
 	char        username[64];

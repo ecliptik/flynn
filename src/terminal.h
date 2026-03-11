@@ -21,6 +21,7 @@
 
 #include "color.h"
 
+
 /* Maximum screen dimensions (buffer size) */
 #define TERM_COLS		132
 #define TERM_ROWS		50
@@ -173,9 +174,12 @@ typedef struct {
 	unsigned char	saved_origin_mode;
 	unsigned char	saved_autowrap;
 
-	/* Response buffer for DA/DSR replies and OSC 52 clipboard */
-	char		response[768];
+	/* Response buffer for DA/DSR replies */
+	char		response[256];
 	short		response_len;
+
+	/* Connection for immediate response flush (NULL if disconnected) */
+	void		*resp_conn;
 
 	/* OSC buffer */
 	char		osc_buf[512];

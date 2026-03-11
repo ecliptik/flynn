@@ -271,14 +271,10 @@ session_poll_data(Session *sess)
 			term_dirty_all(&sess->terminal);
 		}
 
+		/* Set connection for immediate response flush */
+		sess->terminal.resp_conn = &sess->conn;
 		terminal_process(&sess->terminal, out_buf, out_len);
-
-		/* Send terminal responses */
-		if (sess->terminal.response_len > 0) {
-			conn_send(&sess->conn, sess->terminal.response,
-			    sess->terminal.response_len);
-			sess->terminal.response_len = 0;
-		}
+		sess->terminal.resp_conn = 0L;
 
 		/* Update window title */
 		if (sess->terminal.title_changed)

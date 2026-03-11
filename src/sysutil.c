@@ -57,40 +57,6 @@ TrapAvailable(unsigned long trap)
 	    NGetTrapAddress(_Unimplemented, ToolTrap));
 }
 
-static void
-GetSystemFolder(short *vRefNumP, long *dirIDP)
-{
-	SysEnvRec info;
-	long wdProcID;
-
-	SysEnvirons(1, &info);
-	if (GetWDInfo(info.sysVRefNum, vRefNumP, dirIDP, &wdProcID) != noErr) {
-		*vRefNumP = 0;
-		*dirIDP = 0;
-	}
-}
-
-static void
-GetSystemSubfolder(OSType folder, bool create, short *vRefNumP, long *dirIDP)
-{
-	bool hasFolderMgr = false;
-	long feature;
-
-	if (TrapAvailable(_GestaltDispatch) &&
-	    Gestalt(gestaltFindFolderAttr, &feature) == noErr)
-		hasFolderMgr = true;
-
-	if (!hasFolderMgr) {
-		GetSystemFolder(vRefNumP, dirIDP);
-		return;
-	}
-
-	if (FindFolder(kOnSystemDisk, folder, create, vRefNumP,
-	    dirIDP) != noErr) {
-		*vRefNumP = 0;
-		*dirIDP = 0;
-	}
-}
 
 /* Machine type constants not in Retro68 Multiverse.h */
 #ifndef gestaltMacSE030

@@ -33,9 +33,15 @@
 #include <string.h>
 #include <Memory.h>
 #include "telnet.h"
+#include "connection.h"
 
 /* Maximum send buffer size (must match caller's buffer) */
 #define TELNET_SEND_MAX		4096
+
+/* Compile-time check: TCP read buffer must hold full telnet send */
+#if TCP_READ_BUFSIZ < TELNET_SEND_MAX
+#error "TCP_READ_BUFSIZ must be >= TELNET_SEND_MAX"
+#endif
 
 /* Telnet protocol bytes */
 #define SE		240	/* end of sub-negotiation */

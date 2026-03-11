@@ -21,8 +21,6 @@
 #include <OSUtils.h>
 #include "tcp.h"
 
-#define RCV_BUFFER_SIZE 1024
-#define TCP_BUFFER_SIZE 8192
 #define OPEN_TIMEOUT 60
 
 /* Retro68 compatibility: PBControl/PBOpen -> Sync/Async variants */
@@ -439,10 +437,4 @@ ip2long(char *ip)
 	return address;
 }
 
-void
-long2ip(unsigned long num, char *ip)
-{
-	unsigned char *tmp = (unsigned char *)&num;
-	snprintf(ip, 16, "%d.%d.%d.%d", tmp[0], tmp[1], tmp[2], tmp[3]);
-}
 
