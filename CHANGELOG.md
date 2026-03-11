@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
 - Option+/ (Ctrl-/) not recognized: added '/' to vkey_to_base table
   with special case since '/' & 0x1F produces wrong value (0x0F instead
   of 0x1F)
+- ANSI-BBS disconnect losing goodbye screen: telnet_init() zeroed the
+  session's preferred_ttype before the snapshot restore check, so
+  bookmark-specific ANSI-BBS sessions saw the global pref (e.g. xterm)
+  and incorrectly restored the pre-clear snapshot. Now saves the
+  session's terminal type before reset
 
 ## [1.9.3] - 2026-03-11
 
