@@ -1,6 +1,6 @@
 # Flynn
 
-A Telnet client for classic Macintosh (68000/Mac Plus). Built for monochrome System 6.0.8 with MacTCP 2.1 (also works under Open Transport's MacTCP compatibility layer), with full System 7 compatibility including MultiFinder, Apple Events, and Notification Manager support. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
+A Telnet client for classic 68000 Macintosh systems, from the Mac Plus and up. Supports monochrome on System 6 and 256 colors on System 7. Works with MacTCP and Open Transport's MacTCP compatibility layer. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 
 This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
@@ -26,26 +26,37 @@ Pre-built binaries are available on the [Releases](https://github.com/ecliptik/f
 
 No build toolchain required — just download and run.
 
+## Requirements
+
+- Macintosh Plus or later (4MB RAM, 68000 CPU)
+- System 6.0.8 or System 7 with MacTCP or Open Transport
+- ~113KB disk space, ~72KB RAM per session (mono) / ~123KB (color)
+
 ## Features
 
-- **Multiple sessions** (up to 4 simultaneous windows)
-- **VT100/VT220/xterm/xterm-256color/ANSI-BBS terminal emulation**
-- **CP437/ANSI-BBS mode** for bulletin board systems (full 256-char CP437 rendering)
+**Terminal Emulation**
+- **VT100/VT220/xterm/xterm-256color/ANSI-BBS terminal emulation** with CP437 rendering
 - **256-color support** on System 7 with Color QuickDraw (zero System 6 impact)
 - **SGR attributes**: bold, italic, underline, dim, strikethrough, blink, inverse
-- **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns**
+- **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns** (202 glyphs + 17 emoji)
+
+**Display & Windowing**
+- **Multiple sessions** (up to 4 simultaneous windows)
 - **Resizable window and scrollback** (80x24 up to 132x50)
 - **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
-- **Session bookmarks**
+- **Dark mode**
+
+**Input & Interaction**
 - **Mouse text selection with copy/paste**
 - **Bracketed paste mode**
-- **Backspace DEL/BS toggle** (auto-switches with terminal type)
-- **Keystroke buffering**
 - **M0110 keyboard support**
-- **Dark mode**
+- **Keystroke buffering**
+- **Backspace DEL/BS toggle** (auto-switches with terminal type)
+
+**Session Management**
+- **Session bookmarks**
 - **Settings persistence**
-- **System 7 compatible** (MultiFinder, Apple Events, Notification Manager)
-- **4MB Mac Plus** (~103KB on disk, ~79KB RAM per session mono / ~92KB color)
+- **MultiFinder, Apple Events, and Notification Manager support**
 
 ## Keyboard Shortcuts
 
