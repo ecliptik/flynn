@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.2] - 2026-03-10
+
+### Added
+- CP437/ANSI-BBS terminal emulation for bulletin board systems
+  - Full 256-entry CP437 lookup table mapping each byte to ASCII, Mac Roman,
+    or QuickDraw glyph rendering
+  - cp437_mode bypasses UTF-8 decoder for raw byte rendering, essential for
+    BBS art using 0x80-0x9F range (C1 control code collision in UTF-8 mode)
+  - ANSI-BBS terminal type in TTYPE negotiation, settings, preferences menu,
+    and connect dialog — follows BBS community convention (ansi-bbs = CP437)
+- True SGR attribute rendering
+  - Italic (SGR 3) via TextFace(italic)
+  - Strikethrough (SGR 9) via horizontal line at cell mid-height
+  - Dim (SGR 2) halves foreground RGB on color systems
+  - Blink (SGR 5/6) promotes background to bright colors (DOS-style)
+- Bold-to-bright color promotion: SGR 1;30-37m promotes to bright colors
+  (indices 8-15), matching standard ANSI/BBS behavior
+- UTF-8 CP437 fallback for BBSes that send raw CP437 bytes despite
+  xterm-256color TTYPE negotiation
+- 57 new QuickDraw glyph primitives: double-line box drawing, mixed
+  junctions, smileys, Greek/math symbols (160+ total primitives)
+- 18 fractional block element glyphs (U+2581-U+258F, U+2594-U+2595)
+- 60 sextant characters (U+1FB00-U+1FB3B) as 2x3 grid patterns
+- DNS-over-TCP fallback for NAT environments
+- Rendering diagnostic script (`scripts/render-test.sh`)
+
+### Fixed
+- DNS resolution through NAT: Snow's DaynaPORT rewrites UDP source IPs,
+  causing Flynn to reject valid DNS responses. Removed redundant source IP
+  validation (txn_id match already authenticates responses)
+- Backspace sends BS (0x08) instead of DEL (0x7F) for BBS compatibility
+  (Linux telnetd accepts both; BBSes universally expect BS)
+- Bytes 0xF8-0xFF silently dropped by UTF-8 parser — now route to CP437
+- Legacy Computing chars (U+1FB00-U+1FBFF) produced double '??' instead
+  of single '?' (they are single-width, not wide)
+
+### Changed
+- Glyph count: 103 → 160+ QuickDraw primitives
+- Dead code removal: 25 cases from boxdraw_to_dec() superseded by glyph
+  tables, 3 cases from unicode_symbol_to_macroman(), dead block element
+  fallback block (~50 lines, ~700 bytes recovered)
+- Performance: eliminated double cell fetch in draw_row() (~80K cycles/redraw
+  saved on 68000), replaced dark shade MULU with shift operation
+- New source files: `cp437.c`, `cp437.h`
+
 ## [1.9.1] - 2026-03-10
 
 ### Changed

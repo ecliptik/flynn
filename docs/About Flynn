@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.9.1
+                    Version 1.9.2
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -24,6 +24,13 @@ Midnight Commander. It renders box-drawing characters,
 handles UTF-8 text, and provides all the keyboard
 mappings needed to work comfortably on the original
 Macintosh keyboard.
+
+Flynn also supports CP437/ANSI-BBS mode for connecting
+to bulletin board systems (BBSes). The ANSI-BBS
+terminal type enables raw CP437 byte rendering for
+correct display of BBS ANSI art, including block
+elements, shade characters, and the full CP437
+character set.
 
 On System 7 with Color QuickDraw, Flynn supports full
 256-color rendering (16 ANSI + 216 color cube + 24
@@ -86,10 +93,19 @@ Features
     quotes, em dashes, and other Unicode symbols
   - 256-color support on System 7 with Color QuickDraw
     (automatic detection, zero impact on System 6)
-  - Unicode glyph rendering: 103 QuickDraw primitives
+  - CP437/ANSI-BBS mode for bulletin board systems
+    (full 256-character CP437 rendering, sextant and
+    fractional block characters for BBS ANSI art)
+  - True SGR attributes: italic, strikethrough, dim,
+    and blink (DOS-style bright background on color)
+  - Bold-to-bright color promotion for standard
+    ANSI/BBS color rendering
+  - Unicode glyph rendering: 160+ QuickDraw primitives
     (arrows, shapes, blocks, triangles, diamonds,
-    circles, superscripts, subscripts, card suits),
-    15 monochrome bitmap emoji, and braille patterns
+    circles, superscripts, subscripts, card suits,
+    double-line box drawing, sextants, fractional
+    blocks), 15 monochrome bitmap emoji, and braille
+    patterns
   - Alternate screen buffer for full-screen apps
     (vi, nano, less, tmux)
   - 96-line scrollback buffer with position indicator
@@ -104,7 +120,8 @@ Features
   - Six font choices: Monaco 9, Monaco 12, Courier
     10, Chicago 12, Geneva 9, Geneva 10
   - Per-session font and terminal type overrides
-  - Terminal type: xterm, VT220, VT100, xterm-256color
+  - Terminal type: xterm, VT220, VT100, xterm-256color,
+    ANSI-BBS
   - Dark mode (white text on black background)
   - Custom DNS server configuration
   - Username auto-login
@@ -324,9 +341,11 @@ terminal type, networking, and display mode.
   Terminal Type
   ~~~~~~~~~~~~~
   Choose the terminal type reported to the server:
-  xterm (default), VT220, VT100, or xterm-256color.
-  This controls which escape sequences the server
-  sends. Changes take effect on the next connection.
+  xterm (default), VT220, VT100, xterm-256color, or
+  ANSI-BBS. The first four use UTF-8 text encoding;
+  ANSI-BBS uses raw CP437 byte encoding for correct
+  BBS ANSI art rendering. Changes take effect on the
+  next connection.
 
   Networking
   ~~~~~~~~~~

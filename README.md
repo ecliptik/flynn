@@ -29,8 +29,10 @@ No build toolchain required — just download and run.
 ## Features
 
 - **Multiple sessions** (up to 4 simultaneous windows)
-- **VT100/VT220/xterm/xterm-256color terminal emulation**
+- **VT100/VT220/xterm/xterm-256color/ANSI-BBS terminal emulation**
+- **CP437/ANSI-BBS mode** for bulletin board systems (full 256-char CP437 rendering)
 - **256-color support** on System 7 with Color QuickDraw (zero System 6 impact)
+- **SGR attributes**: bold, italic, underline, dim, strikethrough, blink, inverse
 - **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns**
 - **Resizable window and scrollback** (80x24 up to 132x50)
 - **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
