@@ -124,10 +124,6 @@
 #define MIN_WIN_COLS        20
 #define MIN_WIN_ROWS         5
 
-/* Application creator and type */
-#define APP_CREATOR         'FLYN'
-#define APP_TYPE            'APPL'
-
 /* Font preset table for bookmark font cycling */
 typedef struct {
 	short	font_id;

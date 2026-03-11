@@ -62,6 +62,5 @@ OSErr _UDPRelease(UDPiopb *pb, StreamPtr stream, Ptr userData,
   UDPIOCompletionProc ioCompletion, Boolean async);
 
 unsigned long ip2long(char *ip);
-void long2ip(unsigned long num, char *ip);
 
 #endif

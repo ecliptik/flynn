@@ -3136,35 +3136,6 @@ term_ui_sel_get_range(short *start_row, short *start_col,
 	sel_normalize(start_row, start_col, end_row, end_col);
 }
 
-/*
- * term_ui_sel_contains - check if (row, col) is within selection
- *
- * Stream selection: not rectangular.
- */
-short
-term_ui_sel_contains(short row, short col)
-{
-	short sr, sc, er, ec;
-
-	if (!sel.active)
-		return 0;
-
-	sel_normalize(&sr, &sc, &er, &ec);
-
-	if (row < sr || row > er)
-		return 0;
-
-	if (sr == er)
-		return (col >= sc && col <= ec);
-
-	if (row == sr)
-		return (col >= sc);
-
-	if (row == er)
-		return (col <= ec);
-
-	return 1;
-}
 
 /*
  * term_ui_sel_check_double_click - detect double-click
