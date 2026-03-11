@@ -201,6 +201,10 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 {
 	short i;
 	unsigned char ch;
+	/* Cached color row pointer: avoids cur_row*TERM_COLS multiply
+	 * per character in the ASCII fast path */
+	CellColor *cached_color_row = 0L;
+	short cached_color_row_idx = -1;
 
 	for (i = 0; i < len; i++) {
 		ch = data[i];
@@ -267,13 +271,21 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					term->screen[term->cur_row][term->cur_col].attr = a;
 					if (term->has_color &&
 					    term->screen_color) {
-						CellColor *cc =
-						    &term->screen_color[
-						    term->cur_row *
-						    TERM_COLS +
-						    term->cur_col];
-						cc->fg = term->cur_fg;
-						cc->bg = term->cur_bg;
+						if (term->cur_row !=
+						    cached_color_row_idx) {
+							cached_color_row_idx =
+							    term->cur_row;
+							cached_color_row =
+							    &term->screen_color[
+							    term->cur_row *
+							    TERM_COLS];
+						}
+						cached_color_row[
+						    term->cur_col].fg =
+						    term->cur_fg;
+						cached_color_row[
+						    term->cur_col].bg =
+						    term->cur_bg;
 					}
 					term->dirty[term->cur_row] = 1;
 					if (term->cur_col < term->active_cols - 1)
@@ -788,37 +800,52 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 			term_save_scrollback(term, r);
 	}
 
-	/* Move lines up (copy only active columns for speed) */
-	for (r = top; r <= bottom - count; r++) {
-		memcpy(term->screen[r], term->screen[r + count],
-		    term->active_cols * sizeof(TermCell));
-		term->line_attr[r] = term->line_attr[r + count];
-	}
+	/* Move lines up: single memmove instead of per-row memcpy */
+	{
+		short rows_to_move = bottom - top - count + 1;
+		if (rows_to_move > 0) {
+			memmove(&term->screen[top][0],
+			    &term->screen[top + count][0],
+			    (long)rows_to_move * TERM_COLS *
+			    sizeof(TermCell));
+			memmove(&term->line_attr[top],
+			    &term->line_attr[top + count],
+			    rows_to_move);
+		}
 
-	/* Scroll color arrays in parallel */
-	if (term->has_color && term->screen_color) {
-		for (r = top; r <= bottom - count; r++) {
-			memcpy(&term->screen_color[r * TERM_COLS],
-			    &term->screen_color[(r + count) * TERM_COLS],
-			    term->active_cols * sizeof(CellColor));
+		/* Scroll color arrays in parallel */
+		if (term->has_color && term->screen_color &&
+		    rows_to_move > 0) {
+			memmove(&term->screen_color[
+			    (long)top * TERM_COLS],
+			    &term->screen_color[
+			    (long)(top + count) * TERM_COLS],
+			    (long)rows_to_move * TERM_COLS *
+			    sizeof(CellColor));
 		}
 	}
 
-	/* Clear newly exposed lines at bottom */
-	for (r = bottom - count + 1; r <= bottom; r++) {
-		for (c = 0; c < term->active_cols; c++) {
-			term->screen[r][c].ch = ' ';
-			term->screen[r][c].attr = ATTR_NORMAL;
+	/* Clear newly exposed lines at bottom (word-at-a-time fill) */
+	{
+		unsigned short fill = ((unsigned short)' ' << 8) |
+		    ATTR_NORMAL;
+		for (r = bottom - count + 1; r <= bottom; r++) {
+			unsigned short *p =
+			    (unsigned short *)&term->screen[r][0];
+			for (c = 0; c < term->active_cols; c++)
+				*p++ = fill;
+			term->line_attr[r] = LINE_ATTR_NORMAL;
 		}
-		term->line_attr[r] = LINE_ATTR_NORMAL;
 
 		/* Clear color for exposed lines */
 		if (term->has_color && term->screen_color) {
-			CellColor *cc = &term->screen_color[r * TERM_COLS];
-			for (c = 0; c < term->active_cols; c++) {
-				cc->fg = COLOR_DEFAULT;
-				cc->bg = COLOR_DEFAULT;
-				cc++;
+			for (r = bottom - count + 1; r <= bottom;
+			    r++) {
+				memset(&term->screen_color[
+				    (long)r * TERM_COLS],
+				    COLOR_DEFAULT,
+				    term->active_cols *
+				    sizeof(CellColor));
 			}
 		}
 	}
@@ -840,37 +867,51 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 	if (count > (bottom - top + 1))
 		count = bottom - top + 1;
 
-	/* Move lines down (copy only active columns for speed) */
-	for (r = bottom; r >= top + count; r--) {
-		memcpy(term->screen[r], term->screen[r - count],
-		    term->active_cols * sizeof(TermCell));
-		term->line_attr[r] = term->line_attr[r - count];
-	}
+	/* Move lines down: single memmove instead of per-row memcpy */
+	{
+		short rows_to_move = bottom - top - count + 1;
+		if (rows_to_move > 0) {
+			memmove(&term->screen[top + count][0],
+			    &term->screen[top][0],
+			    (long)rows_to_move * TERM_COLS *
+			    sizeof(TermCell));
+			memmove(&term->line_attr[top + count],
+			    &term->line_attr[top],
+			    rows_to_move);
+		}
 
-	/* Scroll color arrays in parallel */
-	if (term->has_color && term->screen_color) {
-		for (r = bottom; r >= top + count; r--) {
-			memcpy(&term->screen_color[r * TERM_COLS],
-			    &term->screen_color[(r - count) * TERM_COLS],
-			    term->active_cols * sizeof(CellColor));
+		/* Scroll color arrays in parallel */
+		if (term->has_color && term->screen_color &&
+		    rows_to_move > 0) {
+			memmove(&term->screen_color[
+			    (long)(top + count) * TERM_COLS],
+			    &term->screen_color[
+			    (long)top * TERM_COLS],
+			    (long)rows_to_move * TERM_COLS *
+			    sizeof(CellColor));
 		}
 	}
 
-	/* Clear newly exposed lines at top */
-	for (r = top; r < top + count; r++) {
-		for (c = 0; c < term->active_cols; c++) {
-			term->screen[r][c].ch = ' ';
-			term->screen[r][c].attr = ATTR_NORMAL;
+	/* Clear newly exposed lines at top (word-at-a-time fill) */
+	{
+		unsigned short fill = ((unsigned short)' ' << 8) |
+		    ATTR_NORMAL;
+		for (r = top; r < top + count; r++) {
+			unsigned short *p =
+			    (unsigned short *)&term->screen[r][0];
+			for (c = 0; c < term->active_cols; c++)
+				*p++ = fill;
+			term->line_attr[r] = LINE_ATTR_NORMAL;
 		}
-		term->line_attr[r] = LINE_ATTR_NORMAL;
 
 		/* Clear color for exposed lines */
 		if (term->has_color && term->screen_color) {
-			CellColor *cc = &term->screen_color[r * TERM_COLS];
-			for (c = 0; c < term->active_cols; c++) {
-				cc->fg = COLOR_DEFAULT;
-				cc->bg = COLOR_DEFAULT;
-				cc++;
+			for (r = top; r < top + count; r++) {
+				memset(&term->screen_color[
+				    (long)r * TERM_COLS],
+				    COLOR_DEFAULT,
+				    term->active_cols *
+				    sizeof(CellColor));
 			}
 		}
 	}

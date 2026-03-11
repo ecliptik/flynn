@@ -35,11 +35,20 @@
  * Set foreground/background color by palette index using RGBForeColor/
  * RGBBackColor.  PmForeColor/PmBackColor don't work in Retro68's
  * Palette Manager trap glue, so we use direct RGB calls instead.
+ *
+ * Cached indices skip redundant RGBForeColor/RGBBackColor trap calls.
+ * Reset to -1 at the start of each term_ui_draw() pass.
  */
+static short cached_fg_idx = -1;
+static short cached_bg_idx = -1;
+
 static void
 set_fg_color(unsigned char index)
 {
 	RGBColor rgb;
+	if ((short)index == cached_fg_idx)
+		return;
+	cached_fg_idx = (short)index;
 	color_get_rgb(index, &rgb);
 	RGBForeColor(&rgb);
 }
@@ -48,6 +57,9 @@ static void
 set_bg_color(unsigned char index)
 {
 	RGBColor rgb;
+	if ((short)index == cached_bg_idx)
+		return;
+	cached_bg_idx = (short)index;
 	color_get_rgb(index, &rgb);
 	RGBBackColor(&rgb);
 }
@@ -223,6 +235,10 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	TextSize(g_font_size);
 	g_mono_dark = g_dark_mode && !g_has_color_qd;
 
+	/* Reset color cache so first set_fg/bg_color takes effect */
+	cached_fg_idx = -1;
+	cached_bg_idx = -1;
+
 	/* If cursor moved, mark old and new rows dirty to clean up
 	 * XOR artifacts from previous draw_cursor() calls */
 	if (cursor_initialized) {
@@ -368,6 +384,9 @@ draw_row(Terminal *term, short row)
 	unsigned char lattr;
 	short use_color;
 	short color_dirty = 0;
+	TermCell *row_cells;
+	CellColor *row_colors;
+	short run_x, run_w;
 
 	baseline = row_top(row) + g_cell_baseline;
 	row_y = row_top(row);
@@ -414,6 +433,48 @@ draw_row(Terminal *term, short row)
 		}
 	}
 
+	/* Pre-compute row pointers to avoid per-cell function calls */
+	if (term->scroll_offset == 0) {
+		row_cells = &term->screen[row][0];
+		if (use_color)
+			row_colors = &term->screen_color[
+			    row * TERM_COLS];
+		else
+			row_colors = 0L;
+	} else {
+		short sb_row = row - term->scroll_offset;
+		if (sb_row < 0) {
+			short sb_idx = term->sb_head +
+			    (term->sb_count + sb_row);
+			if (sb_idx < 0)
+				sb_idx += TERM_SCROLLBACK_LINES;
+			if (sb_idx >= TERM_SCROLLBACK_LINES)
+				sb_idx -= TERM_SCROLLBACK_LINES;
+			if (sb_idx < 0 ||
+			    sb_idx >= TERM_SCROLLBACK_LINES) {
+				row_cells = &term->screen[0][0];
+				row_colors = 0L;
+			} else {
+				row_cells =
+				    &term->scrollback[sb_idx][0];
+				if (use_color && term->sb_color)
+					row_colors =
+					    &term->sb_color[
+					    sb_idx * TERM_COLS];
+				else
+					row_colors = 0L;
+			}
+		} else {
+			row_cells = &term->screen[sb_row][0];
+			if (use_color)
+				row_colors =
+				    &term->screen_color[
+				    sb_row * TERM_COLS];
+			else
+				row_colors = 0L;
+		}
+	}
+
 	col = 0;
 	while (col < eff_cols) {
 		unsigned char cell_attr;
@@ -426,20 +487,17 @@ draw_row(Terminal *term, short row)
 		 * First cell seeds run_attr/fg/bg; subsequent cells
 		 * break on attribute or color change. */
 		while (col < eff_cols) {
-			cell = terminal_get_display_cell(term, row, col);
+			cell = &row_cells[col];
 			cell_attr = cell->attr;
 			if (col >= sel_start_col && col <= sel_end_col)
 				cell_attr ^= ATTR_INVERSE;
 
 			cell_fg = COLOR_DEFAULT;
 			cell_bg = COLOR_DEFAULT;
-			if (use_color && (cell_attr & ATTR_HAS_COLOR)) {
-				cc = terminal_get_display_color(
-				    term, row, col);
-				if (cc) {
-					cell_fg = cc->fg;
-					cell_bg = cc->bg;
-				}
+			if (use_color && (cell_attr & ATTR_HAS_COLOR) &&
+			    row_colors) {
+				cell_fg = row_colors[col].fg;
+				cell_bg = row_colors[col].bg;
 			}
 
 			if (run_len == 0) {
@@ -477,6 +535,10 @@ draw_row(Terminal *term, short row)
 			if (all_space)
 				continue;
 		}
+
+		/* Pre-compute run pixel position and width */
+		run_x = LEFT_MARGIN + run_start * cell_w;
+		run_w = run_len * cell_w;
 
 		/*
 		 * Resolve effective fg/bg for rendering.
@@ -531,12 +593,8 @@ draw_row(Terminal *term, short row)
 				if (eff_bg != erase_bg) {
 					Rect bg_r;
 					SetRect(&bg_r,
-					    LEFT_MARGIN +
-					    run_start * cell_w,
-					    row_y,
-					    LEFT_MARGIN +
-					    run_start * cell_w +
-					    run_len * cell_w,
+					    run_x, row_y,
+					    run_x + run_w,
 					    row_bottom(row));
 					set_bg_color(eff_bg);
 					EraseRect(&bg_r);
@@ -559,7 +617,7 @@ draw_row(Terminal *term, short row)
 			/* DEC Special Graphics */
 			if (CELL_IS_DEC(run_attr)) {
 				short i, x;
-				x = LEFT_MARGIN + run_start * cell_w;
+				x = run_x;
 				for (i = 0; i < run_len; i++) {
 					draw_line_char(buf[i], x, row_y,
 					    run_attr);
@@ -573,7 +631,7 @@ draw_row(Terminal *term, short row)
 			/* Braille patterns */
 			if (CELL_IS_BRAILLE(run_attr)) {
 				short i, x;
-				x = LEFT_MARGIN + run_start * cell_w;
+				x = run_x;
 				for (i = 0; i < run_len; i++) {
 					draw_braille((unsigned char)buf[i],
 					    x, row_y, run_attr);
@@ -587,7 +645,7 @@ draw_row(Terminal *term, short row)
 			/* Custom glyphs: primitives and emoji */
 			if (CELL_IS_GLYPH(run_attr)) {
 				short i, x;
-				x = LEFT_MARGIN + run_start * cell_w;
+				x = run_x;
 				for (i = 0; i < run_len; i++) {
 					unsigned char gid;
 					gid = (unsigned char)buf[i];
@@ -633,8 +691,7 @@ draw_row(Terminal *term, short row)
 
 			if (run_attr & ATTR_INVERSE) {
 				if (use_color) {
-					short x = LEFT_MARGIN +
-					    run_start * cell_w;
+					short x = run_x;
 					short i;
 					for (i = 0; i < run_len; i++) {
 						MoveTo(x, baseline);
@@ -651,20 +708,15 @@ draw_row(Terminal *term, short row)
 					Rect inv_r;
 					short x, use_bic;
 					SetRect(&inv_r,
-					    LEFT_MARGIN +
-					    run_start * cell_w,
-					    row_y,
-					    LEFT_MARGIN +
-					    run_start * cell_w +
-					    run_len * cell_w,
+					    run_x, row_y,
+					    run_x + run_w,
 					    row_bottom(row));
 					use_bic =
 					    mono_cell_prep(&inv_r,
 					    run_attr);
 					if (use_bic)
 						TextMode(srcBic);
-					x = LEFT_MARGIN +
-					    run_start * cell_w;
+					x = run_x;
 					{
 						short i;
 						for (i = 0; i < run_len;
@@ -679,8 +731,7 @@ draw_row(Terminal *term, short row)
 				}
 			} else if ((run_attr & ATTR_BOLD) ||
 			    cell_w != g_cell_width) {
-				short x = LEFT_MARGIN +
-				    run_start * cell_w;
+				short x = run_x;
 				short i;
 				if (g_mono_dark)
 					TextMode(srcBic);
@@ -704,9 +755,8 @@ draw_row(Terminal *term, short row)
 			if (run_attr & ATTR_STRIKETHROUGH) {
 				short strike_y = row_y +
 				    g_cell_height / 2;
-				short x0 = LEFT_MARGIN +
-				    run_start * cell_w;
-				short x1 = x0 + run_len * cell_w;
+				short x0 = run_x;
+				short x1 = run_x + run_w;
 				if (mono_eff_inv(run_attr))
 					PenMode(patBic);
 				MoveTo(x0, strike_y);
@@ -726,8 +776,9 @@ draw_row(Terminal *term, short row)
 		set_bg_color(g_dark_mode ? 0 : 15);
 	}
 
-	/* Restore normal face */
-	TextFace(0);
+	/* Restore normal face only if it was changed */
+	if (last_face > 0)
+		TextFace(0);
 }
 
 /*
