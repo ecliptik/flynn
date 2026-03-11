@@ -1325,10 +1325,14 @@ term_process_esc(Terminal *term, unsigned char ch)
 	default:
 		if (term->intermediate == '(') {
 			/* ESC ( X - designate G0 charset */
-			term->g0_charset = ch;
+			if (ch == 'B' || ch == '0' || ch == 'A' ||
+			    ch == 'U' || ch == '1' || ch == '2')
+				term->g0_charset = ch;
 		} else if (term->intermediate == ')') {
 			/* ESC ) X - designate G1 charset */
-			term->g1_charset = ch;
+			if (ch == 'B' || ch == '0' || ch == 'A' ||
+			    ch == 'U' || ch == '1' || ch == '2')
+				term->g1_charset = ch;
 		} else if (term->intermediate == '#') {
 			/* DEC line attributes */
 			switch (ch) {
@@ -2218,9 +2222,13 @@ term_process_osc(Terminal *term, unsigned char ch)
 
 		term->osc_param = 0;
 		for (i = 0; i < term->osc_len; i++) {
-			if (term->osc_param < 1000)
-				term->osc_param = term->osc_param * 10 +
-				    (term->osc_buf[i] - '0');
+			unsigned char d = term->osc_buf[i];
+			if (d < '0' || d > '9')
+				break;
+			if (term->osc_param > 9999)
+				break;
+			term->osc_param = term->osc_param * 10 +
+			    (d - '0');
 		}
 		term->osc_len = 0;
 		return;

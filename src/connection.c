@@ -308,6 +308,8 @@ conn_send(Connection *conn, char *data, short len)
 {
 	wdsEntry wds[2];
 
+	if (len <= 0)
+		return -1;
 	if (conn->state != CONN_STATE_CONNECTED)
 		return -1;
 
