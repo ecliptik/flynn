@@ -1225,7 +1225,7 @@ term_process_esc(Terminal *term, unsigned char ch)
 		term->parse_state = PARSE_CSI;
 		term->num_params = 0;
 		term->intermediate = 0;
-		memset(term->params, 0, sizeof(term->params));
+		term->params[0] = 0;
 		return;
 
 	case '7':
