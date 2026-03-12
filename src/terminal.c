@@ -118,6 +118,7 @@ terminal_init(Terminal *term)
 
 	term->scroll_top = 0;
 	term->scroll_bottom = term->active_rows - 1;
+	term->scroll_pending = 0;
 
 	/* Character sets */
 	term->g0_charset = 'B';
@@ -700,6 +701,7 @@ void
 term_dirty_all(Terminal *term)
 {
 	term_dirty_range(term, 0, term->active_rows - 1);
+	term->scroll_pending = 0;
 }
 
 /*
@@ -873,7 +875,42 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		}
 	}
 
-	term_dirty_range(term, top, bottom);
+	/* Set/accumulate scroll hint for ScrollRect optimization */
+	if (term->scroll_pending && term->scroll_dir == 1 &&
+	    term->scroll_rgn_top == top &&
+	    term->scroll_rgn_bot == bottom) {
+		/* Same direction and region — accumulate */
+		term->scroll_count += count;
+	} else if (term->scroll_pending) {
+		/* Different direction or region — flush old hint */
+		term_dirty_range(term, term->scroll_rgn_top,
+		    term->scroll_rgn_bot);
+		term->scroll_dir = 1;
+		term->scroll_count = count;
+		term->scroll_rgn_top = top;
+		term->scroll_rgn_bot = bottom;
+	} else {
+		/* New hint */
+		term->scroll_pending = 1;
+		term->scroll_dir = 1;
+		term->scroll_count = count;
+		term->scroll_rgn_top = top;
+		term->scroll_rgn_bot = bottom;
+	}
+
+	/* Full-screen fallback: if accumulated count >= region height,
+	 * ScrollRect saves nothing — dirty all and cancel hint */
+	{
+		short region_height = bottom - top + 1;
+		if (term->scroll_count >= region_height) {
+			term_dirty_range(term, top, bottom);
+			term->scroll_pending = 0;
+		} else {
+			/* Dirty only newly exposed rows */
+			term_dirty_range(term,
+			    bottom - term->scroll_count + 1, bottom);
+		}
+	}
 }
 
 /*
@@ -945,7 +982,42 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		}
 	}
 
-	term_dirty_range(term, top, bottom);
+	/* Set/accumulate scroll hint for ScrollRect optimization */
+	if (term->scroll_pending && term->scroll_dir == -1 &&
+	    term->scroll_rgn_top == top &&
+	    term->scroll_rgn_bot == bottom) {
+		/* Same direction and region — accumulate */
+		term->scroll_count += count;
+	} else if (term->scroll_pending) {
+		/* Different direction or region — flush old hint */
+		term_dirty_range(term, term->scroll_rgn_top,
+		    term->scroll_rgn_bot);
+		term->scroll_dir = -1;
+		term->scroll_count = count;
+		term->scroll_rgn_top = top;
+		term->scroll_rgn_bot = bottom;
+	} else {
+		/* New hint */
+		term->scroll_pending = 1;
+		term->scroll_dir = -1;
+		term->scroll_count = count;
+		term->scroll_rgn_top = top;
+		term->scroll_rgn_bot = bottom;
+	}
+
+	/* Full-screen fallback: if accumulated count >= region height,
+	 * ScrollRect saves nothing — dirty all and cancel hint */
+	{
+		short region_height = bottom - top + 1;
+		if (term->scroll_count >= region_height) {
+			term_dirty_range(term, top, bottom);
+			term->scroll_pending = 0;
+		} else {
+			/* Dirty only newly exposed rows at top */
+			term_dirty_range(term, top,
+			    top + term->scroll_count - 1);
+		}
+	}
 }
 
 /*

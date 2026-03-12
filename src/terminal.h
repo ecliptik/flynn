@@ -119,6 +119,13 @@ typedef struct {
 	short		scroll_top;
 	short		scroll_bottom;
 
+	/* Scroll hint for ScrollRect optimization */
+	short		scroll_pending;	/* 1 if hint is valid */
+	short		scroll_dir;	/* 1=up, -1=down */
+	short		scroll_count;	/* accumulated line count */
+	short		scroll_rgn_top;	/* scroll region top for hint */
+	short		scroll_rgn_bot;	/* scroll region bottom for hint */
+
 	/* Dirty flags: one per row, nonzero means row needs redraw */
 	unsigned char	dirty[TERM_ROWS];
 

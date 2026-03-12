@@ -250,6 +250,38 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		}
 	}
 
+	/* ScrollRect optimization: blit existing pixels instead of
+	 * redrawing all rows.  Only the newly exposed rows (marked
+	 * dirty by term_scroll_up/down) need actual drawing. */
+	if (term->scroll_pending) {
+		short rgn_height = term->scroll_rgn_bot -
+		    term->scroll_rgn_top + 1;
+
+		if (term->scroll_count < rgn_height) {
+			Rect scroll_r;
+			RgnHandle update_rgn;
+			short dv;
+
+			SetRect(&scroll_r, LEFT_MARGIN,
+			    row_top(term->scroll_rgn_top),
+			    LEFT_MARGIN +
+			    term->active_cols * g_cell_width,
+			    row_bottom(term->scroll_rgn_bot));
+
+			if (term->scroll_dir > 0)
+				dv = -(term->scroll_count *
+				    g_cell_height);
+			else
+				dv = term->scroll_count *
+				    g_cell_height;
+
+			update_rgn = NewRgn();
+			ScrollRect(&scroll_r, 0, dv, update_rgn);
+			DisposeRgn(update_rgn);
+		}
+		term->scroll_pending = 0;
+	}
+
 	for (row = 0; row < term->active_rows; row++) {
 		if (!terminal_is_row_dirty(term, row))
 			continue;
