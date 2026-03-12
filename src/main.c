@@ -278,6 +278,8 @@ session_process_data(Session *sess)
 		conn_send(&sess->conn, (char *)send_buf, send_len);
 
 	if (out_len > 0) {
+		short offset = 0;
+
 		if (sess->terminal.scroll_offset > 0) {
 			sess->terminal.scroll_offset = 0;
 			term_dirty_all(&sess->terminal);
@@ -285,7 +287,34 @@ session_process_data(Session *sess)
 
 		/* Set connection for immediate response flush */
 		sess->terminal.resp_conn = &sess->conn;
-		terminal_process(&sess->terminal, out_buf, out_len);
+
+		/*
+		 * Process terminal data in chunks with intermediate
+		 * draws.  This keeps scroll_count low so ScrollRect
+		 * stays effective — shifting 18+ rows via blit and
+		 * only redrawing 4-6 new rows, instead of falling
+		 * back to a full 24-row redraw.
+		 */
+		while (offset < out_len) {
+			short chunk = out_len - offset;
+			if (chunk > 512)
+				chunk = 512;
+			terminal_process(&sess->terminal,
+			    out_buf + offset, chunk);
+			offset += chunk;
+
+			/* Draw when scroll accumulates past threshold
+			 * and there's more data to process.  With
+			 * 512-byte chunks (~6 lines each), threshold
+			 * of 6 triggers one draw per chunk —
+			 * ScrollRect blits 18 rows, redraws 6. */
+			if (offset < out_len &&
+			    sess->terminal.scroll_pending &&
+			    sess->terminal.scroll_count >= 6) {
+				session_draw(sess);
+			}
+		}
+
 		sess->terminal.resp_conn = 0L;
 
 		/* Update window title */
@@ -326,12 +355,16 @@ main_event_loop(void)
 {
 	EventRecord event;
 	long wait_ticks;
+	short had_data = 0;	/* nonzero = data was processed last tick */
 
 	while (running) {
 		if (g_suspended)
 			wait_ticks = 60L;
+		else if (had_data)
+			wait_ticks = 0L;	/* don't sleep — more data likely */
 		else
 			wait_ticks = session_any_connected() ? 1L : 10L;
+		had_data = 0;
 		WaitNextEvent(everyEvent, &event, wait_ticks, 0L);
 
 		switch (event.what) {
@@ -375,10 +408,12 @@ main_event_loop(void)
 					session_process_data(
 					    active_session);
 					drain++;
-				} while (drain < 8);
+				} while (drain < 16);
 
-				if (drain > 0)
+				if (drain > 0) {
 					session_draw(active_session);
+					had_data = 1;
+				}
 
 				if (!g_suspended &&
 				    active_session->conn.state ==
@@ -442,10 +477,12 @@ main_event_loop(void)
 						session_process_data(
 						    sess);
 						drain++;
-					} while (drain < 4);
+					} while (drain < 8);
 
-					if (drain > 0)
+					if (drain > 0) {
 						session_draw(sess);
+						had_data = 1;
+					}
 				}
 
 				/* Cursor blink only for front session,
@@ -654,23 +691,37 @@ handle_update(EventRecord *event)
 		term_ui_load_state(&sess->ui);
 		session_load_font(sess);
 
-		if (sess->conn.state == CONN_STATE_CONNECTED) {
-			if (sess->terminal.window_title[0])
-				set_wtitlef(sess->window, "Flynn - %s",
-				    sess->terminal.window_title);
-			else
-				set_wtitlef(sess->window, "Flynn - %s",
-				    sess->conn.host);
+		if (sess->conn.state == CONN_STATE_CONNECTED &&
+		    sess->terminal.window_title[0])
+			set_wtitlef(sess->window, "Flynn - %s",
+			    sess->terminal.window_title);
+		else if (sess->conn.state == CONN_STATE_CONNECTED)
+			set_wtitlef(sess->window, "Flynn - %s",
+			    sess->conn.host);
 
-			/* Mark all rows dirty for full repaints */
-			term_dirty_all(&sess->terminal);
-			term_ui_draw(sess->window, &sess->terminal);
-		} else {
-			/* Redraw preserved terminal content
-			 * (screen buffer kept on disconnect) */
-			term_dirty_all(&sess->terminal);
-			term_ui_draw(sess->window, &sess->terminal);
+		/* Use visRgn bounding box (clipped by BeginUpdate)
+		 * to only dirty rows that actually need repainting,
+		 * instead of always redrawing all 24 rows */
+		{
+			Rect clip_box;
+			short first_row, last_row, r;
+
+			clip_box = (**(win->visRgn)).rgnBBox;
+			first_row = (clip_box.top - TOP_MARGIN) /
+			    g_cell_height;
+			last_row = (clip_box.bottom - TOP_MARGIN +
+			    g_cell_height - 1) / g_cell_height;
+
+			if (first_row < 0)
+				first_row = 0;
+			if (last_row >= sess->terminal.active_rows)
+				last_row =
+				    sess->terminal.active_rows - 1;
+
+			for (r = first_row; r <= last_row; r++)
+				sess->terminal.dirty[r] = 1;
 		}
+		term_ui_draw(sess->window, &sess->terminal);
 
 		term_ui_save_state(&sess->ui);
 	}

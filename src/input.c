@@ -369,8 +369,11 @@ handle_content_click(Session *s, EventRecord *event)
 
 	track_selection_drag(s);
 
-	/* Redraw all rows to show final selection state */
-	term_dirty_all(&s->terminal);
+	/* Dirty only the click row (for zero-width selection cleanup)
+	 * and any active selection rows.  Reduces click redraw from
+	 * 24 rows to typically 1 row. */
+	s->terminal.dirty[row] = 1;
+	term_ui_sel_dirty_all(&s->terminal);
 	term_ui_draw(s->window, &s->terminal);
 
 	SetPort(save);
