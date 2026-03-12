@@ -818,14 +818,16 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 			term_save_scrollback(term, r);
 	}
 
-	/* Move lines up: single memmove instead of per-row memcpy */
+	/* Move lines up: per-row memmove using active_cols to
+	 * avoid moving unused columns (saves ~39% when 80 of 132) */
 	{
 		short rows_to_move = bottom - top - count + 1;
 		if (rows_to_move > 0) {
-			memmove(&term->screen[top][0],
-			    &term->screen[top + count][0],
-			    (long)rows_to_move * TERM_COLS *
-			    sizeof(TermCell));
+			for (r = 0; r < rows_to_move; r++)
+				memmove(&term->screen[top + r][0],
+				    &term->screen[top + count + r][0],
+				    term->active_cols *
+				    sizeof(TermCell));
 			memmove(&term->line_attr[top],
 			    &term->line_attr[top + count],
 			    rows_to_move);
@@ -834,12 +836,15 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		/* Scroll color arrays in parallel */
 		if (term->has_color && term->screen_color &&
 		    rows_to_move > 0) {
-			memmove(&term->screen_color[
-			    (long)top * TERM_COLS],
-			    &term->screen_color[
-			    (long)(top + count) * TERM_COLS],
-			    (long)rows_to_move * TERM_COLS *
-			    sizeof(CellColor));
+			for (r = 0; r < rows_to_move; r++)
+				memmove(
+				    &term->screen_color[
+				    (long)(top + r) * TERM_COLS],
+				    &term->screen_color[
+				    (long)(top + count + r) *
+				    TERM_COLS],
+				    term->active_cols *
+				    sizeof(CellColor));
 		}
 	}
 
@@ -885,14 +890,17 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 	if (count > (bottom - top + 1))
 		count = bottom - top + 1;
 
-	/* Move lines down: single memmove instead of per-row memcpy */
+	/* Move lines down: per-row memmove using active_cols,
+	 * iterate in reverse (dest > src) to avoid overwriting */
 	{
 		short rows_to_move = bottom - top - count + 1;
 		if (rows_to_move > 0) {
-			memmove(&term->screen[top + count][0],
-			    &term->screen[top][0],
-			    (long)rows_to_move * TERM_COLS *
-			    sizeof(TermCell));
+			for (r = rows_to_move - 1; r >= 0; r--)
+				memmove(&term->screen[top + count +
+				    r][0],
+				    &term->screen[top + r][0],
+				    term->active_cols *
+				    sizeof(TermCell));
 			memmove(&term->line_attr[top + count],
 			    &term->line_attr[top],
 			    rows_to_move);
@@ -901,12 +909,15 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		/* Scroll color arrays in parallel */
 		if (term->has_color && term->screen_color &&
 		    rows_to_move > 0) {
-			memmove(&term->screen_color[
-			    (long)(top + count) * TERM_COLS],
-			    &term->screen_color[
-			    (long)top * TERM_COLS],
-			    (long)rows_to_move * TERM_COLS *
-			    sizeof(CellColor));
+			for (r = rows_to_move - 1; r >= 0; r--)
+				memmove(
+				    &term->screen_color[
+				    (long)(top + count + r) *
+				    TERM_COLS],
+				    &term->screen_color[
+				    (long)(top + r) * TERM_COLS],
+				    term->active_cols *
+				    sizeof(CellColor));
 		}
 	}
 
