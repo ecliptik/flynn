@@ -722,7 +722,25 @@ draw_row(Terminal *term, short row)
 				set_fg_color(eff_fg);
 
 			if (run_attr & ATTR_INVERSE) {
-				if (use_color) {
+				if (use_color &&
+				    !(run_attr & ATTR_BOLD) &&
+				    cell_w == g_cell_width) {
+					/*
+					 * Batched DrawText for
+					 * color inverse: non-bold,
+					 * normal-width only.
+					 * Bold excluded to avoid
+					 * advance width drift.
+					 */
+					MoveTo(col_left(run_start),
+					    baseline);
+					DrawText(buf, 0, run_len);
+				} else if (use_color) {
+					/*
+					 * Per-char for bold or
+					 * double-width inverse
+					 * on color systems.
+					 */
 					short x = run_x;
 					short i;
 					for (i = 0; i < run_len; i++) {
