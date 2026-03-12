@@ -82,6 +82,7 @@ short			g_font_id = 4;
 short			g_font_size = 9;
 static short		g_dark_mode = 0;
 static short		g_mono_dark = 0;	/* monochrome dark mode active */
+static RgnHandle	g_scroll_rgn = 0L;	/* pre-allocated for ScrollRect */
 
 /* Current effective colors for glyph shade blending (set by draw_row) */
 static unsigned char	g_eff_fg = 0;
@@ -150,6 +151,8 @@ static void draw_glyph_prim(unsigned char glyph_id, short x, short y,
 static void draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	    unsigned char attr);
 static void draw_cursor(Terminal *term, short on);
+static void cursor_set_rect(Rect *r, short crow, short ccol,
+	    unsigned char style);
 static void sel_normalize(short *sr, short *sc, short *er, short *ec);
 static void find_word_bounds(Terminal *term, short row, short col,
 	    short *start, short *end);
@@ -239,9 +242,27 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	cached_fg_idx = -1;
 	cached_bg_idx = -1;
 
-	/* If cursor moved, mark old and new rows dirty to clean up
-	 * XOR artifacts from previous draw_cursor() calls */
-	if (cursor_initialized) {
+	/* Erase cursor XOR artifact before any drawing.
+	 * ScrollRect would blit the XOR mark to wrong positions,
+	 * and dirty row redraws need clean pixels underneath. */
+	if (cursor_initialized && cursor_visible) {
+		Rect cur_r;
+		cursor_set_rect(&cur_r, cursor_prev_row,
+		    cursor_prev_col, term->cursor_style);
+		PenMode(patXor);
+		PaintRect(&cur_r);
+		PenNormal();
+		cursor_visible = 0;
+	}
+
+	/* Track if this draw involves a scroll — suppress cursor
+	 * drawing during scroll draws to prevent XOR artifacts
+	 * from being blitted by subsequent ScrollRect calls */
+	{
+	short had_scroll = term->scroll_pending;
+
+	/* If cursor moved and no scroll, mark old/new rows dirty */
+	if (cursor_initialized && !had_scroll) {
 		short crow, ccol;
 		terminal_get_cursor(term, &crow, &ccol);
 		if (crow != cursor_prev_row || ccol != cursor_prev_col) {
@@ -259,7 +280,6 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 		if (term->scroll_count < rgn_height) {
 			Rect scroll_r;
-			RgnHandle update_rgn;
 			short dv;
 
 			SetRect(&scroll_r, LEFT_MARGIN,
@@ -281,9 +301,15 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			if (g_dark_mode || g_mono_dark)
 				BackPat(&qd.black);
 
-			update_rgn = NewRgn();
-			ScrollRect(&scroll_r, 0, dv, update_rgn);
-			DisposeRgn(update_rgn);
+			/* Use pre-allocated region to avoid
+			 * NewRgn/DisposeRgn overhead per draw */
+			if (!g_scroll_rgn)
+				g_scroll_rgn = NewRgn();
+			SetEmptyRgn(g_scroll_rgn);
+			ScrollRect(&scroll_r, 0, dv, g_scroll_rgn);
+			/* Validate so Window Manager doesn't
+			 * generate updateEvt → full redraw */
+			ValidRgn(g_scroll_rgn);
 
 			if (g_dark_mode || g_mono_dark)
 				BackPat(&qd.white);
@@ -390,18 +416,25 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		PenNormal();
 	}
 
-	/* Draw cursor only when viewing live terminal and cursor enabled */
-	if (term->scroll_offset == 0 && term->cursor_visible)
+	/* Draw cursor only on non-scroll draws.  During scroll draws,
+	 * suppressing cursor avoids XOR artifacts that would be blitted
+	 * to wrong positions by the next ScrollRect.  cursor_blink()
+	 * re-shows the cursor during idle time. */
+	if (!had_scroll && term->scroll_offset == 0 &&
+	    term->cursor_visible)
 		draw_cursor(term, 1);
+	} /* end had_scroll scope */
 }
 
 /*
  * draw_row - render one row of terminal cells
  *
  * Scans left-to-right, batching consecutive cells with the same
- * attribute.  Non-bold plain text uses DrawText() for ~10x speedup
- * over per-character MoveTo()+DrawChar().  Bold and inverse text
- * still uses per-character positioning to avoid advance width drift.
+ * attribute.  Uses DrawText() for all text rendering where possible.
+ * Bold text uses the double-DrawText technique: two DrawText passes
+ * at x and x+1 with plain TextFace replicates QuickDraw bold's
+ * shift-and-OR with correct advance widths.  Only double-width
+ * cells require per-character MoveTo()+DrawChar().
  *
  * Selection bounds are pre-computed per row to avoid calling
  * term_ui_sel_contains() per cell.  Inner-loop x-coordinates use
@@ -707,10 +740,24 @@ draw_row(Terminal *term, short row)
 				continue;
 			}
 
-			/* Set text face for this run */
+			/*
+			 * Set text face for this run.
+			 *
+			 * For bold with normal cell width, we use
+			 * the double-DrawText technique instead of
+			 * TextFace(bold): two DrawText passes at
+			 * x and x+1 with TextFace(0) replicate QD
+			 * bold's shift-and-OR with correct advance
+			 * widths (no drift).  14.5x faster than
+			 * per-char MoveTo+DrawChar.
+			 *
+			 * Bold is still set for double-width cells
+			 * which must use per-char rendering anyway.
+			 */
 			{
 				short face = 0;
-				if (run_attr & ATTR_BOLD)
+				if ((run_attr & ATTR_BOLD) &&
+				    cell_w != g_cell_width)
 					face |= bold;
 				if (run_attr & ATTR_UNDERLINE)
 					face |= underline;
@@ -731,41 +778,38 @@ draw_row(Terminal *term, short row)
 				set_fg_color(eff_fg);
 
 			if (run_attr & ATTR_INVERSE) {
-				if (use_color &&
-				    !(run_attr & ATTR_BOLD) &&
-				    cell_w == g_cell_width) {
+				if (cell_w != g_cell_width) {
 					/*
-					 * Batched DrawText for
-					 * color inverse: non-bold,
-					 * normal-width only.
-					 * Bold excluded to avoid
-					 * advance width drift.
-					 */
-					MoveTo(col_left(run_start),
-					    baseline);
-					DrawText(buf, 0, run_len);
-				} else if (use_color) {
-					/*
-					 * Per-char for bold or
-					 * double-width inverse
-					 * on color systems.
+					 * Double-width inverse:
+					 * per-char required.
 					 */
 					short x = run_x;
 					short i;
+					if (!use_color) {
+						Rect inv_r;
+						SetRect(&inv_r,
+						    run_x, row_y,
+						    run_x + run_w,
+						    row_bottom(row));
+						if (mono_cell_prep(
+						    &inv_r, run_attr))
+							TextMode(srcBic);
+					}
 					for (i = 0; i < run_len; i++) {
 						MoveTo(x, baseline);
 						DrawChar(buf[i]);
 						x += cell_w;
 					}
-				} else {
+					if (!use_color)
+						TextMode(srcOr);
+				} else if (!use_color) {
 					/*
-					 * Monochrome inverse text.
-					 * mono_cell_prep handles bg:
-					 * light+inv → PaintRect+srcBic
-					 * dark+inv → EraseRect+srcOr
+					 * Monochrome inverse:
+					 * batched DrawText.
+					 * mono_cell_prep fills bg.
 					 */
 					Rect inv_r;
-					short x, use_bic;
+					short use_bic;
 					SetRect(&inv_r,
 					    run_x, row_y,
 					    run_x + run_w,
@@ -775,21 +819,39 @@ draw_row(Terminal *term, short row)
 					    run_attr);
 					if (use_bic)
 						TextMode(srcBic);
-					x = run_x;
-					{
-						short i;
-						for (i = 0; i < run_len;
-						    i++) {
-							MoveTo(x, baseline);
-							DrawChar(buf[i]);
-							x += cell_w;
-						}
+					MoveTo(col_left(run_start),
+					    baseline);
+					DrawText(buf, 0, run_len);
+					if (run_attr & ATTR_BOLD) {
+						MoveTo(
+						    col_left(run_start)
+						    + 1, baseline);
+						DrawText(buf, 0,
+						    run_len);
 					}
 					if (use_bic)
 						TextMode(srcOr);
+				} else {
+					/*
+					 * Color inverse: batched
+					 * DrawText for all cases.
+					 */
+					MoveTo(col_left(run_start),
+					    baseline);
+					DrawText(buf, 0, run_len);
+					if (run_attr & ATTR_BOLD) {
+						MoveTo(
+						    col_left(run_start)
+						    + 1, baseline);
+						DrawText(buf, 0,
+						    run_len);
+					}
 				}
-			} else if ((run_attr & ATTR_BOLD) ||
-			    cell_w != g_cell_width) {
+			} else if (cell_w != g_cell_width) {
+				/*
+				 * Double-width: per-char required
+				 * for 2x cell spacing.
+				 */
 				short x = run_x;
 				short i;
 				if (g_mono_dark)
@@ -801,7 +863,27 @@ draw_row(Terminal *term, short row)
 				}
 				if (g_mono_dark)
 					TextMode(srcOr);
+			} else if (run_attr & ATTR_BOLD) {
+				/*
+				 * Bold normal-width: double-DrawText.
+				 * Two passes at x and x+1 with plain
+				 * TextFace replicates QD bold's
+				 * shift-and-OR algorithm with correct
+				 * advance widths.
+				 */
+				if (g_mono_dark)
+					TextMode(srcBic);
+				MoveTo(col_left(run_start), baseline);
+				DrawText(buf, 0, run_len);
+				MoveTo(col_left(run_start) + 1,
+				    baseline);
+				DrawText(buf, 0, run_len);
+				if (g_mono_dark)
+					TextMode(srcOr);
 			} else {
+				/*
+				 * Normal text: batched DrawText.
+				 */
 				if (g_mono_dark)
 					TextMode(srcBic);
 				MoveTo(col_left(run_start), baseline);
@@ -3059,6 +3141,14 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	PenNormal();
 
 	cursor_visible = !cursor_visible;
+
+	/* Track where we drew so term_ui_draw can erase it.
+	 * Without this, the erase targets the old cursor_prev
+	 * position while the actual XOR mark is here. */
+	if (cursor_visible) {
+		cursor_prev_row = crow;
+		cursor_prev_col = ccol;
+	}
 
 	SetPort(old_port);
 }
