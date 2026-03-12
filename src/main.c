@@ -59,6 +59,8 @@ static void handle_update(EventRecord *event);
 static void handle_activate(EventRecord *event);
 static void session_handle_disconnect(Session *sess);
 static void session_poll_data(Session *sess);
+static void session_process_data(Session *sess);
+static void session_draw(Session *sess);
 static void session_update_title(Session *sess);
 
 /*
@@ -256,11 +258,12 @@ session_update_title(Session *sess)
 }
 
 /*
- * session_poll_data - process incoming TCP data through telnet and terminal.
- * Uses file-scope out_buf/send_buf to avoid stack allocation.
+ * session_process_data - process TCP data through telnet and terminal
+ * without drawing.  Used by drain loop to batch multiple reads before
+ * a single draw pass.
  */
 static void
-session_poll_data(Session *sess)
+session_process_data(Session *sess)
 {
 	short out_len = 0;
 	short send_len = 0;
@@ -288,18 +291,34 @@ session_poll_data(Session *sess)
 		/* Update window title */
 		if (sess->terminal.title_changed)
 			session_update_title(sess);
-
-		{
-			GrafPtr save;
-
-			GetPort(&save);
-			SetPort(sess->window);
-			term_ui_draw(sess->window, &sess->terminal);
-			SetPort(save);
-		}
 	}
 
 	sess->conn.read_len = 0;
+}
+
+/*
+ * session_draw - render dirty terminal rows to the session window.
+ */
+static void
+session_draw(Session *sess)
+{
+	GrafPtr save;
+
+	GetPort(&save);
+	SetPort(sess->window);
+	term_ui_draw(sess->window, &sess->terminal);
+	SetPort(save);
+}
+
+/*
+ * session_poll_data - process incoming TCP data and draw.
+ * Convenience wrapper for single-read paths.
+ */
+static void
+session_poll_data(Session *sess)
+{
+	session_process_data(sess);
+	session_draw(sess);
 }
 
 static void
@@ -329,18 +348,37 @@ main_event_loop(void)
 
 			/* Fast path: single session skips save/load cycling */
 			if (session_count() == 1 && active_session) {
-				prev_state = active_session->conn.state;
-				conn_idle(&active_session->conn);
+				short drain = 0;
 
-				if (prev_state == CONN_STATE_CONNECTED &&
-				    active_session->conn.state ==
-				    CONN_STATE_IDLE) {
-					session_handle_disconnect(
+				/* Drain loop: batch up to 8 TCP reads
+				 * before drawing.  Scroll hints
+				 * accumulate across reads for a single
+				 * ScrollRect blit. */
+				do {
+					prev_state =
+					    active_session->conn.state;
+					conn_idle(&active_session->conn);
+
+					if (prev_state ==
+					    CONN_STATE_CONNECTED &&
+					    active_session->conn.state ==
+					    CONN_STATE_IDLE) {
+						session_handle_disconnect(
+						    active_session);
+						break;
+					}
+
+					if (active_session->conn.read_len
+					    == 0)
+						break;
+
+					session_process_data(
 					    active_session);
-				} else if (active_session->conn.read_len >
-				    0) {
-					session_poll_data(active_session);
-				}
+					drain++;
+				} while (drain < 8);
+
+				if (drain > 0)
+					session_draw(active_session);
 
 				if (!g_suspended &&
 				    active_session->conn.state ==
@@ -375,19 +413,40 @@ main_event_loop(void)
 				term_ui_load_state(&sess->ui);
 				session_load_font(sess);
 
-				prev_state = sess->conn.state;
-				conn_idle(&sess->conn);
+				{
+					short drain = 0;
 
-				/* Detect remote disconnect */
-				if (prev_state == CONN_STATE_CONNECTED &&
-				    sess->conn.state == CONN_STATE_IDLE) {
-					session_handle_disconnect(sess);
-					continue;
+					/* Drain loop: batch up to 4
+					 * TCP reads per session in
+					 * multi-session mode (lower
+					 * limit avoids starvation) */
+					do {
+						prev_state =
+						    sess->conn.state;
+						conn_idle(&sess->conn);
+
+						if (prev_state ==
+						    CONN_STATE_CONNECTED
+						    && sess->conn.state
+						    ==
+						    CONN_STATE_IDLE) {
+							session_handle_disconnect(
+							    sess);
+							break;
+						}
+
+						if (sess->conn.read_len
+						    == 0)
+							break;
+
+						session_process_data(
+						    sess);
+						drain++;
+					} while (drain < 4);
+
+					if (drain > 0)
+						session_draw(sess);
 				}
-
-				/* Process incoming data */
-				if (sess->conn.read_len > 0)
-					session_poll_data(sess);
 
 				/* Cursor blink only for front session,
 				 * skip when suspended in background */
