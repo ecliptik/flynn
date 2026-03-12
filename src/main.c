@@ -362,6 +362,15 @@ main_event_loop(void)
 				if (!sess)
 					continue;
 
+				/* Skip expensive UI/font swap for
+				 * disconnected sessions — just run
+				 * conn_idle for cleanup */
+				if (sess->conn.state !=
+				    CONN_STATE_CONNECTED) {
+					conn_idle(&sess->conn);
+					continue;
+				}
+
 				/* Load this session's UI + font state */
 				term_ui_load_state(&sess->ui);
 				session_load_font(sess);
