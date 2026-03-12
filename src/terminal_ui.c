@@ -275,9 +275,18 @@ term_ui_draw(WindowPtr win, Terminal *term)
 				dv = term->scroll_count *
 				    g_cell_height;
 
+			/* In dark mode, set background to black so
+			 * ScrollRect fills exposed region with black
+			 * instead of white */
+			if (g_dark_mode || g_mono_dark)
+				BackPat(&qd.black);
+
 			update_rgn = NewRgn();
 			ScrollRect(&scroll_r, 0, dv, update_rgn);
 			DisposeRgn(update_rgn);
+
+			if (g_dark_mode || g_mono_dark)
+				BackPat(&qd.white);
 		}
 		term->scroll_pending = 0;
 	}

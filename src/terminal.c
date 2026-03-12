@@ -906,6 +906,17 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 			term_dirty_range(term, top, bottom);
 			term->scroll_pending = 0;
 		} else {
+			/* Shift dirty flags up by count to stay aligned
+			 * with ScrollRect pixel shift.  Without this,
+			 * character writes between scrolls leave dirty
+			 * flags at stale positions, causing rows to show
+			 * wrong content after the blit. */
+			short dr;
+			for (dr = top; dr <= bottom - count; dr++)
+				term->dirty[dr] = term->dirty[dr + count];
+			for (dr = bottom - count + 1; dr <= bottom; dr++)
+				term->dirty[dr] = 0;
+
 			/* Dirty only newly exposed rows */
 			term_dirty_range(term,
 			    bottom - term->scroll_count + 1, bottom);
@@ -1013,6 +1024,14 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 			term_dirty_range(term, top, bottom);
 			term->scroll_pending = 0;
 		} else {
+			/* Shift dirty flags down by count to stay aligned
+			 * with ScrollRect pixel shift */
+			short dr;
+			for (dr = bottom; dr >= top + count; dr--)
+				term->dirty[dr] = term->dirty[dr - count];
+			for (dr = top; dr < top + count; dr++)
+				term->dirty[dr] = 0;
+
 			/* Dirty only newly exposed rows at top */
 			term_dirty_range(term, top,
 			    top + term->scroll_count - 1);
