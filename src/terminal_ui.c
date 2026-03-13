@@ -91,6 +91,7 @@ static Ptr	g_offscreen_bits;	/* pixel data (NewPtr) */
 static short	g_offscreen_cols;	/* allocated width in cells */
 static short	g_offscreen_rows;	/* allocated height in cells */
 static BitMap	g_saved_bits;		/* saved real portBits during offscreen */
+static WindowPtr g_offscreen_win;	/* window that owns current offscreen */
 
 /* Current effective colors for glyph shade blending (set by draw_row) */
 static unsigned char	g_eff_fg = 0;
@@ -185,10 +186,19 @@ offscreen_alloc(WindowPtr win, short cols, short rows)
 	rb = ((pixel_w + 15) / 16) * 2;
 	size = (long)rb * pixel_h;
 
-	/* Reuse if dimensions unchanged */
+	/* Reuse if dimensions and window unchanged */
 	if (g_offscreen_bits && g_offscreen_cols == cols &&
-	    g_offscreen_rows == rows)
+	    g_offscreen_rows == rows && g_offscreen_win == win)
 		return 1;
+
+	/* Same dimensions, different window: reuse buffer,
+	 * just update bounds and owner (no realloc needed) */
+	if (g_offscreen_bits && g_offscreen_cols == cols &&
+	    g_offscreen_rows == rows) {
+		g_offscreen.bounds = win->portRect;
+		g_offscreen_win = win;
+		return 1;
+	}
 
 	if (g_offscreen_bits) {
 		DisposePtr(g_offscreen_bits);
@@ -207,6 +217,7 @@ offscreen_alloc(WindowPtr win, short cols, short rows)
 
 	g_offscreen_cols = cols;
 	g_offscreen_rows = rows;
+	g_offscreen_win = win;
 
 	return 1;
 }
@@ -223,16 +234,17 @@ offscreen_free(void)
 	}
 	g_offscreen_cols = 0;
 	g_offscreen_rows = 0;
+	g_offscreen_win = 0L;
 }
 
 /*
  * term_ui_has_offscreen - check if valid offscreen buffer matches dimensions
  */
 short
-term_ui_has_offscreen(short cols, short rows)
+term_ui_has_offscreen(WindowPtr win, short cols, short rows)
 {
-	return g_offscreen_bits && g_offscreen_cols == cols &&
-	    g_offscreen_rows == rows;
+	return g_offscreen_bits && g_offscreen_win == win &&
+	    g_offscreen_cols == cols && g_offscreen_rows == rows;
 }
 
 /*
@@ -258,6 +270,7 @@ term_ui_invalidate_offscreen(void)
 {
 	g_offscreen_cols = 0;
 	g_offscreen_rows = 0;
+	g_offscreen_win = 0L;
 }
 
 /*

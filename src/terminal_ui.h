@@ -89,7 +89,7 @@ void  term_ui_sel_dirty_all(Terminal *term);
 void term_ui_set_dark_mode(short enabled);
 
 /* Offscreen double buffer accessors */
-short term_ui_has_offscreen(short cols, short rows);
+short term_ui_has_offscreen(WindowPtr win, short cols, short rows);
 void  term_ui_blit_offscreen(WindowPtr win);
 void  term_ui_invalidate_offscreen(void);
 

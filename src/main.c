@@ -746,16 +746,15 @@ handle_update(EventRecord *event)
 		 * Avoids full clear_window_bg + redraw (~8x faster).
 		 * Cursor is not in offscreen; cursor_blink() will
 		 * redraw it on the next idle tick. */
-		if (term_ui_has_offscreen(
+		if (term_ui_has_offscreen(sess->window,
 		    sess->terminal.active_cols,
 		    sess->terminal.active_rows)) {
 			term_ui_blit_offscreen(sess->window);
 		} else {
-			/* Fallback: full redraw */
-			clear_window_bg(win, prefs.dark_mode);
-
-			/* Use visRgn bounding box to only dirty
-			 * rows that need repainting */
+			/* Fallback: redraw via offscreen.
+			 * No clear_window_bg — term_ui_draw handles
+			 * erase+draw in offscreen then blits.
+			 * Use visRgn to only dirty exposed rows. */
 			{
 				Rect clip_box;
 				short first_row, last_row, r;
