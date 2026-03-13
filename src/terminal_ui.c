@@ -226,6 +226,41 @@ offscreen_free(void)
 }
 
 /*
+ * term_ui_has_offscreen - check if valid offscreen buffer matches dimensions
+ */
+short
+term_ui_has_offscreen(short cols, short rows)
+{
+	return g_offscreen_bits && g_offscreen_cols == cols &&
+	    g_offscreen_rows == rows;
+}
+
+/*
+ * term_ui_blit_offscreen - CopyBits from offscreen buffer to window
+ */
+void
+term_ui_blit_offscreen(WindowPtr win)
+{
+	if (!g_offscreen_bits)
+		return;
+	CopyBits(&g_offscreen, &win->portBits,
+	    &g_offscreen.bounds, &g_offscreen.bounds,
+	    srcCopy, 0L);
+}
+
+/*
+ * term_ui_invalidate_offscreen - force reallocation on next draw
+ *
+ * Called on session switch to prevent stale offscreen blits.
+ */
+void
+term_ui_invalidate_offscreen(void)
+{
+	g_offscreen_cols = 0;
+	g_offscreen_rows = 0;
+}
+
+/*
  * term_ui_init - set up font and cursor state
  */
 void

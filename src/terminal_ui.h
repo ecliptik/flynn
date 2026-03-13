@@ -88,6 +88,11 @@ void  term_ui_sel_dirty_all(Terminal *term);
 /* Dark mode */
 void term_ui_set_dark_mode(short enabled);
 
+/* Offscreen double buffer accessors */
+short term_ui_has_offscreen(short cols, short rows);
+void  term_ui_blit_offscreen(WindowPtr win);
+void  term_ui_invalidate_offscreen(void);
+
 /* Per-session UI state for save/restore */
 typedef struct {
 	unsigned long	cursor_last_tick;
