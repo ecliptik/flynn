@@ -40,6 +40,10 @@ FlynnPrefs prefs;
 static RgnHandle grow_clip_rgn = 0L;
 Session *active_session = 0L;
 
+/* Saved system key repeat settings (restored on quit) */
+static short saved_key_thresh;
+static short saved_key_rep_thresh;
+
 /* Notification Manager */
 static NMRec nm_rec;
 static Boolean notification_posted = false;
@@ -138,6 +142,14 @@ main(void)
 	rebuild_file_menu();
 	update_menus();
 	update_prefs_menu();
+
+	/* Save system key repeat and set fast repeat for terminal use.
+	 * Default PRAM is often ~18 ticks (300ms) between repeats.
+	 * We set 2 ticks (33ms) ≈ 30 cps for responsive typing. */
+	saved_key_thresh = LMGetKeyThresh();
+	saved_key_rep_thresh = LMGetKeyRepThresh();
+	LMSetKeyThresh(12);		/* 200ms initial delay */
+	LMSetKeyRepThresh(2);		/* 33ms repeat = ~30 cps */
 
 	main_event_loop();
 	return 0;
@@ -525,18 +537,24 @@ main_event_loop(void)
 					    &pending);
 				flush_key_send(active_session);
 
-				/* Immediate echo poll: check if
-				 * server response arrived during
-				 * synchronous TCP send.  Eliminates
-				 * up to 17ms post-send latency. */
+				/* Echo poll: tight loop with 2-tick
+				 * (33ms) budget to catch server echo
+				 * on LAN-speed connections. */
 				if (active_session->conn.state ==
 				    CONN_STATE_CONNECTED) {
-					conn_idle(
-					    &active_session->conn);
-					if (active_session->conn
-					    .read_len > 0)
-						session_process_data(
-						    active_session);
+					unsigned long deadline;
+
+					deadline = TickCount() + 2;
+					do {
+						conn_idle(
+						    &active_session->conn);
+						if (active_session->conn
+						    .read_len > 0) {
+							session_process_data(
+							    active_session);
+							break;
+						}
+					} while (TickCount() < deadline);
 				}
 
 				/* Draw locally-echoed or server-
@@ -601,6 +619,10 @@ main_event_loop(void)
 
 	if (grow_clip_rgn)
 		DisposeRgn(grow_clip_rgn);
+
+	/* Restore system key repeat settings */
+	LMSetKeyThresh(saved_key_thresh);
+	LMSetKeyRepThresh(saved_key_rep_thresh);
 
 	ExitToShell();
 }
