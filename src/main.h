@@ -46,6 +46,7 @@
 #define PREFS_DNS_ID         4
 #define PREFS_DARK_ID        5
 #define PREFS_BKSP_DEL_ID    6
+#define PREFS_LOCAL_ECHO_ID  7
 
 /* Font submenu (MENU 134) items */
 #define FONT_MENU_ID        134

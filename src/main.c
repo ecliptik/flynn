@@ -524,6 +524,29 @@ main_event_loop(void)
 					handle_key_down(active_session,
 					    &pending);
 				flush_key_send(active_session);
+
+				/* Immediate echo poll: check if
+				 * server response arrived during
+				 * synchronous TCP send.  Eliminates
+				 * up to 17ms post-send latency. */
+				if (active_session->conn.state ==
+				    CONN_STATE_CONNECTED) {
+					conn_idle(
+					    &active_session->conn);
+					if (active_session->conn
+					    .read_len > 0)
+						session_process_data(
+						    active_session);
+				}
+
+				/* Draw locally-echoed or server-
+				 * echoed chars.  No-op if no
+				 * dirty rows. */
+				session_draw(active_session);
+
+				/* Next WNE returns immediately
+				 * for echo data arriving after */
+				had_data = 1;
 			}
 			break;
 		case mouseDown:

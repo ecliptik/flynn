@@ -53,7 +53,8 @@ resource 'MENU' (131, "Options") {
 		"-", noIcon, noKey, noMark, plain;
 		"DNS Server\311", noIcon, noKey, noMark, plain;
 		"Dark Mode", noIcon, noKey, noMark, plain;
-		"Backspace Sends BS", noIcon, noKey, noMark, plain
+		"Backspace Sends BS", noIcon, noKey, noMark, plain;
+		"Local Echo", noIcon, noKey, noMark, plain
 	}
 };
 

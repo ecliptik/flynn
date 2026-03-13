@@ -5,7 +5,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	9
+#define PREFS_VERSION	10
 #define MAX_BOOKMARKS	8
 #define MAX_RECENT	5
 
@@ -34,6 +34,7 @@ typedef struct {
 	char		username[64];	/* auto-login username, empty = disabled */
 	short		recent[MAX_RECENT];	/* recently used bookmark indices */
 	short		recent_count;
+	unsigned char	local_echo;	/* 1=echo locally when server WONT ECHO */
 	/* NOTE: always append new fields here, never insert above */
 } FlynnPrefs;
 

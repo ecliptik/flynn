@@ -93,6 +93,20 @@ flush_key_send(Session *s)
 	}
 }
 
+/*
+ * local_echo - Echo data locally when server isn't echoing.
+ * Only active when local_echo pref is on AND server has WONT ECHO.
+ */
+static void
+local_echo(Session *s, const unsigned char *data, short len)
+{
+	if (!prefs.local_echo)
+		return;
+	if (s->telnet.opts[TELOPT_ECHO] & OPTFLAG_REMOTE)
+		return;
+	terminal_process(&s->terminal, (unsigned char *)data, len);
+}
+
 void
 handle_key_down(Session *s, EventRecord *event)
 {
@@ -232,6 +246,11 @@ handle_key_down(Session *s, EventRecord *event)
 	if (vkey == 0x33) {
 		char bs = prefs.backspace_bs ? 0x08 : 0x7F;
 		buffer_key_send(s, &bs, 1);
+		{
+			static const unsigned char bs_echo[] =
+			    { 0x08, 0x20, 0x08 };
+			local_echo(s, bs_echo, 3);
+		}
 		return;
 	}
 
@@ -243,6 +262,12 @@ handle_key_down(Session *s, EventRecord *event)
 				buffer_key_send(s,
 				    (char *)special_key_map[ki].seq,
 				    special_key_map[ki].len);
+				/* Local echo for Return/Enter */
+				if (vkey == 0x24 || vkey == 0x4C) {
+					static const unsigned char
+					    crlf[] = { 0x0D, 0x0A };
+					local_echo(s, crlf, 2);
+				}
 				return;
 			}
 		}
@@ -305,6 +330,7 @@ handle_key_down(Session *s, EventRecord *event)
 
 	/* Regular printable character */
 	buffer_key_send(s, &key, 1);
+	local_echo(s, (unsigned char *)&key, 1);
 }
 
 short
