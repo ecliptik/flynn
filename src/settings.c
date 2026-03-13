@@ -50,6 +50,7 @@ prefs_defaults(FlynnPrefs *prefs)
 	prefs->terminal_type = 0;	/* xterm */
 	prefs->dark_mode = 0;		/* light */
 	prefs->backspace_bs = 0;	/* DEL (0x7F) for xterm */
+	prefs->local_echo = 0;		/* off by default */
 	strncpy(prefs->dns_server, "1.1.1.1", sizeof(prefs->dns_server) - 1);
 	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 }
@@ -197,6 +198,16 @@ prefs_load(FlynnPrefs *prefs)
 		strncpy(prefs->dns_server, "1.1.1.1",
 		    sizeof(prefs->dns_server) - 1);
 		prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
+		prefs->version = PREFS_VERSION;
+		prefs_save(prefs);
+		return;
+	}
+
+	if (prefs->version == 9) {
+		/* v9→v10 migration: add local_echo.
+		 * Enable by default for ANSI-BBS. */
+		prefs->local_echo =
+		    (prefs->terminal_type == 4) ? 1 : 0;
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

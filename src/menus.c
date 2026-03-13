@@ -271,6 +271,8 @@ update_prefs_menu(void)
 	    prefs.dark_mode != 0);
 	CheckItem(prefs_menu, PREFS_BKSP_DEL_ID,
 	    prefs.backspace_bs != 0);
+	CheckItem(prefs_menu, PREFS_LOCAL_ECHO_ID,
+	    prefs.local_echo != 0);
 }
 
 void
@@ -563,8 +565,9 @@ handle_ttype_submenu(short item)
 	}
 	/* Also update global default */
 	prefs.terminal_type = ttype;
-	/* Sync backspace mode to match terminal type default */
+	/* Sync backspace and local echo to match terminal type */
 	prefs.backspace_bs = (ttype == 4) ? 1 : 0;
+	prefs.local_echo = (ttype == 4) ? 1 : 0;
 	prefs_save(&prefs);
 	update_prefs_menu();
 	if (active_session &&
@@ -614,6 +617,11 @@ handle_prefs_menu(short item)
 		break;
 	case PREFS_BKSP_DEL_ID:
 		prefs.backspace_bs = !prefs.backspace_bs;
+		prefs_save(&prefs);
+		update_prefs_menu();
+		break;
+	case PREFS_LOCAL_ECHO_ID:
+		prefs.local_echo = !prefs.local_echo;
 		prefs_save(&prefs);
 		update_prefs_menu();
 		break;
