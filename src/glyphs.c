@@ -235,6 +235,7 @@ static const GlyphMappingBMP glyph_map_bmp[] = {
 	{ 0x2310, GLYPH_REVERSED_NOT },
 	{ 0x2320, GLYPH_INTEGRAL_T },
 	{ 0x2321, GLYPH_INTEGRAL_B },
+	{ 0x23F1, GLYPH_EMOJI_STOPWATCH },
 	{ 0x23F5, GLYPH_PLAY },
 	/* Quadrants (not in block_element_glyphs range) */
 	{ 0x2596, GLYPH_QUAD_LL },
@@ -330,10 +331,12 @@ static const GlyphMappingAstral glyph_map_astral[] = {
 	{ 0x1F338, GLYPH_FLOWER },	/* 🌸 cherry blossom */
 	{ 0x1F33A, GLYPH_FLOWER },	/* 🌺 hibiscus */
 	{ 0x1F33C, GLYPH_FLOWER },	/* 🌼 blossom */
+	{ 0x1F33F, GLYPH_EMOJI_HERB },	/* 🌿 herb */
 	{ 0x1F40D, GLYPH_EMOJI_SNAKE },
 	{ 0x1F44D, GLYPH_EMOJI_THUMBSUP },
 	{ 0x1F4A1, GLYPH_EMOJI_BULB },
 	{ 0x1F4AB, GLYPH_EMOJI_STAR },	/* 💫 dizzy */
+	{ 0x1F4B0, GLYPH_EMOJI_MONEY },	/* 💰 money bag */
 	{ 0x1F4C1, GLYPH_EMOJI_FOLDER },
 	{ 0x1F4E6, GLYPH_EMOJI_PACKAGE },
 	{ 0x1F525, GLYPH_EMOJI_FIRE },
@@ -575,6 +578,9 @@ static const GlyphInfo emoji_info[] = {
 	/* 0xAC PACKAGE */       { GLYPH_CAT_EMOJI, GLYPH_WIDE, '#', 0 },
 	/* 0xAD SNAKE */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'S', 0 },
 	/* 0xAE CRAB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'V', 0 },
+	/* 0xFC HERB */          { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'H', 0 },
+	/* 0xFD MONEY */         { GLYPH_CAT_EMOJI, GLYPH_WIDE, '$', 0 },
+	/* 0xFE STOPWATCH */     { GLYPH_CAT_EMOJI, GLYPH_WIDE, 'T', 0 },
 };
 
 /* ----------------------------------------------------------------
@@ -797,6 +803,48 @@ static const unsigned char bmp_crab[] = {
 	0x00, 0x00,
 };
 
+/* Herb: leaf/plant */
+static const unsigned char bmp_herb[] = {
+	0x02, 0x00,	/* ......#. .. */
+	0x04, 0x00,	/* .....#.. .. */
+	0x0E, 0x00,	/* ....###. .. */
+	0x1B, 0x00,	/* ...##.## .. */
+	0x35, 0x00,	/* ..##.#.# .. */
+	0x6A, 0x00,	/* .##.#.#. .. */
+	0x34, 0x00,	/* ..##.#.. .. */
+	0x08, 0x00,	/* ....#... .. */
+	0x08, 0x00,	/* ....#... .. */
+	0x00, 0x00,
+};
+
+/* Money bag: bag with $ sign */
+static const unsigned char bmp_money[] = {
+	0x1C, 0x00,	/* ...###.. .. */
+	0x08, 0x00,	/* ....#... .. */
+	0x3E, 0x00,	/* ..#####. .. */
+	0x7F, 0x00,	/* .####### .. */
+	0x7F, 0x00,	/* .####### .. */
+	0x7F, 0x00,	/* .####### .. */
+	0x7F, 0x00,	/* .####### .. */
+	0x3E, 0x00,	/* ..#####. .. */
+	0x1C, 0x00,	/* ...###.. .. */
+	0x00, 0x00,
+};
+
+/* Stopwatch: circle with button on top */
+static const unsigned char bmp_stopwatch[] = {
+	0x08, 0x00,	/* ....#... .. */
+	0x1C, 0x00,	/* ...###.. .. */
+	0x3E, 0x00,	/* ..#####. .. */
+	0x63, 0x00,	/* .##...## .. */
+	0x4B, 0x00,	/* .#..#.## .. */
+	0x4B, 0x00,	/* .#..#.## .. */
+	0x41, 0x00,	/* .#.....# .. */
+	0x63, 0x00,	/* .##...## .. */
+	0x3E, 0x00,	/* ..#####. .. */
+	0x00, 0x00,
+};
+
 /* Bitmap table: indexed by (glyph_id - GLYPH_EMOJI_BASE) */
 static const GlyphBitmap emoji_bitmaps[] = {
 	{ 10, 10, 2, bmp_grin },	/* 0x80 */
@@ -814,6 +862,9 @@ static const GlyphBitmap emoji_bitmaps[] = {
 	{ 10, 10, 2, bmp_package },	/* 0x8C */
 	{ 10, 10, 2, bmp_snake },	/* 0x8D */
 	{ 10, 10, 2, bmp_crab },	/* 0x8E */
+	{ 10, 10, 2, bmp_herb },	/* 0xFC */
+	{ 10, 10, 2, bmp_money },	/* 0xFD */
+	{ 10, 10, 2, bmp_stopwatch },	/* 0xFE */
 };
 
 /* ----------------------------------------------------------------
@@ -892,8 +943,8 @@ glyph_lookup(long cp)
 		return -1;
 	}
 
-	/* Legacy Computing: sextant characters U+1FB00-U+1FB3B */
-	if (cp >= 0x1FB00L && cp <= 0x1FB3BL) {
+	/* Legacy Computing: sextant characters U+1FB00-U+1FB38 */
+	if (cp >= 0x1FB00L && cp <= 0x1FB38L) {
 		return GLYPH_SEXTANT_BASE + (short)(cp - 0x1FB00L);
 	}
 

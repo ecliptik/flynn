@@ -252,29 +252,32 @@
 
 #define GLYPH_PRIM_COUNT	180
 
-/* --- Sextant characters (U+1FB00-U+1FB3B): 2x3 grid patterns --- */
+/* --- Sextant characters (U+1FB00-U+1FB38): 2x3 grid patterns --- */
 #define GLYPH_SEXTANT_BASE	0xB4
-/* 60 packed indices (0-59), unpack to 6-bit patterns at render time */
-#define GLYPH_SEXTANT_COUNT	60
+/* 57 packed indices (0-56), unpack to 6-bit patterns at render time */
+#define GLYPH_SEXTANT_COUNT	57
 
-/* --- Bitmap emoji indices (0xF0-0xFE) --- */
-#define GLYPH_EMOJI_BASE	0xF0
-#define GLYPH_EMOJI_GRIN	0xF0	/* U+1F600 */
-#define GLYPH_EMOJI_HEART	0xF1	/* U+2764 */
-#define GLYPH_EMOJI_THUMBSUP	0xF2	/* U+1F44D */
-#define GLYPH_EMOJI_FIRE	0xF3	/* U+1F525 */
-#define GLYPH_EMOJI_STAR	0xF4	/* U+2B50 */
-#define GLYPH_EMOJI_CHECK	0xF5	/* U+2705 */
-#define GLYPH_EMOJI_CROSSMARK	0xF6	/* U+274C */
-#define GLYPH_EMOJI_ROCKET	0xF7	/* U+1F680 */
-#define GLYPH_EMOJI_FOLDER	0xF8	/* U+1F4C1 */
-#define GLYPH_EMOJI_BULB	0xF9	/* U+1F4A1 */
-#define GLYPH_EMOJI_GLOBE	0xFA	/* U+1F310 */
-#define GLYPH_EMOJI_WRENCH	0xFB	/* U+1F527 */
-#define GLYPH_EMOJI_PACKAGE	0xFC	/* U+1F4E6 */
-#define GLYPH_EMOJI_SNAKE	0xFD	/* U+1F40D */
-#define GLYPH_EMOJI_CRAB	0xFE	/* U+1F980 */
-#define GLYPH_EMOJI_COUNT	15
+/* --- Bitmap emoji indices (0xED-0xFE) --- */
+#define GLYPH_EMOJI_BASE	0xED
+#define GLYPH_EMOJI_GRIN	0xED	/* U+1F600 */
+#define GLYPH_EMOJI_HEART	0xEE	/* U+2764 */
+#define GLYPH_EMOJI_THUMBSUP	0xEF	/* U+1F44D */
+#define GLYPH_EMOJI_FIRE	0xF0	/* U+1F525 */
+#define GLYPH_EMOJI_STAR	0xF1	/* U+2B50 */
+#define GLYPH_EMOJI_CHECK	0xF2	/* U+2705 */
+#define GLYPH_EMOJI_CROSSMARK	0xF3	/* U+274C */
+#define GLYPH_EMOJI_ROCKET	0xF4	/* U+1F680 */
+#define GLYPH_EMOJI_FOLDER	0xF5	/* U+1F4C1 */
+#define GLYPH_EMOJI_BULB	0xF6	/* U+1F4A1 */
+#define GLYPH_EMOJI_GLOBE	0xF7	/* U+1F310 */
+#define GLYPH_EMOJI_WRENCH	0xF8	/* U+1F527 */
+#define GLYPH_EMOJI_PACKAGE	0xF9	/* U+1F4E6 */
+#define GLYPH_EMOJI_SNAKE	0xFA	/* U+1F40D */
+#define GLYPH_EMOJI_CRAB	0xFB	/* U+1F980 */
+#define GLYPH_EMOJI_HERB	0xFC	/* U+1F33F */
+#define GLYPH_EMOJI_MONEY	0xFD	/* U+1F4B0 */
+#define GLYPH_EMOJI_STOPWATCH	0xFE	/* U+23F1 */
+#define GLYPH_EMOJI_COUNT	18
 
 /* Glyph info: describes how to render a glyph */
 typedef struct {

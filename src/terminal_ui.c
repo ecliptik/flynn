@@ -27,6 +27,7 @@
 #include <ToolUtils.h>
 #include <OSUtils.h>
 #include <Multiverse.h>
+#include <string.h>
 #include "terminal_ui.h"
 #include "color.h"
 #include "glyphs.h"
@@ -156,6 +157,7 @@ static void cursor_set_rect(Rect *r, short crow, short ccol,
 static void sel_normalize(short *sr, short *sc, short *er, short *ec);
 static void find_word_bounds(Terminal *term, short row, short col,
 	    short *start, short *end);
+static void glyph_cache_rebuild(void);
 
 /*
  * term_ui_init - set up font and cursor state
@@ -208,6 +210,9 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 
 	TextFace(0);
 	TextMode(srcOr);
+
+	/* Rebuild glyph bitmap cache for new font metrics */
+	glyph_cache_rebuild();
 
 	SetPort(old_port);
 }
@@ -445,6 +450,425 @@ do_draw:
 	    term->cursor_visible)
 		draw_cursor(term, 1);
 	} /* end had_scroll scope */
+}
+
+/*
+ * try_merge_dec_run - merge consecutive identical DEC graphics chars
+ *
+ * Scans buf[pos..run_len) for consecutive cells matching the DEC char.
+ * For 'q' (horizontal line), renders as a single LineTo spanning N cells.
+ * For 'a' (checkerboard), renders as a single FillRect spanning N cells.
+ *
+ * Returns the number of cells consumed (>= 2) on success, 0 if not
+ * mergeable or only 1 cell exists.
+ */
+static short
+try_merge_dec_run(unsigned char ch, const char *buf, short pos,
+    short run_len, short x, short y, unsigned char attr, short cell_w)
+{
+	short count, j, mw, cy;
+	Rect mr;
+
+	/* Only 'q' and 'a' are worth merging */
+	if (ch != 'q' && ch != 'a')
+		return 0;
+
+	/* Count consecutive identical characters */
+	count = 1;
+	for (j = pos + 1; j < run_len; j++) {
+		if ((unsigned char)buf[j] != ch)
+			break;
+		count++;
+	}
+	if (count < 2)
+		return 0;
+
+	mw = count * cell_w;
+
+	switch (ch) {
+	case 'q':
+		/* ─ horizontal line: single LineTo spanning N cells */
+		cy = y + g_cell_height / 2;
+		if (attr & ATTR_BOLD)
+			PenSize(2, 1);
+		else
+			PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(x + mw - 1, cy);
+		return count;
+
+	case 'a':
+		/* ▒ checkerboard: single FillRect spanning N cells */
+		SetRect(&mr, x, y, x + mw, y + g_cell_height);
+		FillRect(&mr, &qd.gray);
+		return count;
+	}
+
+	return 0;
+}
+
+/*
+ * try_merge_glyph_run - merge consecutive identical glyphs into one call
+ *
+ * Scans buf[pos..run_len) for consecutive cells matching glyph_id.
+ * For mergeable glyphs (horizontal lines, block fills, shades),
+ * renders the entire run with a single QuickDraw call.
+ *
+ * Returns the number of cells consumed (>= 2) on success, 0 if the
+ * glyph is not mergeable or only 1 cell exists.
+ */
+static short
+try_merge_glyph_run(unsigned char gid, const char *buf, short pos,
+    short run_len, short x, short y, unsigned char attr, short cell_w)
+{
+	short count, j, mw, cy;
+	Rect mr;
+
+	/* Count consecutive identical glyphs */
+	count = 1;
+	for (j = pos + 1; j < run_len; j++) {
+		if ((unsigned char)buf[j] != gid)
+			break;
+		count++;
+	}
+	if (count < 2)
+		return 0;
+
+	mw = count * cell_w;
+	cy = y + g_cell_height / 2;
+
+	switch (gid) {
+	/* --- Horizontal line merges --- */
+	case GLYPH_BOX_H:
+		PenSize(1, 1);
+		MoveTo(x, cy);
+		LineTo(x + mw, cy);
+		return count;
+
+	case GLYPH_BOX2_H:
+		PenSize(1, 1);
+		MoveTo(x, cy - 1);
+		LineTo(x + mw, cy - 1);
+		MoveTo(x, cy + 1);
+		LineTo(x + mw, cy + 1);
+		return count;
+
+	/* --- Full-width block merges --- */
+	case GLYPH_BLOCK_FULL:
+		SetRect(&mr, x, y, x + mw, y + g_cell_height);
+		PaintRect(&mr);
+		return count;
+
+	case GLYPH_BLOCK_UPPER:
+		SetRect(&mr, x, y, x + mw, cy);
+		PaintRect(&mr);
+		return count;
+
+	case GLYPH_BLOCK_LOWER:
+		SetRect(&mr, x, cy, x + mw, y + g_cell_height);
+		PaintRect(&mr);
+		return count;
+
+	/* --- Fractional lower block merges --- */
+	case GLYPH_BLOCK_LOWER_1:
+		SetRect(&mr, x,
+		    y + g_cell_height - g_cell_height / 8,
+		    x + mw, y + g_cell_height);
+		PaintRect(&mr);
+		return count;
+	case GLYPH_BLOCK_LOWER_2:
+		SetRect(&mr, x,
+		    y + g_cell_height - g_cell_height * 2 / 8,
+		    x + mw, y + g_cell_height);
+		PaintRect(&mr);
+		return count;
+	case GLYPH_BLOCK_LOWER_3:
+		SetRect(&mr, x,
+		    y + g_cell_height - g_cell_height * 3 / 8,
+		    x + mw, y + g_cell_height);
+		PaintRect(&mr);
+		return count;
+	case GLYPH_BLOCK_LOWER_5:
+		SetRect(&mr, x,
+		    y + g_cell_height - g_cell_height * 5 / 8,
+		    x + mw, y + g_cell_height);
+		PaintRect(&mr);
+		return count;
+	case GLYPH_BLOCK_LOWER_6:
+		SetRect(&mr, x,
+		    y + g_cell_height - g_cell_height * 6 / 8,
+		    x + mw, y + g_cell_height);
+		PaintRect(&mr);
+		return count;
+	case GLYPH_BLOCK_LOWER_7:
+		SetRect(&mr, x,
+		    y + g_cell_height - g_cell_height * 7 / 8,
+		    x + mw, y + g_cell_height);
+		PaintRect(&mr);
+		return count;
+	case GLYPH_BLOCK_UPPER_1:
+		SetRect(&mr, x, y, x + mw,
+		    y + g_cell_height / 8);
+		PaintRect(&mr);
+		return count;
+
+	/* --- Shade merges --- */
+	case GLYPH_SHADE_LIGHT:
+		SetRect(&mr, x, y, x + mw, y + g_cell_height);
+		if (g_has_color_qd) {
+			RGBColor frgb, brgb, blend;
+			color_get_rgb(g_eff_fg, &frgb);
+			color_get_rgb(g_eff_bg, &brgb);
+			blend.red   = brgb.red +
+			    (frgb.red - brgb.red) / 4;
+			blend.green = brgb.green +
+			    (frgb.green - brgb.green) / 4;
+			blend.blue  = brgb.blue +
+			    (frgb.blue - brgb.blue) / 4;
+			RGBForeColor(&blend);
+			PaintRect(&mr);
+			set_fg_color(g_eff_fg);
+		} else {
+			if (attr & ATTR_INVERSE)
+				FillRect(&mr, &qd.dkGray);
+			else
+				FillRect(&mr, &qd.ltGray);
+		}
+		return count;
+
+	case GLYPH_SHADE_MEDIUM:
+		SetRect(&mr, x, y, x + mw, y + g_cell_height);
+		if (g_has_color_qd) {
+			RGBColor frgb, brgb, blend;
+			color_get_rgb(g_eff_fg, &frgb);
+			color_get_rgb(g_eff_bg, &brgb);
+			blend.red   = brgb.red +
+			    (frgb.red - brgb.red) / 2;
+			blend.green = brgb.green +
+			    (frgb.green - brgb.green) / 2;
+			blend.blue  = brgb.blue +
+			    (frgb.blue - brgb.blue) / 2;
+			RGBForeColor(&blend);
+			PaintRect(&mr);
+			set_fg_color(g_eff_fg);
+		} else {
+			FillRect(&mr, &qd.gray);
+		}
+		return count;
+
+	case GLYPH_SHADE_DARK:
+		SetRect(&mr, x, y, x + mw, y + g_cell_height);
+		if (g_has_color_qd) {
+			RGBColor frgb, brgb, blend;
+			color_get_rgb(g_eff_fg, &frgb);
+			color_get_rgb(g_eff_bg, &brgb);
+			blend.red   = frgb.red -
+			    (frgb.red - brgb.red) / 4;
+			blend.green = frgb.green -
+			    (frgb.green - brgb.green) / 4;
+			blend.blue  = frgb.blue -
+			    (frgb.blue - brgb.blue) / 4;
+			RGBForeColor(&blend);
+			PaintRect(&mr);
+			set_fg_color(g_eff_fg);
+		} else {
+			if (attr & ATTR_INVERSE)
+				FillRect(&mr, &qd.ltGray);
+			else
+				FillRect(&mr, &qd.dkGray);
+		}
+		return count;
+
+	default:
+		return 0;
+	}
+}
+
+/*
+ * Bitmap cache for frequently used multi-call glyphs.
+ *
+ * Pre-renders box drawing corners, tees, and double-line equivalents
+ * to offscreen bitmaps.  CopyBits (1 trap) replaces 3-8 QuickDraw
+ * calls per cached glyph.  Invalidated on font change.
+ *
+ * Memory: ~3.9KB static (49 glyphs × 2 variants × 40 bytes max).
+ */
+#define GLYPH_CACHE_COUNT	49
+#define GLYPH_CACHE_MAX_RB	2	/* rowBytes for up to 15px wide */
+#define GLYPH_CACHE_MAX_H	20	/* max cell height supported */
+#define GLYPH_CACHE_BM_SIZE	(GLYPH_CACHE_MAX_RB * GLYPH_CACHE_MAX_H)
+
+static const unsigned char cached_glyph_ids[GLYPH_CACHE_COUNT] = {
+	/* Single-line box drawing (10) */
+	GLYPH_BOX_V,   GLYPH_BOX_DR,  GLYPH_BOX_DL,
+	GLYPH_BOX_UR,  GLYPH_BOX_UL,  GLYPH_BOX_VR,
+	GLYPH_BOX_VL,  GLYPH_BOX_DH,  GLYPH_BOX_UH,
+	GLYPH_BOX_VH,
+	/* Double-line box drawing (10) */
+	GLYPH_BOX2_V,  GLYPH_BOX2_DR,
+	GLYPH_BOX2_DL, GLYPH_BOX2_UR, GLYPH_BOX2_UL,
+	GLYPH_BOX2_VR, GLYPH_BOX2_VL, GLYPH_BOX2_DH,
+	GLYPH_BOX2_UH, GLYPH_BOX2_VH,
+	/* Quadrants — heavy in ANSI art (4) */
+	GLYPH_QUAD_UL, GLYPH_QUAD_UR,
+	GLYPH_QUAD_LL, GLYPH_QUAD_LR,
+	/* Half blocks — non-mergeable individual cells (2) */
+	GLYPH_BLOCK_LEFT, GLYPH_BLOCK_RIGHT,
+	/* Arrows — btop scroll indicators, 6 QD calls each (2) */
+	GLYPH_ARROW_UP, GLYPH_ARROW_DOWN,
+	/* Mixed single/double junctions — btop panels (2) */
+	GLYPH_BOX_sVdR, GLYPH_BOX_sVdL,
+	/* Common symbols (2) */
+	GLYPH_CIRCLE_FILLED, GLYPH_CIRCLE_EMPTY,
+	/* Claude Code UI glyphs (4) */
+	GLYPH_TRI_RIGHT_SM, GLYPH_DOT_MIDDLE,
+	GLYPH_CHEVRON_RIGHT, GLYPH_ASTERISK_8,
+	/* Three-quarter quadrants — ANSI art (4) */
+	GLYPH_QUAD_UL_UR_LL, GLYPH_QUAD_UL_UR_LR,
+	GLYPH_QUAD_UL_LL_LR, GLYPH_QUAD_UR_LL_LR,
+	/* Diagonal quadrants — ANSI art (2) */
+	GLYPH_QUAD_UL_LR, GLYPH_QUAD_UR_LL,
+	/* Mixed junctions — btop panel headers (2) */
+	GLYPH_BOX_dHsD, GLYPH_BOX_dHsU,
+	/* Common symbols — CI/test output, dev tools (5) */
+	GLYPH_CHECK, GLYPH_CHECK_HEAVY,
+	GLYPH_CROSS, GLYPH_CROSS_HEAVY,
+	GLYPH_STAR_FILLED
+};
+
+static struct {
+	short		valid;
+	short		font_id;
+	short		font_size;
+	short		cell_w;
+	short		cell_h;
+	short		rowBytes;
+	unsigned char	bits[GLYPH_CACHE_COUNT][2][GLYPH_CACHE_BM_SIZE];
+} g_glyph_cache;
+
+/*
+ * glyph_cache_find - look up glyph in cache, return index or -1
+ */
+static short
+glyph_cache_find(unsigned char gid)
+{
+	short i;
+
+	for (i = 0; i < GLYPH_CACHE_COUNT; i++) {
+		if (cached_glyph_ids[i] == gid)
+			return i;
+	}
+	return -1;
+}
+
+/*
+ * glyph_cache_rebuild - re-render all cached glyphs for current font
+ *
+ * Creates a temporary offscreen GrafPort, renders each glyph to a
+ * 1-bit bitmap, stores normal and bold variants.
+ */
+static void
+glyph_cache_rebuild(void)
+{
+	GrafPort offPort;
+	GrafPtr savePort;
+	short i, v, rb, bm_size;
+	Rect bounds;
+
+	rb = (g_cell_width + 15) / 16 * 2;
+	if (rb > GLYPH_CACHE_MAX_RB || g_cell_height > GLYPH_CACHE_MAX_H) {
+		g_glyph_cache.valid = 0;
+		return;
+	}
+
+	bm_size = rb * g_cell_height;
+	SetRect(&bounds, 0, 0, g_cell_width, g_cell_height);
+
+	GetPort(&savePort);
+	OpenPort(&offPort);
+	offPort.portBits.rowBytes = rb;
+	offPort.portBits.bounds = bounds;
+	offPort.portRect = bounds;
+	RectRgn(offPort.clipRgn, &bounds);
+	RectRgn(offPort.visRgn, &bounds);
+
+	for (i = 0; i < GLYPH_CACHE_COUNT; i++) {
+		for (v = 0; v < 2; v++) {
+			unsigned char attr;
+			unsigned char *dst;
+
+			attr = v ? ATTR_BOLD : ATTR_NORMAL;
+			dst = g_glyph_cache.bits[i][v];
+
+			/* Clear bitmap (0 = white in 1-bit) */
+			memset(dst, 0, bm_size);
+			offPort.portBits.baseAddr = (Ptr)dst;
+
+			/* Render glyph at origin */
+			PenNormal();
+			draw_glyph_prim(cached_glyph_ids[i],
+			    0, 0, attr);
+		}
+	}
+
+	PenNormal();
+	ClosePort(&offPort);
+	SetPort(savePort);
+
+	g_glyph_cache.font_id = g_font_id;
+	g_glyph_cache.font_size = g_font_size;
+	g_glyph_cache.cell_w = g_cell_width;
+	g_glyph_cache.cell_h = g_cell_height;
+	g_glyph_cache.rowBytes = rb;
+	g_glyph_cache.valid = 1;
+}
+
+/*
+ * glyph_cache_draw - render a cached glyph via CopyBits
+ *
+ * Returns 1 if drawn from cache, 0 if not cached (caller should
+ * fall back to draw_glyph_prim).
+ */
+static short
+glyph_cache_draw(unsigned char gid, short x, short y, unsigned char attr)
+{
+	short idx, variant;
+	BitMap src;
+	Rect src_r, dst_r;
+
+	if (!g_glyph_cache.valid)
+		return 0;
+
+	/* Invalidate if font changed */
+	if (g_glyph_cache.font_id != g_font_id ||
+	    g_glyph_cache.font_size != g_font_size) {
+		g_glyph_cache.valid = 0;
+		return 0;
+	}
+
+	idx = glyph_cache_find(gid);
+	if (idx < 0)
+		return 0;
+
+	variant = (attr & ATTR_BOLD) ? 1 : 0;
+
+	/* Set up source BitMap */
+	src.baseAddr = (Ptr)g_glyph_cache.bits[idx][variant];
+	src.rowBytes = g_glyph_cache.rowBytes;
+	SetRect(&src.bounds, 0, 0,
+	    g_glyph_cache.cell_w, g_glyph_cache.cell_h);
+	SetRect(&src_r, 0, 0,
+	    g_glyph_cache.cell_w, g_glyph_cache.cell_h);
+	SetRect(&dst_r, x, y,
+	    x + g_glyph_cache.cell_w, y + g_glyph_cache.cell_h);
+
+	/* srcOr for normal, srcBic for inverse/dark mono */
+	CopyBits(&src, &qd.thePort->portBits,
+	    &src_r, &dst_r,
+	    mono_eff_inv(attr) ? srcBic : srcOr,
+	    0L);
+
+	return 1;
 }
 
 /*
@@ -741,47 +1165,102 @@ draw_row(Terminal *term, short row)
 			/* Cell type dispatch */
 			switch (run_attr & CELL_TYPE_MASK) {
 			case CELL_TYPE_DEC: {
-				short i, x;
+				short i, x, merged;
+				Rect run_r;
+				SetRect(&run_r, run_x, row_y,
+				    run_x + run_w,
+				    row_bottom(row));
+				if (mono_cell_prep(&run_r,
+				    run_attr))
+					PenMode(patBic);
 				x = run_x;
-				for (i = 0; i < run_len; i++) {
-					draw_line_char(buf[i], x, row_y,
-					    run_attr);
+				i = 0;
+				while (i < run_len) {
+					merged =
+					    try_merge_dec_run(
+					    (unsigned char)buf[i],
+					    buf, i, run_len,
+					    x, row_y, run_attr,
+					    cell_w);
+					if (merged > 0) {
+						x += merged * cell_w;
+						i += merged;
+						continue;
+					}
+					draw_line_char(buf[i],
+					    x, row_y, run_attr);
 					x += cell_w;
+					i++;
 				}
+				PenNormal();
 				if (use_color)
 					color_dirty = 1;
 				continue;
 			}
 			case CELL_TYPE_BRAILLE: {
 				short i, x;
+				Rect run_r;
+				SetRect(&run_r, run_x, row_y,
+				    run_x + run_w,
+				    row_bottom(row));
+				if (mono_cell_prep(&run_r,
+				    run_attr))
+					PenMode(patBic);
 				x = run_x;
 				for (i = 0; i < run_len; i++) {
 					draw_braille((unsigned char)buf[i],
 					    x, row_y, run_attr);
 					x += cell_w;
 				}
+				PenNormal();
 				if (use_color)
 					color_dirty = 1;
 				continue;
 			}
 			case CELL_TYPE_GLYPH: {
-				short i, x;
+				short i, x, merged;
+				unsigned char gid;
+				Rect run_r;
+				SetRect(&run_r, run_x, row_y,
+				    run_x + run_w,
+				    row_bottom(row));
+				if (mono_cell_prep(&run_r,
+				    run_attr))
+					PenMode(patBic);
 				x = run_x;
-				for (i = 0; i < run_len; i++) {
-					unsigned char gid;
+				i = 0;
+				while (i < run_len) {
 					gid = (unsigned char)buf[i];
 					if (gid == GLYPH_WIDE_SPACER) {
 						x += cell_w;
+						i++;
 						continue;
 					}
-					if (gid < GLYPH_EMOJI_BASE)
-						draw_glyph_prim(gid,
-						    x, row_y, run_attr);
-					else
+					merged =
+					    try_merge_glyph_run(gid,
+					    buf, i, run_len,
+					    x, row_y, run_attr,
+					    cell_w);
+					if (merged > 0) {
+						x += merged * cell_w;
+						i += merged;
+						continue;
+					}
+					if (gid < GLYPH_EMOJI_BASE) {
+						if (!glyph_cache_draw(
+						    gid, x, row_y,
+						    run_attr))
+							draw_glyph_prim(
+							    gid, x,
+							    row_y,
+							    run_attr);
+					} else
 						draw_glyph_bitmap(gid,
 						    x, row_y, run_attr);
 					x += cell_w;
+					i++;
 				}
+				PenNormal();
 				if (use_color)
 					color_dirty = 1;
 				continue;
@@ -992,13 +1471,6 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
-	/*
-	 * Monochrome cell setup: handles inverse and dark mode.
-	 * On color, draw_row already swapped fg/bg.
-	 */
-	if (mono_cell_prep(&cell_r, attr))
-		PenMode(patBic);
-
 	/* Bold: thicker horizontal pen */
 	if (attr & ATTR_BOLD)
 		PenSize(2, 1);
@@ -1150,7 +1622,6 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 		break;
 	}
 
-	PenNormal();
 }
 
 /*
@@ -1175,13 +1646,6 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 	h4 = g_cell_height / 4;
 
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
-
-	/*
-	 * Monochrome cell setup: handles inverse and dark mode.
-	 * On color, draw_row already swapped fg/bg.
-	 */
-	if (mono_cell_prep(&cell_r, attr))
-		PenMode(patBic);
 
 	/* Bold: thicker strokes */
 	if (attr & ATTR_BOLD)
@@ -2973,7 +3437,6 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 		break;
 	}
 
-	PenNormal();
 }
 
 /*
@@ -2988,7 +3451,7 @@ draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 {
 	const GlyphBitmap *bm;
 	BitMap src_bits;
-	Rect src_r, dst_r, cell_r;
+	Rect src_r, dst_r;
 	short dx, dy, cell2_w;
 
 	bm = glyph_get_bitmap(glyph_id);
@@ -3000,13 +3463,6 @@ draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 
 	/* 2-cell wide area */
 	cell2_w = g_cell_width * 2;
-	SetRect(&cell_r, x, y, x + cell2_w, y + g_cell_height);
-
-	/*
-	 * Monochrome cell setup: handles inverse and dark mode.
-	 * On color, draw_row already swapped fg/bg.
-	 */
-	mono_cell_prep(&cell_r, attr);
 
 	/* Build source BitMap from glyph data */
 	src_bits.baseAddr = (Ptr)bm->bits;
@@ -3042,7 +3498,7 @@ draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 static void
 draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 {
-	Rect cell_r, dot_r;
+	Rect dot_r;
 	short dot_w, dot_h, gap_x, gap_y;
 	short dx, dy;
 	short col_idx, row_idx;
@@ -3050,15 +3506,6 @@ draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 	static const unsigned char bit_pos[4][2] = {
 		{ 0, 3 }, { 1, 4 }, { 2, 5 }, { 6, 7 }
 	};
-
-	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
-
-	/*
-	 * Monochrome cell setup: handles inverse and dark mode.
-	 * On color, draw_row already swapped fg/bg.
-	 */
-	if (mono_cell_prep(&cell_r, attr))
-		PenMode(patBic);
 
 	/* Compute dot dimensions (scale with font) */
 	dot_w = g_cell_width / 4;
@@ -3094,9 +3541,6 @@ draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 		}
 	}
 
-	if (mono_eff_inv(attr))
-		PenMode(patCopy);
-	PenNormal();
 }
 
 /*
