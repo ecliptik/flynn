@@ -118,6 +118,7 @@ terminal_init(Terminal *term)
 
 	term->scroll_top = 0;
 	term->scroll_bottom = term->active_rows - 1;
+	term->scroll_pending = 0;
 
 	/* Character sets */
 	term->g0_charset = 'B';
@@ -700,6 +701,7 @@ void
 term_dirty_all(Terminal *term)
 {
 	term_dirty_range(term, 0, term->active_rows - 1);
+	term->scroll_pending = 0;
 }
 
 /*
@@ -818,14 +820,16 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 			term_save_scrollback(term, r);
 	}
 
-	/* Move lines up: single memmove instead of per-row memcpy */
+	/* Move lines up: per-row memmove using active_cols to
+	 * avoid moving unused columns (saves ~39% when 80 of 132) */
 	{
 		short rows_to_move = bottom - top - count + 1;
 		if (rows_to_move > 0) {
-			memmove(&term->screen[top][0],
-			    &term->screen[top + count][0],
-			    (long)rows_to_move * TERM_COLS *
-			    sizeof(TermCell));
+			for (r = 0; r < rows_to_move; r++)
+				memmove(&term->screen[top + r][0],
+				    &term->screen[top + count + r][0],
+				    term->active_cols *
+				    sizeof(TermCell));
 			memmove(&term->line_attr[top],
 			    &term->line_attr[top + count],
 			    rows_to_move);
@@ -834,12 +838,15 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		/* Scroll color arrays in parallel */
 		if (term->has_color && term->screen_color &&
 		    rows_to_move > 0) {
-			memmove(&term->screen_color[
-			    (long)top * TERM_COLS],
-			    &term->screen_color[
-			    (long)(top + count) * TERM_COLS],
-			    (long)rows_to_move * TERM_COLS *
-			    sizeof(CellColor));
+			for (r = 0; r < rows_to_move; r++)
+				memmove(
+				    &term->screen_color[
+				    (long)(top + r) * TERM_COLS],
+				    &term->screen_color[
+				    (long)(top + count + r) *
+				    TERM_COLS],
+				    term->active_cols *
+				    sizeof(CellColor));
 		}
 	}
 
@@ -868,7 +875,53 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		}
 	}
 
-	term_dirty_range(term, top, bottom);
+	/* Set/accumulate scroll hint for ScrollRect optimization */
+	if (term->scroll_pending && term->scroll_dir == 1 &&
+	    term->scroll_rgn_top == top &&
+	    term->scroll_rgn_bot == bottom) {
+		/* Same direction and region — accumulate */
+		term->scroll_count += count;
+	} else if (term->scroll_pending) {
+		/* Different direction or region — flush old hint */
+		term_dirty_range(term, term->scroll_rgn_top,
+		    term->scroll_rgn_bot);
+		term->scroll_dir = 1;
+		term->scroll_count = count;
+		term->scroll_rgn_top = top;
+		term->scroll_rgn_bot = bottom;
+	} else {
+		/* New hint */
+		term->scroll_pending = 1;
+		term->scroll_dir = 1;
+		term->scroll_count = count;
+		term->scroll_rgn_top = top;
+		term->scroll_rgn_bot = bottom;
+	}
+
+	/* Full-screen fallback: if accumulated count >= region height,
+	 * ScrollRect saves nothing — dirty all and cancel hint */
+	{
+		short region_height = bottom - top + 1;
+		if (term->scroll_count >= region_height) {
+			term_dirty_range(term, top, bottom);
+			term->scroll_pending = 0;
+		} else {
+			/* Shift dirty flags up by count to stay aligned
+			 * with ScrollRect pixel shift.  Without this,
+			 * character writes between scrolls leave dirty
+			 * flags at stale positions, causing rows to show
+			 * wrong content after the blit. */
+			short dr;
+			for (dr = top; dr <= bottom - count; dr++)
+				term->dirty[dr] = term->dirty[dr + count];
+			for (dr = bottom - count + 1; dr <= bottom; dr++)
+				term->dirty[dr] = 0;
+
+			/* Dirty only newly exposed rows */
+			term_dirty_range(term,
+			    bottom - term->scroll_count + 1, bottom);
+		}
+	}
 }
 
 /*
@@ -885,14 +938,17 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 	if (count > (bottom - top + 1))
 		count = bottom - top + 1;
 
-	/* Move lines down: single memmove instead of per-row memcpy */
+	/* Move lines down: per-row memmove using active_cols,
+	 * iterate in reverse (dest > src) to avoid overwriting */
 	{
 		short rows_to_move = bottom - top - count + 1;
 		if (rows_to_move > 0) {
-			memmove(&term->screen[top + count][0],
-			    &term->screen[top][0],
-			    (long)rows_to_move * TERM_COLS *
-			    sizeof(TermCell));
+			for (r = rows_to_move - 1; r >= 0; r--)
+				memmove(&term->screen[top + count +
+				    r][0],
+				    &term->screen[top + r][0],
+				    term->active_cols *
+				    sizeof(TermCell));
 			memmove(&term->line_attr[top + count],
 			    &term->line_attr[top],
 			    rows_to_move);
@@ -901,12 +957,15 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		/* Scroll color arrays in parallel */
 		if (term->has_color && term->screen_color &&
 		    rows_to_move > 0) {
-			memmove(&term->screen_color[
-			    (long)(top + count) * TERM_COLS],
-			    &term->screen_color[
-			    (long)top * TERM_COLS],
-			    (long)rows_to_move * TERM_COLS *
-			    sizeof(CellColor));
+			for (r = rows_to_move - 1; r >= 0; r--)
+				memmove(
+				    &term->screen_color[
+				    (long)(top + count + r) *
+				    TERM_COLS],
+				    &term->screen_color[
+				    (long)(top + r) * TERM_COLS],
+				    term->active_cols *
+				    sizeof(CellColor));
 		}
 	}
 
@@ -934,7 +993,50 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		}
 	}
 
-	term_dirty_range(term, top, bottom);
+	/* Set/accumulate scroll hint for ScrollRect optimization */
+	if (term->scroll_pending && term->scroll_dir == -1 &&
+	    term->scroll_rgn_top == top &&
+	    term->scroll_rgn_bot == bottom) {
+		/* Same direction and region — accumulate */
+		term->scroll_count += count;
+	} else if (term->scroll_pending) {
+		/* Different direction or region — flush old hint */
+		term_dirty_range(term, term->scroll_rgn_top,
+		    term->scroll_rgn_bot);
+		term->scroll_dir = -1;
+		term->scroll_count = count;
+		term->scroll_rgn_top = top;
+		term->scroll_rgn_bot = bottom;
+	} else {
+		/* New hint */
+		term->scroll_pending = 1;
+		term->scroll_dir = -1;
+		term->scroll_count = count;
+		term->scroll_rgn_top = top;
+		term->scroll_rgn_bot = bottom;
+	}
+
+	/* Full-screen fallback: if accumulated count >= region height,
+	 * ScrollRect saves nothing — dirty all and cancel hint */
+	{
+		short region_height = bottom - top + 1;
+		if (term->scroll_count >= region_height) {
+			term_dirty_range(term, top, bottom);
+			term->scroll_pending = 0;
+		} else {
+			/* Shift dirty flags down by count to stay aligned
+			 * with ScrollRect pixel shift */
+			short dr;
+			for (dr = bottom; dr >= top + count; dr--)
+				term->dirty[dr] = term->dirty[dr - count];
+			for (dr = top; dr < top + count; dr++)
+				term->dirty[dr] = 0;
+
+			/* Dirty only newly exposed rows at top */
+			term_dirty_range(term, top,
+			    top + term->scroll_count - 1);
+		}
+	}
 }
 
 /*
@@ -1225,7 +1327,7 @@ term_process_esc(Terminal *term, unsigned char ch)
 		term->parse_state = PARSE_CSI;
 		term->num_params = 0;
 		term->intermediate = 0;
-		memset(term->params, 0, sizeof(term->params));
+		term->params[0] = 0;
 		return;
 
 	case '7':

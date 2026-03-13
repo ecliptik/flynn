@@ -82,6 +82,7 @@ short			g_font_id = 4;
 short			g_font_size = 9;
 static short		g_dark_mode = 0;
 static short		g_mono_dark = 0;	/* monochrome dark mode active */
+static RgnHandle	g_scroll_rgn = 0L;	/* pre-allocated for ScrollRect */
 
 /* Current effective colors for glyph shade blending (set by draw_row) */
 static unsigned char	g_eff_fg = 0;
@@ -150,6 +151,8 @@ static void draw_glyph_prim(unsigned char glyph_id, short x, short y,
 static void draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	    unsigned char attr);
 static void draw_cursor(Terminal *term, short on);
+static void cursor_set_rect(Rect *r, short crow, short ccol,
+	    unsigned char style);
 static void sel_normalize(short *sr, short *sc, short *er, short *ec);
 static void find_word_bounds(Terminal *term, short row, short col,
 	    short *start, short *end);
@@ -239,15 +242,79 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	cached_fg_idx = -1;
 	cached_bg_idx = -1;
 
-	/* If cursor moved, mark old and new rows dirty to clean up
-	 * XOR artifacts from previous draw_cursor() calls */
-	if (cursor_initialized) {
+	/* Erase cursor XOR artifact before any drawing.
+	 * ScrollRect would blit the XOR mark to wrong positions,
+	 * and dirty row redraws need clean pixels underneath. */
+	if (cursor_initialized && cursor_visible) {
+		Rect cur_r;
+		cursor_set_rect(&cur_r, cursor_prev_row,
+		    cursor_prev_col, term->cursor_style);
+		PenMode(patXor);
+		PaintRect(&cur_r);
+		PenNormal();
+		cursor_visible = 0;
+	}
+
+	/* Track if this draw involves a scroll — suppress cursor
+	 * drawing during scroll draws to prevent XOR artifacts
+	 * from being blitted by subsequent ScrollRect calls */
+	{
+	short had_scroll = term->scroll_pending;
+
+	/* If cursor moved and no scroll, mark old/new rows dirty */
+	if (cursor_initialized && !had_scroll) {
 		short crow, ccol;
 		terminal_get_cursor(term, &crow, &ccol);
 		if (crow != cursor_prev_row || ccol != cursor_prev_col) {
 			term->dirty[cursor_prev_row] = 1;
 			term->dirty[crow] = 1;
 		}
+	}
+
+	/* ScrollRect optimization: blit existing pixels instead of
+	 * redrawing all rows.  Only the newly exposed rows (marked
+	 * dirty by term_scroll_up/down) need actual drawing. */
+	if (term->scroll_pending) {
+		short rgn_height = term->scroll_rgn_bot -
+		    term->scroll_rgn_top + 1;
+
+		if (term->scroll_count < rgn_height) {
+			Rect scroll_r;
+			short dv;
+
+			SetRect(&scroll_r, LEFT_MARGIN,
+			    row_top(term->scroll_rgn_top),
+			    LEFT_MARGIN +
+			    term->active_cols * g_cell_width,
+			    row_bottom(term->scroll_rgn_bot));
+
+			if (term->scroll_dir > 0)
+				dv = -(term->scroll_count *
+				    g_cell_height);
+			else
+				dv = term->scroll_count *
+				    g_cell_height;
+
+			/* In dark mode, set background to black so
+			 * ScrollRect fills exposed region with black
+			 * instead of white */
+			if (g_dark_mode || g_mono_dark)
+				BackPat(&qd.black);
+
+			/* Use pre-allocated region to avoid
+			 * NewRgn/DisposeRgn overhead per draw */
+			if (!g_scroll_rgn)
+				g_scroll_rgn = NewRgn();
+			SetEmptyRgn(g_scroll_rgn);
+			ScrollRect(&scroll_r, 0, dv, g_scroll_rgn);
+			/* Validate so Window Manager doesn't
+			 * generate updateEvt → full redraw */
+			ValidRgn(g_scroll_rgn);
+
+			if (g_dark_mode || g_mono_dark)
+				BackPat(&qd.white);
+		}
+		term->scroll_pending = 0;
 	}
 
 	for (row = 0; row < term->active_rows; row++) {
@@ -278,6 +345,27 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		if (g_has_color_qd)
 			set_fg_color(g_dark_mode ? 15 : 0);
 
+		/* Skip draw_row for blank rows on mono — EraseRect already cleared */
+		if (!g_has_color_qd) {
+			TermCell *rc;
+			short blank, ci;
+			if (term->scroll_offset == 0)
+				rc = &term->screen[row][0];
+			else {
+				/* For scrollback, skip optimization — always draw */
+				goto do_draw;
+			}
+			blank = 1;
+			for (ci = 0; ci < term->active_cols; ci++) {
+				if (rc[ci].ch != ' ' || rc[ci].attr != ATTR_NORMAL) {
+					blank = 0;
+					break;
+				}
+			}
+			if (blank)
+				continue;
+		}
+do_draw:
 		draw_row(term, row);
 
 		/*
@@ -349,18 +437,25 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		PenNormal();
 	}
 
-	/* Draw cursor only when viewing live terminal and cursor enabled */
-	if (term->scroll_offset == 0 && term->cursor_visible)
+	/* Draw cursor only on non-scroll draws.  During scroll draws,
+	 * suppressing cursor avoids XOR artifacts that would be blitted
+	 * to wrong positions by the next ScrollRect.  cursor_blink()
+	 * re-shows the cursor during idle time. */
+	if (!had_scroll && term->scroll_offset == 0 &&
+	    term->cursor_visible)
 		draw_cursor(term, 1);
+	} /* end had_scroll scope */
 }
 
 /*
  * draw_row - render one row of terminal cells
  *
  * Scans left-to-right, batching consecutive cells with the same
- * attribute.  Non-bold plain text uses DrawText() for ~10x speedup
- * over per-character MoveTo()+DrawChar().  Bold and inverse text
- * still uses per-character positioning to avoid advance width drift.
+ * attribute.  Uses DrawText() for all text rendering where possible.
+ * Bold text uses the double-DrawText technique: two DrawText passes
+ * at x and x+1 with plain TextFace replicates QuickDraw bold's
+ * shift-and-OR with correct advance widths.  Only double-width
+ * cells require per-character MoveTo()+DrawChar().
  *
  * Selection bounds are pre-computed per row to avoid calling
  * term_ui_sel_contains() per cell.  Inner-loop x-coordinates use
@@ -478,62 +573,95 @@ draw_row(Terminal *term, short row)
 	col = 0;
 	while (col < eff_cols) {
 		unsigned char cell_attr;
-		unsigned char cell_fg, cell_bg;
 
 		run_start = col;
 		run_len = 0;
 
-		/* Collect run of cells with same attributes and color.
-		 * First cell seeds run_attr/fg/bg; subsequent cells
-		 * break on attribute or color change. */
-		while (col < eff_cols) {
-			cell = &row_cells[col];
-			cell_attr = cell->attr;
-			if (col >= sel_start_col && col <= sel_end_col)
-				cell_attr ^= ATTR_INVERSE;
+		if (use_color) {
+			/* Color path: collect run matching attr+color */
+			unsigned char cell_fg, cell_bg;
 
-			cell_fg = COLOR_DEFAULT;
-			cell_bg = COLOR_DEFAULT;
-			if (use_color && (cell_attr & ATTR_HAS_COLOR) &&
-			    row_colors) {
-				cell_fg = row_colors[col].fg;
-				cell_bg = row_colors[col].bg;
-			}
+			while (col < eff_cols) {
+				cell = &row_cells[col];
+				cell_attr = cell->attr;
+				if (col >= sel_start_col &&
+				    col <= sel_end_col)
+					cell_attr ^= ATTR_INVERSE;
 
-			if (run_len == 0) {
-				/* First cell: seed the run */
-				run_attr = cell_attr;
-				run_fg = cell_fg;
-				run_bg = cell_bg;
-			} else {
-				if (cell_attr != run_attr)
-					break;
-				if (use_color &&
-				    (cell_fg != run_fg ||
-				    cell_bg != run_bg))
-					break;
-			}
-
-			buf[run_len] = cell->ch;
-			run_len++;
-			col++;
-		}
-
-		/* Skip runs of plain spaces (already erased) —
-		 * but NOT if they have background color */
-		if (run_attr == ATTR_NORMAL &&
-		    !(use_color && run_bg != COLOR_DEFAULT)) {
-			short all_space, i;
-
-			all_space = 1;
-			for (i = 0; i < run_len; i++) {
-				if (buf[i] != ' ') {
-					all_space = 0;
-					break;
+				cell_fg = COLOR_DEFAULT;
+				cell_bg = COLOR_DEFAULT;
+				if ((cell_attr & ATTR_HAS_COLOR) &&
+				    row_colors) {
+					cell_fg = row_colors[col].fg;
+					cell_bg = row_colors[col].bg;
 				}
+
+				if (run_len == 0) {
+					run_attr = cell_attr;
+					run_fg = cell_fg;
+					run_bg = cell_bg;
+				} else {
+					if (cell_attr != run_attr)
+						break;
+					if (cell_fg != run_fg ||
+					    cell_bg != run_bg)
+						break;
+				}
+
+				buf[run_len] = cell->ch;
+				run_len++;
+				col++;
 			}
-			if (all_space)
-				continue;
+
+			/* Skip plain spaces unless they have bg */
+			if (run_attr == ATTR_NORMAL &&
+			    run_bg == COLOR_DEFAULT) {
+				short all_space = 1, i;
+				for (i = 0; i < run_len; i++) {
+					if (buf[i] != ' ') {
+						all_space = 0;
+						break;
+					}
+				}
+				if (all_space)
+					continue;
+			}
+		} else {
+			/* Mono path: collect run by attr only */
+			run_fg = COLOR_DEFAULT;
+			run_bg = COLOR_DEFAULT;
+
+			while (col < eff_cols) {
+				cell = &row_cells[col];
+				cell_attr = cell->attr;
+				if (col >= sel_start_col &&
+				    col <= sel_end_col)
+					cell_attr ^= ATTR_INVERSE;
+
+				if (run_len == 0) {
+					run_attr = cell_attr;
+				} else {
+					if (cell_attr != run_attr)
+						break;
+				}
+
+				buf[run_len] = cell->ch;
+				run_len++;
+				col++;
+			}
+
+			/* Skip plain spaces (already erased) */
+			if (run_attr == ATTR_NORMAL) {
+				short all_space = 1, i;
+				for (i = 0; i < run_len; i++) {
+					if (buf[i] != ' ') {
+						all_space = 0;
+						break;
+					}
+				}
+				if (all_space)
+					continue;
+			}
 		}
 
 		/* Pre-compute run pixel position and width */
@@ -551,11 +679,18 @@ draw_row(Terminal *term, short row)
 		 * by mono_cell_prep/mono_eff_inv (srcBic/patBic).
 		 */
 		{
-			unsigned char eff_fg = run_fg;
-			unsigned char eff_bg = run_bg;
+			unsigned char eff_fg, eff_bg;
 
 			if (use_color) {
-				/* Resolve defaults based on dark mode */
+				/*
+				 * Resolve effective fg/bg for
+				 * rendering.  COLOR_DEFAULT resolves
+				 * to fg=black(0)/bg=white(15) in
+				 * normal mode, swapped in dark mode.
+				 */
+				eff_fg = run_fg;
+				eff_bg = run_bg;
+
 				if (eff_fg == COLOR_DEFAULT)
 					eff_fg = g_dark_mode ? 15 : 0;
 				if (eff_bg == COLOR_DEFAULT)
@@ -574,48 +709,38 @@ draw_row(Terminal *term, short row)
 					eff_fg += 8;
 
 				if (run_attr & ATTR_INVERSE) {
-					/* Swap fg and bg */
 					unsigned char tmp = eff_fg;
 					eff_fg = eff_bg;
 					eff_bg = tmp;
 				}
-			}
 
-			/*
-			 * Draw colored background.
-			 * On color systems, draw bg when it differs from
-			 * the row erase color. In dark mode, erase is
-			 * black (0); in normal mode, erase is white (15).
-			 */
-			if (use_color) {
-				unsigned char erase_bg =
-				    g_dark_mode ? 0 : 15;
-				if (eff_bg != erase_bg) {
-					Rect bg_r;
-					SetRect(&bg_r,
-					    run_x, row_y,
-					    run_x + run_w,
-					    row_bottom(row));
-					set_bg_color(eff_bg);
-					EraseRect(&bg_r);
+				/* Draw bg when it differs from erase
+				 * color (dark=black, normal=white) */
+				{
+					unsigned char erase_bg =
+					    g_dark_mode ? 0 : 15;
+					if (eff_bg != erase_bg) {
+						Rect bg_r;
+						SetRect(&bg_r,
+						    run_x, row_y,
+						    run_x + run_w,
+						    row_bottom(row));
+						set_bg_color(eff_bg);
+						EraseRect(&bg_r);
+					}
 				}
-			}
 
-			/*
-			 * Set fg color for pen-based paths
-			 * (line drawing, braille, glyphs).
-			 * Text fg is set AFTER TextFace below
-			 * because TextFace resets the port's
-			 * foreground color on Color QuickDraw.
-			 */
-			if (use_color) {
+				/* Set fg for pen-based paths
+				 * (line drawing, braille, glyphs).
+				 * Text fg set AFTER TextFace below. */
 				set_fg_color(eff_fg);
 				g_eff_fg = eff_fg;
 				g_eff_bg = eff_bg;
 			}
 
-			/* DEC Special Graphics */
-			if (CELL_IS_DEC(run_attr)) {
+			/* Cell type dispatch */
+			switch (run_attr & CELL_TYPE_MASK) {
+			case CELL_TYPE_DEC: {
 				short i, x;
 				x = run_x;
 				for (i = 0; i < run_len; i++) {
@@ -627,9 +752,7 @@ draw_row(Terminal *term, short row)
 					color_dirty = 1;
 				continue;
 			}
-
-			/* Braille patterns */
-			if (CELL_IS_BRAILLE(run_attr)) {
+			case CELL_TYPE_BRAILLE: {
 				short i, x;
 				x = run_x;
 				for (i = 0; i < run_len; i++) {
@@ -641,9 +764,7 @@ draw_row(Terminal *term, short row)
 					color_dirty = 1;
 				continue;
 			}
-
-			/* Custom glyphs: primitives and emoji */
-			if (CELL_IS_GLYPH(run_attr)) {
+			case CELL_TYPE_GLYPH: {
 				short i, x;
 				x = run_x;
 				for (i = 0; i < run_len; i++) {
@@ -665,11 +786,28 @@ draw_row(Terminal *term, short row)
 					color_dirty = 1;
 				continue;
 			}
+			default:
+				break;  /* fall through to normal text */
+			}
 
-			/* Set text face for this run */
+			/*
+			 * Set text face for this run.
+			 *
+			 * For bold with normal cell width, we use
+			 * the double-DrawText technique instead of
+			 * TextFace(bold): two DrawText passes at
+			 * x and x+1 with TextFace(0) replicate QD
+			 * bold's shift-and-OR with correct advance
+			 * widths (no drift).  14.5x faster than
+			 * per-char MoveTo+DrawChar.
+			 *
+			 * Bold is still set for double-width cells
+			 * which must use per-char rendering anyway.
+			 */
 			{
 				short face = 0;
-				if (run_attr & ATTR_BOLD)
+				if ((run_attr & ATTR_BOLD) &&
+				    cell_w != g_cell_width)
 					face |= bold;
 				if (run_attr & ATTR_UNDERLINE)
 					face |= underline;
@@ -690,23 +828,38 @@ draw_row(Terminal *term, short row)
 				set_fg_color(eff_fg);
 
 			if (run_attr & ATTR_INVERSE) {
-				if (use_color) {
+				if (cell_w != g_cell_width) {
+					/*
+					 * Double-width inverse:
+					 * per-char required.
+					 */
 					short x = run_x;
 					short i;
+					if (!use_color) {
+						Rect inv_r;
+						SetRect(&inv_r,
+						    run_x, row_y,
+						    run_x + run_w,
+						    row_bottom(row));
+						if (mono_cell_prep(
+						    &inv_r, run_attr))
+							TextMode(srcBic);
+					}
 					for (i = 0; i < run_len; i++) {
 						MoveTo(x, baseline);
 						DrawChar(buf[i]);
 						x += cell_w;
 					}
-				} else {
+					if (!use_color)
+						TextMode(srcOr);
+				} else if (!use_color) {
 					/*
-					 * Monochrome inverse text.
-					 * mono_cell_prep handles bg:
-					 * light+inv → PaintRect+srcBic
-					 * dark+inv → EraseRect+srcOr
+					 * Monochrome inverse:
+					 * batched DrawText.
+					 * mono_cell_prep fills bg.
 					 */
 					Rect inv_r;
-					short x, use_bic;
+					short use_bic;
 					SetRect(&inv_r,
 					    run_x, row_y,
 					    run_x + run_w,
@@ -716,21 +869,39 @@ draw_row(Terminal *term, short row)
 					    run_attr);
 					if (use_bic)
 						TextMode(srcBic);
-					x = run_x;
-					{
-						short i;
-						for (i = 0; i < run_len;
-						    i++) {
-							MoveTo(x, baseline);
-							DrawChar(buf[i]);
-							x += cell_w;
-						}
+					MoveTo(col_left(run_start),
+					    baseline);
+					DrawText(buf, 0, run_len);
+					if (run_attr & ATTR_BOLD) {
+						MoveTo(
+						    col_left(run_start)
+						    + 1, baseline);
+						DrawText(buf, 0,
+						    run_len);
 					}
 					if (use_bic)
 						TextMode(srcOr);
+				} else {
+					/*
+					 * Color inverse: batched
+					 * DrawText for all cases.
+					 */
+					MoveTo(col_left(run_start),
+					    baseline);
+					DrawText(buf, 0, run_len);
+					if (run_attr & ATTR_BOLD) {
+						MoveTo(
+						    col_left(run_start)
+						    + 1, baseline);
+						DrawText(buf, 0,
+						    run_len);
+					}
 				}
-			} else if ((run_attr & ATTR_BOLD) ||
-			    cell_w != g_cell_width) {
+			} else if (cell_w != g_cell_width) {
+				/*
+				 * Double-width: per-char required
+				 * for 2x cell spacing.
+				 */
 				short x = run_x;
 				short i;
 				if (g_mono_dark)
@@ -742,7 +913,27 @@ draw_row(Terminal *term, short row)
 				}
 				if (g_mono_dark)
 					TextMode(srcOr);
+			} else if (run_attr & ATTR_BOLD) {
+				/*
+				 * Bold normal-width: double-DrawText.
+				 * Two passes at x and x+1 with plain
+				 * TextFace replicates QD bold's
+				 * shift-and-OR algorithm with correct
+				 * advance widths.
+				 */
+				if (g_mono_dark)
+					TextMode(srcBic);
+				MoveTo(col_left(run_start), baseline);
+				DrawText(buf, 0, run_len);
+				MoveTo(col_left(run_start) + 1,
+				    baseline);
+				DrawText(buf, 0, run_len);
+				if (g_mono_dark)
+					TextMode(srcOr);
 			} else {
+				/*
+				 * Normal text: batched DrawText.
+				 */
 				if (g_mono_dark)
 					TextMode(srcBic);
 				MoveTo(col_left(run_start), baseline);
@@ -3000,6 +3191,14 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	PenNormal();
 
 	cursor_visible = !cursor_visible;
+
+	/* Track where we drew so term_ui_draw can erase it.
+	 * Without this, the erase targets the old cursor_prev
+	 * position while the actual XOR mark is here. */
+	if (cursor_visible) {
+		cursor_prev_row = crow;
+		cursor_prev_col = ccol;
+	}
 
 	SetPort(old_port);
 }
