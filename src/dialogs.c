@@ -77,10 +77,14 @@ conn_status_show(const char *msg)
 	w = NewWindow(0L, &r, title, true, dBoxProc,
 	    (WindowPtr)-1L, false, 0L);
 	if (w) {
+		Rect clip_r;
+
 		GetPort(&save);
 		SetPort(w);
 		TextFont(0);   /* Chicago */
 		TextSize(12);
+		SetRect(&clip_r, 0, 0, STATUS_WIN_W, STATUS_WIN_H);
+		ClipRect(&clip_r);
 		len = strlen(msg);
 		if (len > 255) len = 255;
 		ps[0] = len;
@@ -104,6 +108,7 @@ conn_status_update(WindowPtr w, const char *msg)
 	GetPort(&save);
 	SetPort(w);
 	SetRect(&r, 0, 0, STATUS_WIN_W, STATUS_WIN_H);
+	ClipRect(&r);
 	EraseRect(&r);
 	len = strlen(msg);
 	if (len > 255) len = 255;
@@ -907,10 +912,10 @@ bm_list_draw(WindowPtr win, short item)
 {
 	short i, y;
 	Rect r;
-	char line[180];
 	short len, tmpType;
 	Handle tmpH;
 	FlynnPrefs *p = bm_prefs_ptr;
+	RgnHandle save_clip;
 
 	GetDialogItem((DialogPtr)win, item, &tmpType, &tmpH, &r);
 	bm_list_rect = r;
@@ -919,24 +924,19 @@ bm_list_draw(WindowPtr win, short item)
 	FrameRect(&r);
 	InsetRect(&r, 1, 1);
 
+	/* Clip text drawing to list rect so long names don't overflow */
+	save_clip = NewRgn();
+	GetClip(save_clip);
+	ClipRect(&r);
+
 	for (i = 0; i < p->bookmark_count; i++) {
 		y = r.top + 2 + i * 16;
 		if (y + 14 > r.bottom)
 			break;
 
 		MoveTo(r.left + 4, y + 12);
-		if (p->bookmarks[i].port != 23)
-			len = snprintf(line, sizeof(line),
-			    "%s - %s:%u",
-			    p->bookmarks[i].name,
-			    p->bookmarks[i].host,
-			    p->bookmarks[i].port);
-		else
-			len = snprintf(line, sizeof(line),
-			    "%s - %s",
-			    p->bookmarks[i].name,
-			    p->bookmarks[i].host);
-		DrawText(line, 0, len);
+		len = strlen(p->bookmarks[i].name);
+		DrawText(p->bookmarks[i].name, 0, len);
 
 		if (i == bm_selection) {
 			Rect sel_r;
@@ -945,6 +945,9 @@ bm_list_draw(WindowPtr win, short item)
 			InvertRect(&sel_r);
 		}
 	}
+
+	SetClip(save_clip);
+	DisposeRgn(save_clip);
 }
 
 static pascal Boolean
