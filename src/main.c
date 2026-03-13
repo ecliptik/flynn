@@ -303,14 +303,14 @@ session_process_data(Session *sess)
 			    out_buf + offset, chunk);
 			offset += chunk;
 
-			/* Draw when scroll accumulates past threshold
-			 * and there's more data to process.  With
-			 * 512-byte chunks (~6 lines each), threshold
-			 * of 6 triggers one draw per chunk —
-			 * ScrollRect blits 18 rows, redraws 6. */
+			/* Draw when scroll accumulates past half
+			 * the screen.  Batches more scroll before
+			 * drawing — ScrollRect handles large
+			 * offsets as efficiently as small ones. */
 			if (offset < out_len &&
 			    sess->terminal.scroll_pending &&
-			    sess->terminal.scroll_count >= 6) {
+			    sess->terminal.scroll_count >=
+			    sess->terminal.active_rows / 2) {
 				session_draw(sess);
 			}
 		}
