@@ -393,12 +393,15 @@ main_event_loop(void)
 
 			/* Fast path: single session skips save/load cycling */
 			if (session_count() == 1 && active_session) {
-				short drain = 0;
+				short drain;
+				long draw_deadline = 0;
 
-				/* Drain loop: batch up to 8 TCP reads
-				 * before drawing.  Scroll hints
-				 * accumulate across reads for a single
-				 * ScrollRect blit. */
+				/* Jump scroll: suppress draws while
+				 * TCP data is still arriving.  Draw
+				 * when stream pauses or after 4 ticks
+				 * (68ms). */
+			drain_jump:
+				drain = 0;
 				do {
 					prev_state =
 					    active_session->conn.state;
@@ -423,8 +426,16 @@ main_event_loop(void)
 				} while (drain < 16);
 
 				if (drain > 0) {
-					session_draw(active_session);
+					if (!draw_deadline)
+						draw_deadline =
+						    TickCount() + 4;
 					had_data = 1;
+					if (active_session->conn
+					    .pending_data > 0 &&
+					    TickCount() < draw_deadline)
+						goto drain_jump;
+					session_draw(active_session);
+					draw_deadline = 0;
 				}
 
 				if (!g_suspended &&
@@ -461,12 +472,15 @@ main_event_loop(void)
 				session_load_font(sess);
 
 				{
-					short drain = 0;
+					short drain;
+					long draw_deadline = 0;
 
-					/* Drain loop: batch up to 4
-					 * TCP reads per session in
-					 * multi-session mode (lower
-					 * limit avoids starvation) */
+					/* Jump scroll: suppress draws
+					 * while TCP data arriving.
+					 * Draw when stream pauses or
+					 * 4-tick deadline expires. */
+				drain_bg:
+					drain = 0;
 					do {
 						prev_state =
 						    sess->conn.state;
@@ -492,8 +506,18 @@ main_event_loop(void)
 					} while (drain < 8);
 
 					if (drain > 0) {
-						session_draw(sess);
+						if (!draw_deadline)
+							draw_deadline =
+							    TickCount()
+							    + 4;
 						had_data = 1;
+						if (sess->conn
+						    .pending_data > 0
+						    && TickCount() <
+						    draw_deadline)
+							goto drain_bg;
+						session_draw(sess);
+						draw_deadline = 0;
 					}
 				}
 
