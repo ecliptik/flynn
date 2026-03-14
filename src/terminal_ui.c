@@ -449,8 +449,10 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 	/* Step 3-4: Switch to offscreen for dirty row rendering.
 	 * All QuickDraw calls between SetPortBits go to the
-	 * invisible offscreen buffer — no visible flash. */
-	use_offscreen = any_dirty &&
+	 * invisible offscreen buffer — no visible flash.
+	 * Disabled on color systems: 1-bit BitMap can't carry
+	 * color info, so PmForeColor/RGBForeColor produce garbage. */
+	use_offscreen = any_dirty && !g_has_color_qd &&
 	    offscreen_alloc(win, term->active_cols, term->active_rows);
 
 	if (use_offscreen) {

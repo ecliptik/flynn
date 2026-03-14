@@ -427,14 +427,25 @@ main_event_loop(void)
 				} while (drain < 16);
 
 				if (drain > 0) {
-					if (!draw_deadline)
-						draw_deadline =
-						    TickCount() + 4;
 					had_data = 1;
-					if (active_session->conn
-					    .pending_data > 0 &&
-					    TickCount() < draw_deadline)
-						goto drain_jump;
+					/* Jump scroll: suppress draws
+					 * while data arriving (mono
+					 * only — color draws are too
+					 * expensive without offscreen,
+					 * would starve event loop) */
+					if (!g_has_color_qd) {
+						if (!draw_deadline)
+							draw_deadline =
+							    TickCount()
+							    + 4;
+						if (active_session
+						    ->conn
+						    .pending_data > 0
+						    && TickCount() <
+						    draw_deadline)
+							goto
+							    drain_jump;
+					}
 					session_draw(active_session);
 					draw_deadline = 0;
 				}
@@ -516,16 +527,21 @@ main_event_loop(void)
 					} while (drain < 8);
 
 					if (drain > 0) {
-						if (!draw_deadline)
-							draw_deadline =
-							    TickCount()
-							    + 4;
 						had_data = 1;
-						if (sess->conn
-						    .pending_data > 0
-						    && TickCount() <
-						    draw_deadline)
-							goto drain_bg;
+						if (!g_has_color_qd) {
+							if (!draw_deadline)
+								draw_deadline =
+								    TickCount()
+								    + 4;
+							if (sess->conn
+							    .pending_data
+							    > 0
+							    && TickCount()
+							    <
+							    draw_deadline)
+								goto
+								    drain_bg;
+						}
 						session_draw(sess);
 						draw_deadline = 0;
 					}
