@@ -98,6 +98,10 @@ session_destroy(Session *s)
 	if (s == 0L)
 		return;
 
+	/* Invalidate offscreen buffer — prevents stale content
+	 * from a destroyed session being blitted to a new window */
+	term_ui_invalidate_offscreen();
+
 	if (s->conn.state != CONN_STATE_IDLE)
 		conn_close(&s->conn);
 
