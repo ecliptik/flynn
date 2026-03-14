@@ -385,6 +385,7 @@ main_event_loop(void)
 			short si;
 			Session *sess;
 			short prev_state;
+			static unsigned short bg_tick = 0;
 
 			/* Save user interaction state (selection, cursor)
 			 * before cycling through sessions */
@@ -453,6 +454,7 @@ main_event_loop(void)
 				break;
 			}
 
+			bg_tick++;
 			for (si = 0; si < MAX_SESSIONS; si++) {
 				sess = session_get(si);
 				if (!sess)
@@ -466,6 +468,14 @@ main_event_loop(void)
 					conn_idle(&sess->conn);
 					continue;
 				}
+
+				/* Background: skip 3/4 ticks when
+				 * idle to reduce UI/font swap
+				 * overhead (~0.6ms per session) */
+				if (sess != active_session &&
+				    (bg_tick & 3) != 0 &&
+				    sess->conn.pending_data == 0)
+					continue;
 
 				/* Load this session's UI + font state */
 				term_ui_load_state(&sess->ui);
