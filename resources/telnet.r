@@ -203,7 +203,7 @@ resource 'DITL' (130, "About Flynn") {
 
 		/* 3: App name + version */
 		{10, 55, 30, 280},
-		StaticText { disabled, "Flynn 1.9.4" };
+		StaticText { disabled, "Flynn 1.9.5" };
 
 		/* 4: Machine type (set at runtime) */
 		{33, 55, 49, 280},

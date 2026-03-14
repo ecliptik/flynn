@@ -1,7 +1,7 @@
 =====================================================
                       Flynn
               Telnet Client for Macintosh
-                    Version 1.9.4
+                    Version 1.9.5
 =====================================================
 
 Connect your classic Macintosh to the modern world.
@@ -100,12 +100,12 @@ Features
     and blink (DOS-style bright background on color)
   - Bold-to-bright color promotion for standard
     ANSI/BBS color rendering
-  - Unicode glyph rendering: 213 QuickDraw primitives
+  - Unicode glyph rendering: 180 QuickDraw primitives
     (arrows, shapes, blocks, triangles, diamonds,
     circles, superscripts, subscripts, card suits,
-    double-line box drawing, sextants, fractional
-    blocks, flowers, snowflake), 19 monochrome bitmap
-    emoji, and braille patterns
+    double-line box drawing, fractional blocks,
+    flowers, snowflake), 57 sextant characters,
+    18 monochrome bitmap emoji, and braille patterns
   - OSC sequences: window title (OSC 0/2), palette
     color query (OSC 4), foreground/background color
     query (OSC 10/11), cursor color (OSC 12/112,
@@ -138,6 +138,8 @@ Features
   - Multiple simultaneous sessions (up to 4 windows)
   - Window menu with session list
   - Connection progress window with status updates
+  - Double-buffered rendering eliminates screen flash
+  - Local echo for BBS sessions (WONT ECHO servers)
   - Keystroke buffering for reliable fast typing
   - Application cursor keys and keypad mode
   - Bracketed paste mode

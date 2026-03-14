@@ -40,7 +40,7 @@ No build toolchain required — just download and run.
 
 - Macintosh Plus or later (4MB RAM, 68000 CPU)
 - System 6.0.8 or System 7 with MacTCP or Open Transport
-- ~113KB disk space, ~72KB RAM per session (mono) / ~123KB (color)
+- ~119KB disk space, ~72KB RAM per session (mono) / ~123KB (color)
 
 ## Features
 
@@ -48,7 +48,7 @@ No build toolchain required — just download and run.
 - **VT100/VT220/xterm/xterm-256color/ANSI-BBS terminal emulation** with CP437 rendering
 - **256-color support** on System 7 with Color QuickDraw (zero System 6 impact)
 - **SGR attributes**: bold, italic, underline, dim, strikethrough, blink, inverse
-- **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns** (213 glyphs + 19 emoji)
+- **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns** (180 primitives + 57 sextants + 18 emoji)
 - **OSC support**: window title, palette and color queries
 
 **Display & Windowing**
@@ -61,8 +61,10 @@ No build toolchain required — just download and run.
 - **Mouse text selection with copy/paste**
 - **Bracketed paste mode**
 - **M0110 keyboard support**
+- **Double-buffered rendering**
 - **Keystroke buffering**
-- **Backspace DEL/BS toggle** (auto-switches with terminal type)
+- **Local echo** for BBS sessions (WONT ECHO servers)
+- **Backspace DEL/BS toggle**
 
 **Session Management**
 - **Session bookmarks**

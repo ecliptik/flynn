@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.5] - 2026-03-14
+
+### Added
+- Double-buffered rendering, local echo, fast key repeat, send-then-poll
+  echo, 3 new emoji, glyph bitmap cache
+
+### Fixed
+- Bookmark list overflow, ScrollRect dark mode flash, ScrollRect dirty
+  flag misalignment, stale offscreen on session destroy, multi-window
+  cross-session blit
+
+### Changed
+- 12 performance improvements (ScrollRect 10x, partial CopyBits 95%,
+  jump scrolling 7-10x, batched TCP reads, double-DrawText bold 14.5x,
+  mono path split, glyph run merging, etc.), plus offscreen-based update
+  events/dark mode/resize, prefs v10
+- Build size: ~119KB (up from ~103KB, offscreen buffer and glyph cache)
+- Memory: ~90KB/session mono, ~110KB/session color
+
 ## [1.9.4] - 2026-03-11
 
 ### Fixed
