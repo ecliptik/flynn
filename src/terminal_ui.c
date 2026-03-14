@@ -352,6 +352,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 {
 	short row, any_dirty;
 	short use_offscreen;
+	short was_dirty[TERM_ROWS];
 	Rect r;
 
 	TextFont(g_font_id);
@@ -475,9 +476,17 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		SetPortBits(&g_offscreen);
 	}
 
+	/* Save dirty flags before render loop clears them —
+	 * needed for partial CopyBits after rendering */
+	{
+		short di;
+		for (di = 0; di < TERM_ROWS; di++)
+			was_dirty[di] = terminal_is_row_dirty(term, di);
+	}
+
 	/* Step 5: Dirty row loop (renders to offscreen if active) */
 	for (row = 0; row < term->active_rows; row++) {
-		if (!terminal_is_row_dirty(term, row))
+		if (!was_dirty[row])
 			continue;
 
 		/* Erase the row background */
@@ -596,12 +605,56 @@ do_draw:
 		PenNormal();
 	}
 
-	/* Step 6-7: Restore real screen and blit offscreen → screen */
+	/* Step 6-7: Restore real screen and blit offscreen → screen.
+	 * Partial CopyBits: only blit dirty row strips instead of
+	 * the entire offscreen.  Coalesces adjacent dirty rows into
+	 * contiguous rectangles to minimise trap calls.  Falls back
+	 * to full-screen blit when ≥20 rows dirty (cheaper than
+	 * many small blits due to per-call trap overhead). */
 	if (use_offscreen) {
+		short dirty_count, first, has_sb_indicator;
+
 		SetPortBits(&g_saved_bits);
-		CopyBits(&g_offscreen, &win->portBits,
-		    &g_offscreen.bounds, &g_offscreen.bounds,
-		    srcCopy, 0L);
+
+		/* Count dirty rows for fallback decision */
+		dirty_count = 0;
+		for (row = 0; row < term->active_rows; row++) {
+			if (was_dirty[row])
+				dirty_count++;
+		}
+
+		has_sb_indicator = (term->scroll_offset > 0 &&
+		    term->sb_count > 0);
+
+		if (dirty_count >= 20 || has_sb_indicator) {
+			/* Full blit: cheaper than 20+ small blits,
+			 * or scrollback indicator touched right edge */
+			CopyBits(&g_offscreen, &win->portBits,
+			    &g_offscreen.bounds, &g_offscreen.bounds,
+			    srcCopy, 0L);
+		} else {
+			/* Partial blit: coalesce adjacent dirty rows */
+			first = -1;
+			for (row = 0; row <= term->active_rows; row++) {
+				if (row < term->active_rows &&
+				    was_dirty[row]) {
+					if (first < 0)
+						first = row;
+				} else if (first >= 0) {
+					Rect blit_r;
+					SetRect(&blit_r,
+					    g_offscreen.bounds.left,
+					    row_top(first),
+					    g_offscreen.bounds.right,
+					    row_bottom(row - 1));
+					CopyBits(&g_offscreen,
+					    &win->portBits,
+					    &blit_r, &blit_r,
+					    srcCopy, 0L);
+					first = -1;
+				}
+			}
+		}
 	}
 
 	/* Step 8: Draw cursor on REAL screen (after blit).
