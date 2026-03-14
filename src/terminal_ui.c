@@ -85,6 +85,14 @@ static short		g_dark_mode = 0;
 static short		g_mono_dark = 0;	/* monochrome dark mode active */
 static RgnHandle	g_scroll_rgn = 0L;	/* pre-allocated for ScrollRect */
 
+/* Offscreen double buffer (Phase 1) */
+static BitMap	g_offscreen;		/* offscreen bitmap descriptor */
+static Ptr	g_offscreen_bits;	/* pixel data (NewPtr) */
+static short	g_offscreen_cols;	/* allocated width in cells */
+static short	g_offscreen_rows;	/* allocated height in cells */
+static BitMap	g_saved_bits;		/* saved real portBits during offscreen */
+static WindowPtr g_offscreen_win;	/* window that owns current offscreen */
+
 /* Current effective colors for glyph shade blending (set by draw_row) */
 static unsigned char	g_eff_fg = 0;
 static unsigned char	g_eff_bg = 15;
@@ -158,6 +166,112 @@ static void sel_normalize(short *sr, short *sc, short *er, short *ec);
 static void find_word_bounds(Terminal *term, short row, short col,
 	    short *start, short *end);
 static void glyph_cache_rebuild(void);
+
+/*
+ * offscreen_alloc - allocate/reallocate offscreen buffer for given dimensions
+ *
+ * Returns 1 on success, 0 on failure (caller should fall back to direct
+ * drawing).  Reuses existing allocation if dimensions haven't changed.
+ * Sets g_offscreen.bounds to match the window's portRect coordinate space
+ * so all existing drawing coordinates work unmodified.
+ */
+static short
+offscreen_alloc(WindowPtr win, short cols, short rows)
+{
+	short pixel_w, pixel_h, rb;
+	long size;
+
+	pixel_w = win->portRect.right - win->portRect.left;
+	pixel_h = win->portRect.bottom - win->portRect.top;
+	rb = ((pixel_w + 15) / 16) * 2;
+	size = (long)rb * pixel_h;
+
+	/* Reuse if dimensions and window unchanged */
+	if (g_offscreen_bits && g_offscreen_cols == cols &&
+	    g_offscreen_rows == rows && g_offscreen_win == win)
+		return 1;
+
+	/* Same dimensions, different window: reuse buffer,
+	 * just update bounds and owner (no realloc needed) */
+	if (g_offscreen_bits && g_offscreen_cols == cols &&
+	    g_offscreen_rows == rows) {
+		g_offscreen.bounds = win->portRect;
+		g_offscreen_win = win;
+		return 1;
+	}
+
+	if (g_offscreen_bits) {
+		DisposePtr(g_offscreen_bits);
+		g_offscreen_bits = 0L;
+	}
+
+	g_offscreen_bits = NewPtr(size);
+	if (!g_offscreen_bits)
+		return 0;
+
+	memset(g_offscreen_bits, 0, size);
+
+	g_offscreen.baseAddr = g_offscreen_bits;
+	g_offscreen.rowBytes = rb;
+	g_offscreen.bounds = win->portRect;
+
+	g_offscreen_cols = cols;
+	g_offscreen_rows = rows;
+	g_offscreen_win = win;
+
+	return 1;
+}
+
+/*
+ * offscreen_free - free offscreen buffer
+ */
+static void
+offscreen_free(void)
+{
+	if (g_offscreen_bits) {
+		DisposePtr(g_offscreen_bits);
+		g_offscreen_bits = 0L;
+	}
+	g_offscreen_cols = 0;
+	g_offscreen_rows = 0;
+	g_offscreen_win = 0L;
+}
+
+/*
+ * term_ui_has_offscreen - check if valid offscreen buffer matches dimensions
+ */
+short
+term_ui_has_offscreen(WindowPtr win, short cols, short rows)
+{
+	return g_offscreen_bits && g_offscreen_win == win &&
+	    g_offscreen_cols == cols && g_offscreen_rows == rows;
+}
+
+/*
+ * term_ui_blit_offscreen - CopyBits from offscreen buffer to window
+ */
+void
+term_ui_blit_offscreen(WindowPtr win)
+{
+	if (!g_offscreen_bits)
+		return;
+	CopyBits(&g_offscreen, &win->portBits,
+	    &g_offscreen.bounds, &g_offscreen.bounds,
+	    srcCopy, 0L);
+}
+
+/*
+ * term_ui_invalidate_offscreen - force reallocation on next draw
+ *
+ * Called on session switch to prevent stale offscreen blits.
+ */
+void
+term_ui_invalidate_offscreen(void)
+{
+	g_offscreen_cols = 0;
+	g_offscreen_rows = 0;
+	g_offscreen_win = 0L;
+}
 
 /*
  * term_ui_init - set up font and cursor state
@@ -236,7 +350,9 @@ term_ui_set_dark_mode(short enabled)
 void
 term_ui_draw(WindowPtr win, Terminal *term)
 {
-	short row;
+	short row, any_dirty;
+	short use_offscreen;
+	short was_dirty[TERM_ROWS];
 	Rect r;
 
 	TextFont(g_font_id);
@@ -247,7 +363,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	cached_fg_idx = -1;
 	cached_bg_idx = -1;
 
-	/* Erase cursor XOR artifact before any drawing.
+	/* Step 1: Erase cursor XOR artifact on REAL screen.
 	 * ScrollRect would blit the XOR mark to wrong positions,
 	 * and dirty row redraws need clean pixels underneath. */
 	if (cursor_initialized && cursor_visible) {
@@ -276,9 +392,9 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		}
 	}
 
-	/* ScrollRect optimization: blit existing pixels instead of
-	 * redrawing all rows.  Only the newly exposed rows (marked
-	 * dirty by term_scroll_up/down) need actual drawing. */
+	/* Step 2: ScrollRect on REAL screen — blit existing pixels
+	 * instead of redrawing all rows.  Only the newly exposed
+	 * rows (marked dirty by term_scroll_up/down) need drawing. */
 	if (term->scroll_pending) {
 		short rgn_height = term->scroll_rgn_bot -
 		    term->scroll_rgn_top + 1;
@@ -322,8 +438,55 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		term->scroll_pending = 0;
 	}
 
+	/* Check if any rows are dirty */
+	any_dirty = 0;
 	for (row = 0; row < term->active_rows; row++) {
-		if (!terminal_is_row_dirty(term, row))
+		if (terminal_is_row_dirty(term, row)) {
+			any_dirty = 1;
+			break;
+		}
+	}
+
+	/* Step 3-4: Switch to offscreen for dirty row rendering.
+	 * All QuickDraw calls between SetPortBits go to the
+	 * invisible offscreen buffer — no visible flash. */
+	use_offscreen = any_dirty &&
+	    offscreen_alloc(win, term->active_cols, term->active_rows);
+
+	if (use_offscreen) {
+		/* Save real portBits */
+		g_saved_bits = win->portBits;
+
+		/* Phase 3: Sync scroll result into offscreen.
+		 * After ScrollRect shifted real-screen pixels,
+		 * copy the scroll region so offscreen matches. */
+		if (had_scroll) {
+			Rect scroll_area;
+			SetRect(&scroll_area, LEFT_MARGIN,
+			    row_top(term->scroll_rgn_top),
+			    LEFT_MARGIN +
+			    term->active_cols * g_cell_width,
+			    row_bottom(term->scroll_rgn_bot));
+			CopyBits(&win->portBits, &g_offscreen,
+			    &scroll_area, &scroll_area,
+			    srcCopy, 0L);
+		}
+
+		/* Redirect all QD operations to offscreen */
+		SetPortBits(&g_offscreen);
+	}
+
+	/* Save dirty flags before render loop clears them —
+	 * needed for partial CopyBits after rendering */
+	{
+		short di;
+		for (di = 0; di < TERM_ROWS; di++)
+			was_dirty[di] = terminal_is_row_dirty(term, di);
+	}
+
+	/* Step 5: Dirty row loop (renders to offscreen if active) */
+	for (row = 0; row < term->active_rows; row++) {
+		if (!was_dirty[row])
 			continue;
 
 		/* Erase the row background */
@@ -442,10 +605,62 @@ do_draw:
 		PenNormal();
 	}
 
-	/* Draw cursor only on non-scroll draws.  During scroll draws,
-	 * suppressing cursor avoids XOR artifacts that would be blitted
-	 * to wrong positions by the next ScrollRect.  cursor_blink()
-	 * re-shows the cursor during idle time. */
+	/* Step 6-7: Restore real screen and blit offscreen → screen.
+	 * Partial CopyBits: only blit dirty row strips instead of
+	 * the entire offscreen.  Coalesces adjacent dirty rows into
+	 * contiguous rectangles to minimise trap calls.  Falls back
+	 * to full-screen blit when ≥20 rows dirty (cheaper than
+	 * many small blits due to per-call trap overhead). */
+	if (use_offscreen) {
+		short dirty_count, first, has_sb_indicator;
+
+		SetPortBits(&g_saved_bits);
+
+		/* Count dirty rows for fallback decision */
+		dirty_count = 0;
+		for (row = 0; row < term->active_rows; row++) {
+			if (was_dirty[row])
+				dirty_count++;
+		}
+
+		has_sb_indicator = (term->scroll_offset > 0 &&
+		    term->sb_count > 0);
+
+		if (dirty_count >= 20 || has_sb_indicator) {
+			/* Full blit: cheaper than 20+ small blits,
+			 * or scrollback indicator touched right edge */
+			CopyBits(&g_offscreen, &win->portBits,
+			    &g_offscreen.bounds, &g_offscreen.bounds,
+			    srcCopy, 0L);
+		} else {
+			/* Partial blit: coalesce adjacent dirty rows */
+			first = -1;
+			for (row = 0; row <= term->active_rows; row++) {
+				if (row < term->active_rows &&
+				    was_dirty[row]) {
+					if (first < 0)
+						first = row;
+				} else if (first >= 0) {
+					Rect blit_r;
+					SetRect(&blit_r,
+					    g_offscreen.bounds.left,
+					    row_top(first),
+					    g_offscreen.bounds.right,
+					    row_bottom(row - 1));
+					CopyBits(&g_offscreen,
+					    &win->portBits,
+					    &blit_r, &blit_r,
+					    srcCopy, 0L);
+					first = -1;
+				}
+			}
+		}
+	}
+
+	/* Step 8: Draw cursor on REAL screen (after blit).
+	 * During scroll draws, suppress cursor to avoid XOR
+	 * artifacts blitted to wrong positions by next ScrollRect.
+	 * cursor_blink() re-shows the cursor during idle time. */
 	if (!had_scroll && term->scroll_offset == 0 &&
 	    term->cursor_visible)
 		draw_cursor(term, 1);

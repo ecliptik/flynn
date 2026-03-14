@@ -603,11 +603,13 @@ handle_prefs_menu(short item)
 				SetPort(sess->window);
 				sess->terminal.dark_mode =
 				    prefs.dark_mode;
-				clear_window_bg(sess->window,
-				    prefs.dark_mode);
+				/* Offscreen handles the transition —
+				 * no clear_window_bg flash */
+				term_ui_invalidate_offscreen();
+				session_load_font(sess);
 				term_dirty_all(&sess->terminal);
-				InvalRect(
-				    &sess->window->portRect);
+				term_ui_draw(sess->window,
+				    &sess->terminal);
 			}
 			SetPort(save);
 		}

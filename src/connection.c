@@ -247,6 +247,8 @@ conn_idle(Connection *conn)
 	OSErr err;
 	unsigned short len;
 
+	conn->pending_data = 0;
+
 	if (conn->state != CONN_STATE_CONNECTED)
 		return;
 
@@ -255,6 +257,8 @@ conn_idle(Connection *conn)
 		conn_close(conn);
 		return;
 	}
+
+	conn->pending_data = status.amtUnreadData;
 
 	/* Check if connection was closed by remote.
 	 * Drain any remaining data before closing so the final
@@ -283,6 +287,10 @@ conn_idle(Connection *conn)
 	}
 
 	conn->read_len = len;
+
+	/* Update pending to reflect data remaining after read */
+	conn->pending_data = (status.amtUnreadData > (unsigned long)len)
+	    ? status.amtUnreadData - len : 0;
 }
 
 void

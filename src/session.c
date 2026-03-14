@@ -346,10 +346,39 @@ do_window_resize(Session *s, short width, short height)
 	    LEFT_MARGIN * 2 + new_cols * g_cell_width,
 	    TOP_MARGIN * 2 + new_rows * g_cell_height, true);
 
-	/* Clear and redraw */
+	/* Invalidate offscreen — dimensions changed */
+	term_ui_invalidate_offscreen();
+
+	/* Clear margins (outside terminal area) and redraw */
 	GetPort(&save);
 	SetPort(s->window);
-	clear_window_bg(s->window, prefs.dark_mode);
+	{
+		Rect margin;
+		short term_right, term_bottom;
+
+		term_right = LEFT_MARGIN +
+		    new_cols * g_cell_width;
+		term_bottom = TOP_MARGIN +
+		    new_rows * g_cell_height;
+
+		/* Right margin */
+		SetRect(&margin, term_right, 0,
+		    s->window->portRect.right,
+		    s->window->portRect.bottom);
+		if (prefs.dark_mode)
+			PaintRect(&margin);
+		else
+			EraseRect(&margin);
+
+		/* Bottom margin */
+		SetRect(&margin, 0, term_bottom,
+		    s->window->portRect.right,
+		    s->window->portRect.bottom);
+		if (prefs.dark_mode)
+			PaintRect(&margin);
+		else
+			EraseRect(&margin);
+	}
 	term_dirty_all(&s->terminal);
 	term_ui_draw(s->window, &s->terminal);
 	SetPort(save);

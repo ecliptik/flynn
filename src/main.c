@@ -385,6 +385,7 @@ main_event_loop(void)
 			short si;
 			Session *sess;
 			short prev_state;
+			static unsigned short bg_tick = 0;
 
 			/* Save user interaction state (selection, cursor)
 			 * before cycling through sessions */
@@ -393,12 +394,15 @@ main_event_loop(void)
 
 			/* Fast path: single session skips save/load cycling */
 			if (session_count() == 1 && active_session) {
-				short drain = 0;
+				short drain;
+				long draw_deadline = 0;
 
-				/* Drain loop: batch up to 8 TCP reads
-				 * before drawing.  Scroll hints
-				 * accumulate across reads for a single
-				 * ScrollRect blit. */
+				/* Jump scroll: suppress draws while
+				 * TCP data is still arriving.  Draw
+				 * when stream pauses or after 4 ticks
+				 * (68ms). */
+			drain_jump:
+				drain = 0;
 				do {
 					prev_state =
 					    active_session->conn.state;
@@ -423,8 +427,16 @@ main_event_loop(void)
 				} while (drain < 16);
 
 				if (drain > 0) {
-					session_draw(active_session);
+					if (!draw_deadline)
+						draw_deadline =
+						    TickCount() + 4;
 					had_data = 1;
+					if (active_session->conn
+					    .pending_data > 0 &&
+					    TickCount() < draw_deadline)
+						goto drain_jump;
+					session_draw(active_session);
+					draw_deadline = 0;
 				}
 
 				if (!g_suspended &&
@@ -442,6 +454,7 @@ main_event_loop(void)
 				break;
 			}
 
+			bg_tick++;
 			for (si = 0; si < MAX_SESSIONS; si++) {
 				sess = session_get(si);
 				if (!sess)
@@ -456,17 +469,28 @@ main_event_loop(void)
 					continue;
 				}
 
+				/* Background: skip 3/4 ticks when
+				 * idle to reduce UI/font swap
+				 * overhead (~0.6ms per session) */
+				if (sess != active_session &&
+				    (bg_tick & 3) != 0 &&
+				    sess->conn.pending_data == 0)
+					continue;
+
 				/* Load this session's UI + font state */
 				term_ui_load_state(&sess->ui);
 				session_load_font(sess);
 
 				{
-					short drain = 0;
+					short drain;
+					long draw_deadline = 0;
 
-					/* Drain loop: batch up to 4
-					 * TCP reads per session in
-					 * multi-session mode (lower
-					 * limit avoids starvation) */
+					/* Jump scroll: suppress draws
+					 * while TCP data arriving.
+					 * Draw when stream pauses or
+					 * 4-tick deadline expires. */
+				drain_bg:
+					drain = 0;
 					do {
 						prev_state =
 						    sess->conn.state;
@@ -492,8 +516,18 @@ main_event_loop(void)
 					} while (drain < 8);
 
 					if (drain > 0) {
-						session_draw(sess);
+						if (!draw_deadline)
+							draw_deadline =
+							    TickCount()
+							    + 4;
 						had_data = 1;
+						if (sess->conn
+						    .pending_data > 0
+						    && TickCount() <
+						    draw_deadline)
+							goto drain_bg;
+						session_draw(sess);
+						draw_deadline = 0;
 					}
 				}
 
@@ -730,8 +764,6 @@ handle_update(EventRecord *event)
 	SetPort(win);
 	BeginUpdate(win);
 
-	clear_window_bg(win, prefs.dark_mode);
-
 	if (sess) {
 		term_ui_load_state(&sess->ui);
 		session_load_font(sess);
@@ -744,31 +776,52 @@ handle_update(EventRecord *event)
 			set_wtitlef(sess->window, "Flynn - %s",
 			    sess->conn.host);
 
-		/* Use visRgn bounding box (clipped by BeginUpdate)
-		 * to only dirty rows that actually need repainting,
-		 * instead of always redrawing all 24 rows */
-		{
-			Rect clip_box;
-			short first_row, last_row, r;
+		/* Fast path: blit from cached offscreen buffer.
+		 * Avoids full clear_window_bg + redraw (~8x faster).
+		 * Cursor is not in offscreen; cursor_blink() will
+		 * redraw it on the next idle tick. */
+		if (term_ui_has_offscreen(sess->window,
+		    sess->terminal.active_cols,
+		    sess->terminal.active_rows)) {
+			term_ui_blit_offscreen(sess->window);
+		} else {
+			/* Fallback: redraw via offscreen.
+			 * No clear_window_bg — term_ui_draw handles
+			 * erase+draw in offscreen then blits.
+			 * Use visRgn to only dirty exposed rows. */
+			{
+				Rect clip_box;
+				short first_row, last_row, r;
 
-			clip_box = (**(win->visRgn)).rgnBBox;
-			first_row = (clip_box.top - TOP_MARGIN) /
-			    g_cell_height;
-			last_row = (clip_box.bottom - TOP_MARGIN +
-			    g_cell_height - 1) / g_cell_height;
-
-			if (first_row < 0)
-				first_row = 0;
-			if (last_row >= sess->terminal.active_rows)
+				clip_box =
+				    (**(win->visRgn)).rgnBBox;
+				first_row =
+				    (clip_box.top - TOP_MARGIN) /
+				    g_cell_height;
 				last_row =
-				    sess->terminal.active_rows - 1;
+				    (clip_box.bottom - TOP_MARGIN +
+				    g_cell_height - 1) /
+				    g_cell_height;
 
-			for (r = first_row; r <= last_row; r++)
-				sess->terminal.dirty[r] = 1;
+				if (first_row < 0)
+					first_row = 0;
+				if (last_row >=
+				    sess->terminal.active_rows)
+					last_row =
+					    sess->terminal.active_rows
+					    - 1;
+
+				for (r = first_row; r <= last_row;
+				    r++)
+					sess->terminal.dirty[r] = 1;
+			}
+			term_ui_draw(sess->window,
+			    &sess->terminal);
 		}
-		term_ui_draw(sess->window, &sess->terminal);
 
 		term_ui_save_state(&sess->ui);
+	} else {
+		clear_window_bg(win, prefs.dark_mode);
 	}
 
 	/* Draw grow icon (clipped to avoid scroll bar track lines) */
