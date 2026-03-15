@@ -183,6 +183,7 @@ static void sel_normalize(short *sr, short *sc, short *er, short *ec);
 static void find_word_bounds(Terminal *term, short row, short col,
 	    short *start, short *end);
 static void glyph_cache_rebuild(void);
+static void font_cache_rebuild(void);
 
 /*
  * offscreen_alloc - allocate/reallocate offscreen buffer for given dimensions
@@ -530,6 +531,9 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 	/* Rebuild glyph bitmap cache for new font metrics */
 	glyph_cache_rebuild();
 
+	/* Rebuild ASCII font bitmap cache for direct offscreen blit */
+	font_cache_rebuild();
+
 	/* Invalidate shadow buffer — font change alters rendering */
 	g_shadow_valid = 0;
 
@@ -663,6 +667,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	 * color info, so PmForeColor/RGBForeColor produce garbage. */
 	use_offscreen = any_dirty && !g_has_color_qd &&
 	    offscreen_alloc(win, term->active_cols, term->active_rows);
+	g_use_offscreen_now = 0;
 
 	if (use_offscreen) {
 		/* Save real portBits */
@@ -722,6 +727,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 		/* Redirect all QD operations to offscreen */
 		SetPortBits(&g_offscreen);
+		g_use_offscreen_now = 1;
 	}
 
 	/* Color offscreen: redirect to GWorld on color systems.
@@ -863,6 +869,7 @@ do_draw:
 		short dirty_count, first;
 
 		SetPortBits(&g_saved_bits);
+		g_use_offscreen_now = 0;
 
 		/* Count dirty rows for fallback decision */
 		dirty_count = 0;
@@ -1540,6 +1547,16 @@ glyph_cache_draw(unsigned char gid, short x, short y, unsigned char attr)
 
 	variant = (attr & ATTR_BOLD) ? 1 : 0;
 
+	/* Phase 5: direct offscreen blit bypasses CopyBits trap */
+	if (g_use_offscreen_now && !g_has_color_qd) {
+		offscreen_blit_glyph(
+		    g_glyph_cache.bits[idx][variant],
+		    g_glyph_cache.rowBytes,
+		    x, y, g_glyph_cache.cell_h,
+		    mono_eff_inv(attr));
+		return 1;
+	}
+
 	/* Set up source BitMap */
 	src.baseAddr = (Ptr)g_glyph_cache.bits[idx][variant];
 	src.rowBytes = g_glyph_cache.rowBytes;
@@ -1557,6 +1574,149 @@ glyph_cache_draw(unsigned char gid, short x, short y, unsigned char attr)
 	    0L);
 
 	return 1;
+}
+
+/* ASCII font bitmap cache: pre-rendered glyphs for direct buffer copy */
+#define FONT_CACHE_FIRST	0x20	/* space */
+#define FONT_CACHE_LAST		0x7E	/* tilde */
+#define FONT_CACHE_COUNT	(FONT_CACHE_LAST - FONT_CACHE_FIRST + 1)
+#define FONT_CACHE_MAX_RB	2	/* up to 16px wide */
+#define FONT_CACHE_MAX_H	20	/* up to 20px tall */
+#define FONT_CACHE_BM_SIZE	(FONT_CACHE_MAX_RB * FONT_CACHE_MAX_H)
+
+static struct {
+	short		valid;
+	short		font_id;
+	short		font_size;
+	short		cell_w;
+	short		cell_h;
+	short		baseline;
+	short		rowBytes;
+	unsigned char	bits[FONT_CACHE_COUNT][2][FONT_CACHE_BM_SIZE];
+	/* [char_index][0=normal, 1=bold][bitmap_data] */
+} g_font_cache;
+
+/*
+ * font_cache_rebuild - pre-render all printable ASCII into bitmap atlas
+ *
+ * Creates a temporary offscreen GrafPort and renders each character
+ * 0x20-0x7E in normal and bold variants.  Bold uses double-draw at
+ * x=0 and x=1 with srcOr, matching the existing double-DrawText
+ * technique for correct pixel output.
+ */
+static void
+font_cache_rebuild(void)
+{
+	GrafPort off_port;
+	GrafPtr save_port;
+	short rb, bm_size, i, v;
+	Rect bounds;
+	unsigned char ch;
+
+	rb = (g_cell_width + 15) / 16 * 2;
+	if (rb > FONT_CACHE_MAX_RB || g_cell_height > FONT_CACHE_MAX_H) {
+		g_font_cache.valid = 0;
+		return;
+	}
+
+	bm_size = rb * g_cell_height;
+	SetRect(&bounds, 0, 0, g_cell_width, g_cell_height);
+
+	GetPort(&save_port);
+	OpenPort(&off_port);
+	off_port.portBits.rowBytes = rb;
+	off_port.portBits.bounds = bounds;
+	off_port.portRect = bounds;
+	RectRgn(off_port.clipRgn, &bounds);
+	RectRgn(off_port.visRgn, &bounds);
+
+	TextFont(g_font_id);
+	TextSize(g_font_size);
+	TextMode(srcOr);
+
+	for (i = 0; i < FONT_CACHE_COUNT; i++) {
+		ch = FONT_CACHE_FIRST + i;
+		for (v = 0; v < 2; v++) {
+			unsigned char *dst;
+
+			dst = g_font_cache.bits[i][v];
+			memset(dst, 0, bm_size);
+			off_port.portBits.baseAddr = (Ptr)dst;
+
+			/* Normal render */
+			TextFace(0);
+			MoveTo(0, g_cell_baseline);
+			DrawChar(ch);
+
+			/* Bold: double-draw at x+1 */
+			if (v == 1) {
+				MoveTo(1, g_cell_baseline);
+				DrawChar(ch);
+			}
+		}
+	}
+
+	ClosePort(&off_port);
+	SetPort(save_port);
+
+	g_font_cache.font_id = g_font_id;
+	g_font_cache.font_size = g_font_size;
+	g_font_cache.cell_w = g_cell_width;
+	g_font_cache.cell_h = g_cell_height;
+	g_font_cache.baseline = g_cell_baseline;
+	g_font_cache.rowBytes = rb;
+	g_font_cache.valid = 1;
+}
+
+/*
+ * font_cache_blit_run - render ASCII text run directly to offscreen buffer
+ *
+ * Copies pre-rendered glyph bitmaps from the font cache to the offscreen
+ * buffer using bit-shifting.  Handles bold (pre-rendered), underline and
+ * strikethrough as direct bit post-passes.  Skips characters outside the
+ * cached range (spaces are fast — zero bits, but skipped via s==0 check).
+ *
+ * Only called for monochrome offscreen rendering (g_use_offscreen_now &&
+ * !g_has_color_qd).  Italic text falls back to QuickDraw DrawText.
+ */
+static void
+font_cache_blit_run(const char *buf, short len, short x, short y,
+    unsigned char attr)
+{
+	short i, bold, use_bic;
+	short grb, cell_w, cell_h;
+	short start_x;
+	unsigned char ch;
+
+	bold = (attr & ATTR_BOLD) ? 1 : 0;
+	use_bic = mono_eff_inv(attr);
+	grb = g_font_cache.rowBytes;
+	cell_w = g_font_cache.cell_w;
+	cell_h = g_font_cache.cell_h;
+	start_x = x;
+
+	for (i = 0; i < len; i++) {
+		ch = (unsigned char)buf[i];
+		if (ch >= FONT_CACHE_FIRST && ch <= FONT_CACHE_LAST) {
+			offscreen_blit_glyph(
+			    g_font_cache.bits[ch - FONT_CACHE_FIRST][bold],
+			    grb, x, y, cell_h, use_bic);
+		}
+		x += cell_w;
+	}
+
+	/* Underline post-pass: direct bit line at baseline+1 */
+	if (attr & ATTR_UNDERLINE) {
+		short ul_y = y + g_font_cache.baseline + 1;
+		if (ul_y < y + cell_h)
+			offscreen_hline(start_x, x, ul_y, use_bic);
+	}
+
+	/* Strikethrough post-pass: direct bit line at cell_h/2 */
+	if (attr & ATTR_STRIKETHROUGH) {
+		short st_y = y + cell_h / 2;
+		offscreen_hline(start_x, x, st_y, use_bic);
+	}
 }
 
 /*
@@ -1993,6 +2153,34 @@ draw_row(Terminal *term, short row)
 			 */
 			if (use_color)
 				set_fg_color(eff_fg);
+
+			/*
+			 * Phase 1: direct offscreen font cache
+			 * path — bypass DrawText/CopyBits traps.
+			 * Only for mono offscreen, normal cell
+			 * width, non-italic text.
+			 */
+			if (g_font_cache.valid &&
+			    g_use_offscreen_now &&
+			    !g_has_color_qd &&
+			    cell_w == g_cell_width &&
+			    !(run_attr & ATTR_ITALIC)) {
+				if (run_attr & ATTR_INVERSE) {
+					Rect inv_r;
+					SetRect(&inv_r,
+					    run_x, row_y,
+					    run_x + run_w,
+					    row_bottom(row));
+					offscreen_fill_rect(&inv_r,
+					    g_mono_dark ?
+					    0x00 : 0xFF);
+				}
+				font_cache_blit_run(buf,
+				    run_len,
+				    col_left(run_start),
+				    row_y, run_attr);
+				continue;
+			}
 
 			if (run_attr & ATTR_INVERSE) {
 				if (cell_w != g_cell_width) {
