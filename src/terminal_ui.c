@@ -97,6 +97,10 @@ static short	g_offscreen_rows;	/* allocated height in cells */
 static BitMap	g_saved_bits;		/* saved real portBits during offscreen */
 static WindowPtr g_offscreen_win;	/* window that owns current offscreen */
 
+/* Shadow buffer for row-level change detection (Phase 3) */
+static TermCell	g_shadow[TERM_ROWS][TERM_COLS];
+static short	g_shadow_valid;
+
 /* Current effective colors for glyph shade blending (set by draw_row) */
 static unsigned char	g_eff_fg = 0;
 static unsigned char	g_eff_bg = 15;
@@ -381,6 +385,7 @@ term_ui_invalidate_offscreen(void)
 	g_offscreen_cols = 0;
 	g_offscreen_rows = 0;
 	g_offscreen_win = 0L;
+	g_shadow_valid = 0;
 }
 
 /*
@@ -438,6 +443,9 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 	/* Rebuild glyph bitmap cache for new font metrics */
 	glyph_cache_rebuild();
 
+	/* Invalidate shadow buffer — font change alters rendering */
+	g_shadow_valid = 0;
+
 	SetPort(old_port);
 }
 
@@ -448,6 +456,7 @@ void
 term_ui_set_dark_mode(short enabled)
 {
 	g_dark_mode = enabled;
+	g_shadow_valid = 0;
 }
 
 /*
@@ -596,10 +605,42 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			was_dirty[di] = terminal_is_row_dirty(term, di);
 	}
 
+	/* Invalidate shadow on scroll — content shifted */
+	if (had_scroll)
+		g_shadow_valid = 0;
+
 	/* Step 5: Dirty row loop (renders to offscreen if active) */
 	for (row = 0; row < term->active_rows; row++) {
 		if (!was_dirty[row])
 			continue;
+
+		/* Shadow buffer: skip row if content unchanged */
+		if (g_shadow_valid && term->scroll_offset == 0 &&
+		    !had_scroll) {
+			TermCell *cur_row_cells;
+			short row_changed;
+
+			cur_row_cells = &term->screen[row][0];
+			row_changed = memcmp(&g_shadow[row][0],
+			    cur_row_cells,
+			    term->active_cols * sizeof(TermCell));
+			if (!row_changed) {
+				short ci;
+				short has_color_cell = 0;
+				for (ci = 0; ci < term->active_cols;
+				    ci++) {
+					if (cur_row_cells[ci].attr &
+					    ATTR_HAS_COLOR) {
+						has_color_cell = 1;
+						break;
+					}
+				}
+				if (!has_color_cell) {
+					was_dirty[row] = 0;
+					continue;
+				}
+			}
+		}
 
 		/* Erase the row background */
 		SetRect(&r, LEFT_MARGIN, row_top(row),
@@ -652,6 +693,12 @@ term_ui_draw(WindowPtr win, Terminal *term)
 do_draw:
 		draw_row(term, row);
 
+		/* Copy rendered row to shadow buffer */
+		if (term->scroll_offset == 0)
+			memcpy(&g_shadow[row][0],
+			    &term->screen[row][0],
+			    term->active_cols * sizeof(TermCell));
+
 		/*
 		 * On color systems, draw_row() handles dark mode
 		 * by resolving COLOR_DEFAULT to white-on-black.
@@ -660,6 +707,10 @@ do_draw:
 		 * avoid the EraseRect→InvertRect flash.
 		 */
 	}
+
+	/* Validate shadow after all rows processed */
+	if (term->scroll_offset == 0)
+		g_shadow_valid = 1;
 
 	terminal_clear_dirty(term);
 
@@ -4012,6 +4063,7 @@ term_ui_sel_start(short row, short col, short scroll_offset)
 	sel.extent_col = col;
 	sel.scroll_offset = scroll_offset;
 	sel.word_mode = 0;
+	g_shadow_valid = 0;
 }
 
 /*
@@ -4079,6 +4131,7 @@ term_ui_sel_clear(void)
 	sel.active = 0;
 	sel.selecting = 0;
 	sel.word_mode = 0;
+	g_shadow_valid = 0;
 }
 
 /*
