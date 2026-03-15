@@ -578,19 +578,56 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		/* Save real portBits */
 		g_saved_bits = win->portBits;
 
-		/* Phase 3: Sync scroll result into offscreen.
-		 * After ScrollRect shifted real-screen pixels,
-		 * copy the scroll region so offscreen matches. */
+		/* Scroll offscreen buffer directly via memmove
+		 * instead of CopyBits sync from screen. */
 		if (had_scroll) {
-			Rect scroll_area;
-			SetRect(&scroll_area, LEFT_MARGIN,
-			    row_top(term->scroll_rgn_top),
-			    LEFT_MARGIN +
-			    term->active_cols * g_cell_width,
-			    row_bottom(term->scroll_rgn_bot));
-			CopyBits(&win->portBits, &g_offscreen,
-			    &scroll_area, &scroll_area,
-			    srcCopy, 0L);
+			short scroll_px = term->scroll_count *
+			    g_cell_height;
+			short rgn_top_px =
+			    row_top(term->scroll_rgn_top);
+			short rgn_bot_px =
+			    row_bottom(term->scroll_rgn_bot);
+			short move_height =
+			    rgn_bot_px - rgn_top_px - scroll_px;
+			short rb = g_offscreen.rowBytes;
+			char *obase = g_offscreen.baseAddr;
+			unsigned char fill =
+			    g_mono_dark ? 0xFF : 0x00;
+
+			if (move_height > 0 &&
+			    term->scroll_count <
+			    (rgn_bot_px - rgn_top_px) /
+			    g_cell_height) {
+				if (term->scroll_dir > 0) {
+					/* Scroll up */
+					memmove(obase +
+					    (long)rgn_top_px * rb,
+					    obase +
+					    (long)(rgn_top_px +
+					    scroll_px) * rb,
+					    (long)move_height * rb);
+					memset(obase +
+					    (long)(rgn_bot_px -
+					    scroll_px) * rb,
+					    fill,
+					    (long)scroll_px * rb);
+				} else {
+					/* Scroll down */
+					memmove(obase +
+					    (long)(rgn_top_px +
+					    scroll_px) * rb,
+					    obase +
+					    (long)rgn_top_px * rb,
+					    (long)move_height * rb);
+					memset(obase +
+					    (long)rgn_top_px * rb,
+					    fill,
+					    (long)scroll_px * rb);
+				}
+			}
+
+			/* Shadow stale after scroll */
+			g_shadow_valid = 0;
 		}
 
 		/* Redirect all QD operations to offscreen */
