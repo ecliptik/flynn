@@ -51,6 +51,7 @@ prefs_defaults(FlynnPrefs *prefs)
 	prefs->dark_mode = 0;		/* light */
 	prefs->backspace_bs = 0;	/* DEL (0x7F) for xterm */
 	prefs->local_echo = 0;		/* off by default */
+	prefs->show_status_bar = 1;	/* on by default */
 	strncpy(prefs->dns_server, "1.1.1.1", sizeof(prefs->dns_server) - 1);
 	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 }

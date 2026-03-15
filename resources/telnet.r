@@ -24,6 +24,7 @@ resource 'MENU' (129, "File") {
 		"Close Session", noIcon, "W", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Save Contents\311", noIcon, "S", noMark, plain;
+		"DNS Server\311", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Favorites", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
@@ -51,8 +52,9 @@ resource 'MENU' (131, "Options") {
 		"Font", noIcon, noKey, noMark, plain;
 		"Terminal Type", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"DNS Server\311", noIcon, noKey, noMark, plain;
 		"Dark Mode", noIcon, noKey, noMark, plain;
+		"Status Bar", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
 		"Backspace Sends BS", noIcon, noKey, noMark, plain;
 		"Local Echo", noIcon, noKey, noMark, plain
 	}

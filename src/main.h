@@ -24,10 +24,11 @@
 #define FILE_MENU_DISCONNECT_ID 2
 /* separator = 3 */
 #define FILE_MENU_SAVE_ID       4
-/* separator = 5 */
-#define FILE_MENU_FAVORITES_ID  6   /* Favorites hierarchical submenu */
-/* separator = 7 */
-#define FILE_MENU_QUIT_ID       8
+#define FILE_MENU_DNS_ID        5
+/* separator = 6 */
+#define FILE_MENU_FAVORITES_ID  7   /* Favorites hierarchical submenu */
+/* separator = 8 */
+#define FILE_MENU_QUIT_ID       9
 
 /* Edit menu items */
 #define EDIT_MENU_UNDO_ID   1
@@ -43,10 +44,11 @@
 #define PREFS_FONT_HIER      1   /* Font submenu trigger */
 #define PREFS_TTYPE_HIER     2   /* Terminal Type submenu trigger */
 /* separator = 3 */
-#define PREFS_DNS_ID         4
-#define PREFS_DARK_ID        5
-#define PREFS_BKSP_DEL_ID    6
-#define PREFS_LOCAL_ECHO_ID  7
+#define PREFS_DARK_ID        4
+#define PREFS_STATUS_BAR_ID  5
+/* separator = 6 */
+#define PREFS_BKSP_DEL_ID    7
+#define PREFS_LOCAL_ECHO_ID  8
 
 /* Font submenu (MENU 134) items */
 #define FONT_MENU_ID        134

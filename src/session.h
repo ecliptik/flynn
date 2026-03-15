@@ -6,6 +6,7 @@
 #define SESSION_H
 
 #include <Windows.h>
+#include <Multiverse.h>
 #include "main.h"
 #include "terminal.h"
 #include "terminal_ui.h"
@@ -17,6 +18,7 @@
 typedef struct Session {
 	/* Window */
 	WindowPtr	window;
+	ControlHandle	scrollbar;
 
 	/* Core protocol state */
 	Connection	conn;

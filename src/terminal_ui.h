@@ -23,9 +23,11 @@
 #include <Windows.h>
 #include "terminal.h"
 
+struct Session;  /* forward declaration */
+
 /* Default cell metrics (Monaco 9pt) */
 #define CELL_WIDTH		6
-#define CELL_HEIGHT		12
+#define CELL_HEIGHT		11
 
 /* Runtime cell dimensions (set by term_ui_set_font) */
 extern short g_cell_width;
@@ -35,8 +37,11 @@ extern short g_font_id;
 extern short g_font_size;
 
 /* Margins within the terminal window */
-#define LEFT_MARGIN		2
-#define TOP_MARGIN		2
+#define LEFT_MARGIN		0
+#define TOP_MARGIN		0
+#define STATUSBAR_MARGIN	0
+#define SCROLLBAR_WIDTH		16
+#define RIGHT_MARGIN		(LEFT_MARGIN + SCROLLBAR_WIDTH)
 
 /* Cursor blink interval in ticks (30 ticks ~ 0.5s) */
 #define CURSOR_BLINK_TICKS	30
@@ -84,6 +89,10 @@ short term_ui_sel_check_double_click(unsigned long when, short row, short col);
 void  term_ui_sel_dirty_rows(Terminal *term, short old_extent_row,
 	    short new_extent_row);
 void  term_ui_sel_dirty_all(Terminal *term);
+
+/* Status bar */
+void draw_status_bar(WindowPtr win, struct Session *s);
+short status_bar_height(void);  /* STATUSBAR_MARGIN + SCROLLBAR_WIDTH when on, 0 when off */
 
 /* Dark mode */
 void term_ui_set_dark_mode(short enabled);

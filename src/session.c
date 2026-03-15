@@ -62,8 +62,9 @@ session_new(void)
 	 * Use 30px steps so 4 windows (0,30,60,90) all stay visible
 	 * on the 512x342 Mac Plus screen (usable area ~512x322). */
 	offset = slot * 30;
-	win_w = LEFT_MARGIN * 2 + g_cell_width * TERM_DEFAULT_COLS;
-	win_h = TOP_MARGIN * 2 + g_cell_height * TERM_DEFAULT_ROWS;
+	win_w = LEFT_MARGIN * 2 + g_cell_width * TERM_DEFAULT_COLS +
+	    SCROLLBAR_WIDTH;
+	win_h = status_bar_height() + g_cell_height * TERM_DEFAULT_ROWS;
 	SetRect(&bounds, 2 + offset, 40 + offset,
 	    2 + offset + win_w, 40 + offset + win_h);
 
@@ -86,6 +87,21 @@ session_new(void)
 	 * RGBForeColor/RGBBackColor work directly on color
 	 * displays without a custom palette.
 	 */
+
+	/* Create vertical scroll bar in right border area.
+	 * Standard Mac positioning: overlap window frame by 1px
+	 * on top/right, stop above grow box at bottom. */
+	{
+		Rect sb_bounds;
+
+		SetRect(&sb_bounds,
+		    s->window->portRect.right - SCROLLBAR_WIDTH + 1,
+		    -1,
+		    s->window->portRect.right + 1,
+		    s->window->portRect.bottom - SCROLLBAR_WIDTH + 1);
+		s->scrollbar = NewControl(s->window, &sb_bounds,
+		    "\p", true, 0, 0, 0, scrollBarProc, 0L);
+	}
 
 	sessions[slot] = s;
 	num_sessions++;
@@ -113,6 +129,8 @@ session_destroy(Session *s)
 	if (s->terminal.sb_color)
 		DisposePtr((Ptr)s->terminal.sb_color);
 
+	if (s->scrollbar)
+		DisposeControl(s->scrollbar);
 	if (s->window)
 		DisposeWindow(s->window);
 
@@ -193,6 +211,21 @@ session_init_from_prefs(Session *s)
 	s->terminal.dark_mode = prefs.dark_mode;
 	if (prefs.dark_mode)
 		PaintRect(&s->window->portRect);
+
+	/* Snap window to actual font metrics.
+	 * session_new() used g_cell_height before term_ui_set_font
+	 * updated it from GetFontInfo, so the window may be
+	 * the wrong size. */
+	{
+		short win_w, win_h;
+
+		win_w = LEFT_MARGIN * 2 +
+		    s->terminal.active_cols * g_cell_width +
+		    SCROLLBAR_WIDTH;
+		win_h = status_bar_height() +
+		    s->terminal.active_rows * g_cell_height;
+		do_window_resize(s, win_w, win_h);
+	}
 }
 
 /* Font preset table for bookmark font cycling */
@@ -283,9 +316,9 @@ do_font_change(short font_id, short font_size)
 
 	/* Compute window size for default grid */
 	win_w = LEFT_MARGIN * 2 +
-	    TERM_DEFAULT_COLS * g_cell_width;
-	win_h = TOP_MARGIN * 2 +
-	    TERM_DEFAULT_ROWS * g_cell_height;
+	    TERM_DEFAULT_COLS * g_cell_width + SCROLLBAR_WIDTH;
+	win_h = STATUSBAR_MARGIN +
+	    TERM_DEFAULT_ROWS * g_cell_height + SCROLLBAR_WIDTH;
 	if (win_w > MAX_WIN_WIDTH)
 		win_w = MAX_WIN_WIDTH;
 	if (win_h > MAX_WIN_HEIGHT)
@@ -322,9 +355,9 @@ do_window_resize(Session *s, short width, short height)
 	/* Ensure we use this session's font metrics */
 	session_load_font(s);
 
-	/* Compute grid from pixel dimensions */
-	new_cols = (width - LEFT_MARGIN * 2) / g_cell_width;
-	new_rows = (height - TOP_MARGIN * 2) / g_cell_height;
+	/* Compute grid from pixel dimensions (exclude scroll bar + status bar) */
+	new_cols = (width - LEFT_MARGIN * 2 - SCROLLBAR_WIDTH) / g_cell_width;
+	new_rows = (height - status_bar_height()) / g_cell_height;
 
 	/* Clamp to buffer limits */
 	if (new_cols > TERM_COLS)
@@ -345,10 +378,25 @@ do_window_resize(Session *s, short width, short height)
 	if (s->terminal.cur_row >= new_rows)
 		s->terminal.cur_row = new_rows - 1;
 
-	/* Snap window to grid boundaries */
-	SizeWindow(s->window,
-	    LEFT_MARGIN * 2 + new_cols * g_cell_width,
-	    TOP_MARGIN * 2 + new_rows * g_cell_height, true);
+	/* Snap window to grid boundaries (include scroll bar borders) */
+	{
+		short snap_w, snap_h;
+
+		snap_w = LEFT_MARGIN * 2 + new_cols * g_cell_width +
+		    SCROLLBAR_WIDTH;
+		snap_h = status_bar_height() +
+		    new_rows * g_cell_height;
+		SizeWindow(s->window, snap_w, snap_h, true);
+
+		/* Reposition scroll bar to new right edge */
+		if (s->scrollbar) {
+			MoveControl(s->scrollbar,
+			    snap_w - SCROLLBAR_WIDTH + 1, -1);
+			SizeControl(s->scrollbar,
+			    SCROLLBAR_WIDTH,
+			    snap_h - SCROLLBAR_WIDTH + 2);
+		}
+	}
 
 	/* Invalidate offscreen — dimensions changed */
 	term_ui_invalidate_offscreen();
@@ -365,19 +413,10 @@ do_window_resize(Session *s, short width, short height)
 		term_bottom = TOP_MARGIN +
 		    new_rows * g_cell_height;
 
-		/* Right margin */
+		/* Right margin (between content and scroll bar) */
 		SetRect(&margin, term_right, 0,
-		    s->window->portRect.right,
-		    s->window->portRect.bottom);
-		if (prefs.dark_mode)
-			PaintRect(&margin);
-		else
-			EraseRect(&margin);
-
-		/* Bottom margin */
-		SetRect(&margin, 0, term_bottom,
-		    s->window->portRect.right,
-		    s->window->portRect.bottom);
+		    s->window->portRect.right - SCROLLBAR_WIDTH,
+		    s->window->portRect.bottom - SCROLLBAR_WIDTH);
 		if (prefs.dark_mode)
 			PaintRect(&margin);
 		else
@@ -385,6 +424,8 @@ do_window_resize(Session *s, short width, short height)
 	}
 	term_dirty_all(&s->terminal);
 	term_ui_draw(s->window, &s->terminal);
+	if (prefs.show_status_bar)
+		draw_status_bar(s->window, s);
 	SetPort(save);
 
 	/* Send NAWS if connected */

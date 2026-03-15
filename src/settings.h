@@ -35,6 +35,7 @@ typedef struct {
 	short		recent[MAX_RECENT];	/* recently used bookmark indices */
 	short		recent_count;
 	unsigned char	local_echo;	/* 1=echo locally when server WONT ECHO */
+	unsigned char	show_status_bar;	/* 1=show status bar, 0=hide */
 	/* NOTE: always append new fields here, never insert above */
 } FlynnPrefs;
 

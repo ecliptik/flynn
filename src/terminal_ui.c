@@ -28,7 +28,10 @@
 #include <OSUtils.h>
 #include <Multiverse.h>
 #include <string.h>
+#include <stdio.h>
 #include "terminal_ui.h"
+#include "session.h"
+#include "settings.h"
 #include "color.h"
 #include "glyphs.h"
 
@@ -81,6 +84,7 @@ short			g_cell_height = CELL_HEIGHT;
 short			g_cell_baseline = CELL_HEIGHT - 2;
 short			g_font_id = 4;
 short			g_font_size = 9;
+extern FlynnPrefs	prefs;
 static short		g_dark_mode = 0;
 static short		g_mono_dark = 0;	/* monochrome dark mode active */
 static RgnHandle	g_scroll_rgn = 0L;	/* pre-allocated for ScrollRect */
@@ -249,15 +253,33 @@ term_ui_has_offscreen(WindowPtr win, short cols, short rows)
 
 /*
  * term_ui_blit_offscreen - CopyBits from offscreen buffer to window
+ *
+ * Blits only the content area, excluding scroll bar border strips
+ * on the right and bottom edges (those are drawn directly on screen).
  */
 void
 term_ui_blit_offscreen(WindowPtr win)
 {
+	Rect content_r;
+
 	if (!g_offscreen_bits)
 		return;
+	content_r = g_offscreen.bounds;
+	content_r.right -= SCROLLBAR_WIDTH;
+	content_r.bottom -= status_bar_height();
 	CopyBits(&g_offscreen, &win->portBits,
-	    &g_offscreen.bounds, &g_offscreen.bounds,
+	    &content_r, &content_r,
 	    srcCopy, 0L);
+
+	/* Paint status bar margin to match dark mode background */
+	if (g_dark_mode && prefs.show_status_bar) {
+		Rect m;
+
+		SetRect(&m, 0, content_r.bottom,
+		    content_r.right,
+		    content_r.bottom + STATUSBAR_MARGIN);
+		PaintRect(&m);
+	}
 }
 
 /*
@@ -549,64 +571,6 @@ do_draw:
 
 	terminal_clear_dirty(term);
 
-	/* Draw scrollback position indicator on right edge */
-	if (term->scroll_offset > 0 && term->sb_count > 0) {
-		Rect indicator_r;
-		short win_height, indicator_y, indicator_h;
-		short right_edge;
-		short bottom_y;
-
-		/* Calculate position proportional to scroll offset */
-		right_edge = win->portRect.right - 2;
-		win_height = win->portRect.bottom - TOP_MARGIN * 2;
-
-		/* Erase the rail area first to avoid artifacts */
-		SetRect(&indicator_r, right_edge - 4, TOP_MARGIN,
-		    right_edge + 1, TOP_MARGIN + win_height);
-		if (g_dark_mode)
-			PaintRect(&indicator_r);
-		else
-			EraseRect(&indicator_r);
-
-		/* Draw thin rail line for full scroll area */
-		PenNormal();
-		if (g_dark_mode) {
-			PenPat(&qd.white);
-		}
-		PenSize(1, 1);
-		MoveTo(right_edge - 2, TOP_MARGIN);
-		LineTo(right_edge - 2, TOP_MARGIN + win_height);
-		PenNormal();
-
-		/* Indicator height = visible fraction of total */
-		indicator_h = (win_height * term->active_rows) /
-		    (term->active_rows + term->sb_count);
-		if (indicator_h < 8)
-			indicator_h = 8;
-
-		/* Indicator position = proportional to scroll offset */
-		indicator_y = TOP_MARGIN +
-		    ((win_height - indicator_h) *
-		    (term->sb_count - term->scroll_offset)) /
-		    term->sb_count;
-
-		SetRect(&indicator_r, right_edge - 3, indicator_y,
-		    right_edge, indicator_y + indicator_h);
-
-		/* Draw filled rectangle as scroll indicator */
-		if (g_dark_mode)
-			EraseRect(&indicator_r);
-		else
-			PaintRect(&indicator_r);
-
-		/* Draw "scrolled back" separator at bottom */
-		bottom_y = row_top(term->active_rows - 1) + g_cell_height;
-		PenPat(&qd.gray);
-		MoveTo(LEFT_MARGIN, bottom_y + 1);
-		LineTo(win->portRect.right - LEFT_MARGIN, bottom_y + 1);
-		PenNormal();
-	}
-
 	/* Step 6-7: Restore real screen and blit offscreen → screen.
 	 * Partial CopyBits: only blit dirty row strips instead of
 	 * the entire offscreen.  Coalesces adjacent dirty rows into
@@ -614,7 +578,7 @@ do_draw:
 	 * to full-screen blit when ≥20 rows dirty (cheaper than
 	 * many small blits due to per-call trap overhead). */
 	if (use_offscreen) {
-		short dirty_count, first, has_sb_indicator;
+		short dirty_count, first;
 
 		SetPortBits(&g_saved_bits);
 
@@ -625,17 +589,22 @@ do_draw:
 				dirty_count++;
 		}
 
-		has_sb_indicator = (term->scroll_offset > 0 &&
-		    term->sb_count > 0);
-
-		if (dirty_count >= 20 || has_sb_indicator) {
-			/* Full blit: cheaper than 20+ small blits,
-			 * or scrollback indicator touched right edge */
+		if (dirty_count >= 20) {
+			/* Full blit: cheaper than 20+ small blits.
+			 * Exclude scroll bar and status bar. */
+			Rect content_r;
+			content_r = g_offscreen.bounds;
+			content_r.right -= SCROLLBAR_WIDTH;
+			content_r.bottom -= status_bar_height();
 			CopyBits(&g_offscreen, &win->portBits,
-			    &g_offscreen.bounds, &g_offscreen.bounds,
+			    &content_r, &content_r,
 			    srcCopy, 0L);
 		} else {
-			/* Partial blit: coalesce adjacent dirty rows */
+			/* Partial blit: coalesce adjacent dirty rows.
+			 * Right edge stops before scroll bar border. */
+			short content_right;
+			content_right = g_offscreen.bounds.right -
+			    SCROLLBAR_WIDTH;
 			first = -1;
 			for (row = 0; row <= term->active_rows; row++) {
 				if (row < term->active_rows &&
@@ -647,7 +616,7 @@ do_draw:
 					SetRect(&blit_r,
 					    g_offscreen.bounds.left,
 					    row_top(first),
-					    g_offscreen.bounds.right,
+					    content_right,
 					    row_bottom(row - 1));
 					CopyBits(&g_offscreen,
 					    &win->portBits,
@@ -656,6 +625,20 @@ do_draw:
 					first = -1;
 				}
 			}
+		}
+
+		/* Paint status bar margin black in dark mode */
+		if (g_dark_mode && prefs.show_status_bar &&
+		    STATUSBAR_MARGIN > 0) {
+			Rect m;
+			short cb = g_offscreen.bounds.bottom -
+			    status_bar_height();
+
+			SetRect(&m, 0, cb,
+			    g_offscreen.bounds.right -
+			    SCROLLBAR_WIDTH,
+			    cb + STATUSBAR_MARGIN);
+			PaintRect(&m);
 		}
 	}
 
@@ -4110,6 +4093,124 @@ term_ui_sel_dirty_all(Terminal *term)
 
 	for (r = sr; r <= er; r++)
 		term->dirty[r] = 1;
+}
+
+/*
+ * status_bar_height - return bottom inset for the status bar area.
+ * When status bar is shown: STATUSBAR_MARGIN + SCROLLBAR_WIDTH.
+ * When hidden: 0 (content extends to window bottom).
+ */
+short
+status_bar_height(void)
+{
+	return prefs.show_status_bar ?
+	    STATUSBAR_MARGIN + SCROLLBAR_WIDTH : 0;
+}
+
+/*
+ * draw_status_bar - draw status bar at the bottom of the terminal window
+ *
+ * Shows terminal dimensions and connection info.  The status bar is
+ * SCROLLBAR_WIDTH (15px) tall, spanning from the left edge to the
+ * scroll bar.  A 1px separator line divides it from the terminal content.
+ */
+void
+draw_status_bar(WindowPtr win, Session *s)
+{
+	Rect bar_r;
+	short bar_top, bar_right;
+	char status[80];
+
+	bar_top = win->portRect.bottom - SCROLLBAR_WIDTH;
+	bar_right = win->portRect.right - SCROLLBAR_WIDTH;
+
+	/* Background fill (always, even when hidden) */
+	SetRect(&bar_r, 0, bar_top, bar_right, win->portRect.bottom);
+	if (g_dark_mode) {
+		if (g_has_color_qd) {
+			set_bg_color(0);
+			EraseRect(&bar_r);
+		} else {
+			PaintRect(&bar_r);
+		}
+	} else {
+		EraseRect(&bar_r);
+	}
+
+	if (!prefs.show_status_bar)
+		return;
+
+	/* 1px separator line at top of status bar */
+	MoveTo(0, bar_top);
+	if (g_dark_mode && !g_has_color_qd) {
+		PenMode(patBic);
+		LineTo(bar_right - 1, bar_top);
+		PenNormal();
+	} else if (g_dark_mode && g_has_color_qd) {
+		set_fg_color(8);
+		LineTo(bar_right - 1, bar_top);
+		set_fg_color(15);
+	} else {
+		ForeColor(blackColor);
+		LineTo(bar_right - 1, bar_top);
+	}
+
+	/* Build status text */
+	{
+		char ttype[16];
+
+		ttype_to_str(prefs.terminal_type, ttype,
+		    sizeof(ttype));
+		if (s->conn.state == CONN_STATE_CONNECTED) {
+			snprintf(status, sizeof(status),
+			    " %dx%d %s | %s:%d",
+			    s->terminal.active_cols,
+			    s->terminal.active_rows,
+			    ttype, s->conn.host, s->conn.port);
+		} else {
+			snprintf(status, sizeof(status),
+			    " %dx%d %s | Disconnected",
+			    s->terminal.active_cols,
+			    s->terminal.active_rows, ttype);
+		}
+	}
+
+	/* Draw text in system font (Geneva 9 for readability) */
+	TextFont(3);   /* Geneva */
+	TextSize(9);
+	TextFace(0);
+
+	if (g_dark_mode && !g_has_color_qd) {
+		TextMode(srcBic);
+	} else if (g_dark_mode && g_has_color_qd) {
+		set_fg_color(15);
+		TextMode(srcOr);
+	} else {
+		ForeColor(blackColor);
+		TextMode(srcOr);
+	}
+
+	{
+		short text_w;
+
+		text_w = TextWidth(status, 0, strlen(status));
+		MoveTo(bar_right - text_w - 2,
+		    win->portRect.bottom - 3);
+		DrawText(status, 0, strlen(status));
+	}
+
+	/* Restore terminal font */
+	TextFont(g_font_id);
+	TextSize(g_font_size);
+	TextMode(srcOr);
+
+	/* Reset colors to defaults */
+	if (g_has_color_qd) {
+		cached_fg_idx = -1;
+		cached_bg_idx = -1;
+	}
+	ForeColor(blackColor);
+	BackColor(whiteColor);
 }
 
 /*

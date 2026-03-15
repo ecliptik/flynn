@@ -297,8 +297,8 @@ apply_bookmark_font(Session *s, Bookmark *bm)
 	term_ui_set_font(s->window, s->font_id, s->font_size);
 	session_save_font(s);
 	win_w = LEFT_MARGIN * 2 +
-	    TERM_DEFAULT_COLS * g_cell_width;
-	win_h = TOP_MARGIN * 2 +
+	    TERM_DEFAULT_COLS * g_cell_width + SCROLLBAR_WIDTH;
+	win_h = status_bar_height() +
 	    TERM_DEFAULT_ROWS * g_cell_height;
 	if (win_w > MAX_WIN_WIDTH) win_w = MAX_WIN_WIDTH;
 	if (win_h > MAX_WIN_HEIGHT) win_h = MAX_WIN_HEIGHT;

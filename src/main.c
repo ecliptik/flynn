@@ -37,7 +37,6 @@
 Boolean running = true;
 Boolean g_suspended = false;
 FlynnPrefs prefs;
-static RgnHandle grow_clip_rgn = 0L;
 Session *active_session = 0L;
 
 /* Saved system key repeat settings (restored on quit) */
@@ -225,6 +224,8 @@ session_handle_disconnect(Session *sess)
 	SetPort(sess->window);
 	term_dirty_all(&sess->terminal);
 	term_ui_draw(sess->window, &sess->terminal);
+	if (prefs.show_status_bar)
+		draw_status_bar(sess->window, sess);
 	SetPort(save);
 
 	if (sess == active_session)
@@ -338,6 +339,25 @@ session_process_data(Session *sess)
 }
 
 /*
+ * session_update_scrollbar - sync scroll bar with terminal scrollback state.
+ */
+static void
+session_update_scrollbar(Session *sess)
+{
+	short max_val, cur_val;
+
+	if (!sess->scrollbar)
+		return;
+
+	max_val = sess->terminal.sb_count;
+	cur_val = max_val - sess->terminal.scroll_offset;
+
+	SetControlMaximum(sess->scrollbar, max_val);
+	SetControlValue(sess->scrollbar, cur_val);
+	HiliteControl(sess->scrollbar, max_val > 0 ? 0 : 255);
+}
+
+/*
  * session_draw - render dirty terminal rows to the session window.
  */
 static void
@@ -348,6 +368,7 @@ session_draw(Session *sess)
 	GetPort(&save);
 	SetPort(sess->window);
 	term_ui_draw(sess->window, &sess->terminal);
+	session_update_scrollbar(sess);
 	SetPort(save);
 }
 
@@ -667,14 +688,60 @@ main_event_loop(void)
 	}
 	active_session = 0L;
 
-	if (grow_clip_rgn)
-		DisposeRgn(grow_clip_rgn);
-
 	/* Restore system key repeat settings */
 	LMSetKeyThresh(saved_key_thresh);
 	LMSetKeyRepThresh(saved_key_rep_thresh);
 
 	ExitToShell();
+}
+
+/*
+ * scrollbar_action - TrackControl action proc for scroll bar arrows
+ * and page areas.  Called repeatedly while mouse is held down.
+ */
+static pascal void
+scrollbar_action(ControlHandle control, short part)
+{
+	Session *sess;
+	Terminal *term;
+	short new_offset;
+
+	sess = active_session;
+	if (!sess || control != sess->scrollbar)
+		return;
+	term = &sess->terminal;
+
+	new_offset = term->scroll_offset;
+
+	switch (part) {
+	case inUpButton:
+		new_offset++;
+		break;
+	case inDownButton:
+		new_offset--;
+		break;
+	case inPageUp:
+		new_offset += term->active_rows;
+		break;
+	case inPageDown:
+		new_offset -= term->active_rows;
+		break;
+	default:
+		return;
+	}
+
+	if (new_offset < 0)
+		new_offset = 0;
+	if (new_offset > term->sb_count)
+		new_offset = term->sb_count;
+
+	if (new_offset != term->scroll_offset) {
+		term->scroll_offset = new_offset;
+		SetControlValue(control,
+		    term->sb_count - new_offset);
+		term_dirty_all(term);
+		term_ui_draw(sess->window, term);
+	}
 }
 
 static void
@@ -734,8 +801,10 @@ handle_mouse_down(EventRecord *event)
 			break;
 		session_load_font(sess);
 
-		min_w = LEFT_MARGIN * 2 + MIN_WIN_COLS * g_cell_width;
-		min_h = TOP_MARGIN * 2 + MIN_WIN_ROWS * g_cell_height;
+		min_w = LEFT_MARGIN * 2 + MIN_WIN_COLS * g_cell_width +
+		    SCROLLBAR_WIDTH;
+		min_h = status_bar_height() +
+		    MIN_WIN_ROWS * g_cell_height;
 		max_w = qd.screenBits.bounds.right - 10;
 		max_h = qd.screenBits.bounds.bottom - 10;
 
@@ -760,7 +829,43 @@ handle_mouse_down(EventRecord *event)
 			}
 			update_menus();
 		} else if (sess) {
-			handle_content_click(sess, event);
+			/* Check if click is on scroll bar control */
+			ControlHandle hit_ctl;
+			Point local_pt;
+			short ctl_part;
+			GrafPtr save;
+
+			GetPort(&save);
+			SetPort(win);
+			local_pt = event->where;
+			GlobalToLocal(&local_pt);
+			ctl_part = FindControl(local_pt, win,
+			    &hit_ctl);
+			SetPort(save);
+
+			if (ctl_part && hit_ctl == sess->scrollbar) {
+				SetPort(win);
+				if (ctl_part == inThumb) {
+					TrackControl(hit_ctl,
+					    local_pt, 0L);
+					sess->terminal.scroll_offset =
+					    sess->terminal.sb_count -
+					    GetControlValue(
+					    hit_ctl);
+					term_dirty_all(
+					    &sess->terminal);
+					term_ui_draw(sess->window,
+					    &sess->terminal);
+				} else {
+					TrackControl(hit_ctl,
+					    local_pt,
+					    NewControlActionUPP(
+					    scrollbar_action));
+				}
+				SetPort(save);
+			} else {
+				handle_content_click(sess, event);
+			}
 		}
 		break;
 	}
@@ -835,26 +940,47 @@ handle_update(EventRecord *event)
 			    &sess->terminal);
 		}
 
+		if (prefs.show_status_bar)
+			draw_status_bar(win, sess);
 		term_ui_save_state(&sess->ui);
 	} else {
 		clear_window_bg(win, prefs.dark_mode);
 	}
 
-	/* Draw grow icon (clipped to avoid scroll bar track lines) */
+	/* Draw scroll bar column and grow box.
+	 * First erase the entire right column to eliminate
+	 * stray pixels between content, scroll bar, and
+	 * grow box.  Then draw controls on top. */
 	{
 		Rect clip_r;
+		RgnHandle save_clip;
 
-		if (!grow_clip_rgn)
-			grow_clip_rgn = NewRgn();
-		GetClip(grow_clip_rgn);
+		/* Erase entire scroll bar + grow box column */
 		SetRect(&clip_r,
-		    win->portRect.right - 15,
-		    win->portRect.bottom - 15,
+		    win->portRect.right - SCROLLBAR_WIDTH,
+		    0,
 		    win->portRect.right,
 		    win->portRect.bottom);
+		if (prefs.dark_mode)
+			PaintRect(&clip_r);
+		else
+			EraseRect(&clip_r);
+
+		/* Draw grow icon clipped to bottom-right corner */
+		save_clip = NewRgn();
+		GetClip(save_clip);
+		SetRect(&clip_r,
+		    win->portRect.right - SCROLLBAR_WIDTH,
+		    win->portRect.bottom - SCROLLBAR_WIDTH + 2,
+		    win->portRect.right,
+		    win->portRect.bottom + 1);
 		ClipRect(&clip_r);
 		DrawGrowIcon(win);
-		SetClip(grow_clip_rgn);
+		SetClip(save_clip);
+		DisposeRgn(save_clip);
+
+		/* Draw scroll bar on top */
+		DrawControls(win);
 	}
 
 	EndUpdate(win);
@@ -880,6 +1006,15 @@ handle_activate(EventRecord *event)
 			term_ui_load_state(&sess->ui);
 			session_load_font(sess);
 			update_menus();
+			/* Activate scroll bar */
+			if (sess->scrollbar)
+				HiliteControl(sess->scrollbar,
+				    sess->terminal.sb_count > 0 ?
+				    0 : 255);
 		}
+	} else {
+		/* Deactivate scroll bar */
+		if (sess && sess->scrollbar)
+			HiliteControl(sess->scrollbar, 255);
 	}
 }

@@ -273,6 +273,8 @@ update_prefs_menu(void)
 	    prefs.backspace_bs != 0);
 	CheckItem(prefs_menu, PREFS_LOCAL_ECHO_ID,
 	    prefs.local_echo != 0);
+	CheckItem(prefs_menu, PREFS_STATUS_BAR_ID,
+	    prefs.show_status_bar != 0);
 }
 
 void
@@ -397,6 +399,9 @@ handle_file_menu(short item)
 		break;
 	case FILE_MENU_SAVE_ID:
 		do_save_session();
+		break;
+	case FILE_MENU_DNS_ID:
+		do_dns_server_dialog();
 		break;
 	case FILE_MENU_QUIT_ID:
 		if (session_any_connected()) {
@@ -610,12 +615,12 @@ handle_prefs_menu(short item)
 				term_dirty_all(&sess->terminal);
 				term_ui_draw(sess->window,
 				    &sess->terminal);
+				if (prefs.show_status_bar)
+					draw_status_bar(
+					    sess->window, sess);
 			}
 			SetPort(save);
 		}
-		break;
-	case PREFS_DNS_ID:
-		do_dns_server_dialog();
 		break;
 	case PREFS_BKSP_DEL_ID:
 		prefs.backspace_bs = !prefs.backspace_bs;
@@ -627,6 +632,26 @@ handle_prefs_menu(short item)
 		prefs_save(&prefs);
 		update_prefs_menu();
 		break;
+	case PREFS_STATUS_BAR_ID: {
+		short win_w, win_h;
+
+		prefs.show_status_bar = !prefs.show_status_bar;
+		prefs_save(&prefs);
+		update_prefs_menu();
+		/* Resize window to add/remove status bar area */
+		if (active_session) {
+			session_load_font(active_session);
+			win_w = LEFT_MARGIN * 2 +
+			    active_session->terminal.active_cols *
+			    g_cell_width + SCROLLBAR_WIDTH;
+			win_h = status_bar_height() +
+			    active_session->terminal.active_rows *
+			    g_cell_height;
+			do_window_resize(active_session,
+			    win_w, win_h);
+		}
+		break;
+	}
 	}
 }
 
