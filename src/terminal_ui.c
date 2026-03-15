@@ -386,18 +386,13 @@ offscreen_fill_rect(Rect *r, unsigned char fill_val)
 			else
 				row_base[left_byte] &= ~left_mask;
 
-			/* Middle full bytes — use long-word writes
-			 * when 4+ contiguous bytes */
+			/* Middle full bytes — use memset for
+			 * safety (68000 requires even-aligned
+			 * long accesses) */
 			b = left_byte + 1;
-			while (b + 3 <= right_byte - 1) {
-				*(unsigned long *)(row_base + b) =
-				    fill_val ? 0xFFFFFFFFUL : 0UL;
-				b += 4;
-			}
-			while (b < right_byte) {
-				row_base[b] = fill_val;
-				b++;
-			}
+			if (right_byte - b > 0)
+				memset(row_base + b, fill_val,
+				    right_byte - b);
 
 			/* Right edge */
 			if (fill_val)
