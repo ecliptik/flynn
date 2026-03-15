@@ -101,6 +101,7 @@ void term_ui_set_dark_mode(short enabled);
 short term_ui_has_offscreen(WindowPtr win, short cols, short rows);
 void  term_ui_blit_offscreen(WindowPtr win);
 void  term_ui_invalidate_offscreen(void);
+void  term_ui_cleanup(void);
 
 /* Per-session UI state for save/restore */
 typedef struct {

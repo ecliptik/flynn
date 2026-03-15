@@ -97,9 +97,18 @@ static short	g_offscreen_rows;	/* allocated height in cells */
 static BitMap	g_saved_bits;		/* saved real portBits during offscreen */
 static WindowPtr g_offscreen_win;	/* window that owns current offscreen */
 
+/* Color offscreen buffer — GWorld for System 7+ (Phase 6) */
+static GWorldPtr	g_color_gworld;
+static short		g_color_off_cols;
+static short		g_color_off_rows;
+static WindowPtr	g_color_off_win;
+
 /* Shadow buffer for row-level change detection (Phase 3) */
 static TermCell	g_shadow[TERM_ROWS][TERM_COLS];
 static short	g_shadow_valid;
+
+/* Set when rendering to offscreen buffer (Phase 1+5 direct blit) */
+static short	g_use_offscreen_now;
 
 /* Current effective colors for glyph shade blending (set by draw_row) */
 static unsigned char	g_eff_fg = 0;
@@ -246,6 +255,71 @@ offscreen_free(void)
 }
 
 /*
+ * color_offscreen_alloc - allocate/reallocate GWorld for color systems
+ *
+ * Returns 1 on success, 0 on failure (caller falls back to direct drawing).
+ * Reuses existing GWorld if dimensions haven't changed.  Passes depth 0
+ * to NewGWorld so it matches the screen's current pixel depth.
+ */
+static short
+color_offscreen_alloc(WindowPtr win, short cols, short rows)
+{
+	Rect bounds;
+	QDErr err;
+
+	if (!g_has_color_qd)
+		return 0;
+
+	/* Reuse if dimensions and window unchanged */
+	if (g_color_gworld && g_color_off_cols == cols &&
+	    g_color_off_rows == rows && g_color_off_win == win)
+		return 1;
+
+	/* Same dimensions, different window — reuse GWorld */
+	if (g_color_gworld && g_color_off_cols == cols &&
+	    g_color_off_rows == rows) {
+		g_color_off_win = win;
+		return 1;
+	}
+
+	/* Free old GWorld */
+	if (g_color_gworld) {
+		DisposeGWorld(g_color_gworld);
+		g_color_gworld = 0L;
+	}
+
+	bounds = win->portRect;
+	err = NewGWorld(&g_color_gworld, 0, &bounds, 0L, 0L, 0);
+	if (err != noErr || !g_color_gworld) {
+		g_color_gworld = 0L;
+		return 0;
+	}
+
+	LockPixels(GetGWorldPixMap(g_color_gworld));
+
+	g_color_off_cols = cols;
+	g_color_off_rows = rows;
+	g_color_off_win = win;
+
+	return 1;
+}
+
+/*
+ * color_offscreen_free - free color GWorld
+ */
+static void
+color_offscreen_free(void)
+{
+	if (g_color_gworld) {
+		DisposeGWorld(g_color_gworld);
+		g_color_gworld = 0L;
+	}
+	g_color_off_cols = 0;
+	g_color_off_rows = 0;
+	g_color_off_win = 0L;
+}
+
+/*
  * offscreen_fill_rect - fill rectangle in offscreen buffer directly
  *
  * Writes to g_offscreen.baseAddr instead of EraseRect/PaintRect,
@@ -385,7 +459,20 @@ term_ui_invalidate_offscreen(void)
 	g_offscreen_cols = 0;
 	g_offscreen_rows = 0;
 	g_offscreen_win = 0L;
+	g_color_off_cols = 0;
+	g_color_off_rows = 0;
+	g_color_off_win = 0L;
 	g_shadow_valid = 0;
+}
+
+/*
+ * term_ui_cleanup - free all offscreen buffers on app quit
+ */
+void
+term_ui_cleanup(void)
+{
+	offscreen_free();
+	color_offscreen_free();
 }
 
 /*
@@ -471,6 +558,9 @@ term_ui_draw(WindowPtr win, Terminal *term)
 {
 	short row, any_dirty;
 	short use_offscreen;
+	short use_color_offscreen = 0;
+	CGrafPtr saved_gw = 0L;
+	GDHandle saved_gd = 0L;
 	short was_dirty[TERM_ROWS];
 	Rect r;
 
@@ -632,6 +722,18 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 		/* Redirect all QD operations to offscreen */
 		SetPortBits(&g_offscreen);
+	}
+
+	/* Color offscreen: redirect to GWorld on color systems.
+	 * EraseRect + draw_row calls go to the invisible GWorld;
+	 * CopyBits blits to screen after the dirty row loop. */
+	if (g_has_color_qd && any_dirty) {
+		use_color_offscreen = color_offscreen_alloc(win,
+		    term->active_cols, term->active_rows);
+		if (use_color_offscreen) {
+			GetGWorld(&saved_gw, &saved_gd);
+			SetGWorld((CGrafPtr)g_color_gworld, 0L);
+		}
 	}
 
 	/* Save dirty flags before render loop clears them —
@@ -817,6 +919,71 @@ do_draw:
 			SetRect(&m, 0, cb,
 			    g_offscreen.bounds.right -
 			    SCROLLBAR_WIDTH,
+			    cb + STATUSBAR_MARGIN);
+			PaintRect(&m);
+		}
+	}
+
+	/* Color offscreen blit: restore GWorld and copy to screen.
+	 * Same partial/full blit logic as mono offscreen above. */
+	if (use_color_offscreen) {
+		PixMapHandle pm;
+		short dirty_count, first;
+		short content_right;
+
+		SetGWorld(saved_gw, saved_gd);
+		SetPort(win);
+
+		pm = GetGWorldPixMap(g_color_gworld);
+		content_right = win->portRect.right - SCROLLBAR_WIDTH;
+
+		/* Count dirty rows for fallback decision */
+		dirty_count = 0;
+		for (row = 0; row < term->active_rows; row++) {
+			if (was_dirty[row])
+				dirty_count++;
+		}
+
+		if (dirty_count >= 20) {
+			/* Full blit */
+			Rect content_r;
+			content_r = win->portRect;
+			content_r.right -= SCROLLBAR_WIDTH;
+			content_r.bottom -= status_bar_height();
+			CopyBits((BitMap *)*pm, &win->portBits,
+			    &content_r, &content_r, srcCopy, 0L);
+		} else {
+			/* Partial blit: coalesce adjacent dirty rows */
+			first = -1;
+			for (row = 0; row <= term->active_rows; row++) {
+				if (row < term->active_rows &&
+				    was_dirty[row]) {
+					if (first < 0)
+						first = row;
+				} else if (first >= 0) {
+					Rect blit_r;
+					SetRect(&blit_r,
+					    win->portRect.left,
+					    row_top(first),
+					    content_right,
+					    row_bottom(row - 1));
+					CopyBits((BitMap *)*pm,
+					    &win->portBits,
+					    &blit_r, &blit_r,
+					    srcCopy, 0L);
+					first = -1;
+				}
+			}
+		}
+
+		/* Paint status bar margin black in dark mode */
+		if (g_dark_mode && prefs.show_status_bar &&
+		    STATUSBAR_MARGIN > 0) {
+			Rect m;
+			short cb = win->portRect.bottom -
+			    status_bar_height();
+
+			SetRect(&m, 0, cb, content_right,
 			    cb + STATUSBAR_MARGIN);
 			PaintRect(&m);
 		}
@@ -1061,6 +1228,147 @@ try_merge_glyph_run(unsigned char gid, const char *buf, short pos,
 
 	default:
 		return 0;
+	}
+}
+
+/*
+ * offscreen_blit_glyph - blit a 1-bit glyph bitmap to offscreen buffer
+ *
+ * Direct memory copy bypassing CopyBits trap.  Handles non-byte-aligned
+ * destinations via bit shifting.  Supports srcOr (normal) and srcBic
+ * (dark mode/inverse) blend modes.
+ *
+ * src_bits: pre-rendered 1-bit glyph bitmap data
+ * src_rb: source rowBytes (1 for cell_w <= 8, 2 for 9-16)
+ * x, y: destination pixel position in offscreen buffer
+ * h: glyph height in scanlines
+ * use_bic: 1 for AND-NOT (dark mode), 0 for OR (normal)
+ */
+static void
+offscreen_blit_glyph(unsigned char *src_bits, short src_rb,
+    short x, short y, short h, short use_bic)
+{
+	short scan, bit_off, byte_col;
+	short rb;
+	unsigned char *base;
+
+	rb = g_offscreen.rowBytes;
+	base = (unsigned char *)g_offscreen.baseAddr;
+	bit_off = x & 7;
+	byte_col = x >> 3;
+
+	if (src_rb == 1) {
+		/* 1-byte wide source (cell_width <= 8) */
+		for (scan = 0; scan < h; scan++) {
+			unsigned char *dst = base +
+			    (long)(y + scan) * rb + byte_col;
+			unsigned char s = src_bits[scan];
+
+			if (s == 0)
+				continue;
+			if (use_bic) {
+				if (bit_off == 0) {
+					*dst &= ~s;
+				} else {
+					*dst &= ~(s >> bit_off);
+					*(dst + 1) &= ~(unsigned char)
+					    (s << (8 - bit_off));
+				}
+			} else {
+				if (bit_off == 0) {
+					*dst |= s;
+				} else {
+					*dst |= (s >> bit_off);
+					*(dst + 1) |= (unsigned char)
+					    (s << (8 - bit_off));
+				}
+			}
+		}
+	} else {
+		/* 2-byte wide source (cell_width 9-16) */
+		for (scan = 0; scan < h; scan++) {
+			unsigned char *dst = base +
+			    (long)(y + scan) * rb + byte_col;
+			unsigned char s0 = src_bits[scan * 2];
+			unsigned char s1 = src_bits[scan * 2 + 1];
+
+			if (s0 == 0 && s1 == 0)
+				continue;
+			if (use_bic) {
+				if (bit_off == 0) {
+					*dst &= ~s0;
+					*(dst + 1) &= ~s1;
+				} else {
+					*dst &= ~(s0 >> bit_off);
+					*(dst + 1) &= ~((unsigned char)
+					    (s0 << (8 - bit_off)) |
+					    (s1 >> bit_off));
+					*(dst + 2) &= ~(unsigned char)
+					    (s1 << (8 - bit_off));
+				}
+			} else {
+				if (bit_off == 0) {
+					*dst |= s0;
+					*(dst + 1) |= s1;
+				} else {
+					*dst |= (s0 >> bit_off);
+					*(dst + 1) |= (unsigned char)
+					    (s0 << (8 - bit_off)) |
+					    (s1 >> bit_off);
+					*(dst + 2) |= (unsigned char)
+					    (s1 << (8 - bit_off));
+				}
+			}
+		}
+	}
+}
+
+/*
+ * offscreen_hline - draw horizontal line directly in offscreen buffer
+ *
+ * Sets or clears bits for a 1-pixel-high horizontal line.
+ * Used for underline and strikethrough post-passes.
+ */
+static void
+offscreen_hline(short x0, short x1, short y, short use_bic)
+{
+	unsigned char *row_base;
+	short rb, left_byte, right_byte;
+	short left_bit, right_bit;
+	unsigned char left_mask, right_mask;
+	short b;
+
+	rb = g_offscreen.rowBytes;
+	row_base = (unsigned char *)g_offscreen.baseAddr +
+	    (long)y * rb;
+
+	left_byte = x0 >> 3;
+	right_byte = (x1 - 1) >> 3;
+	left_bit = x0 & 7;
+	right_bit = x1 & 7;
+
+	left_mask = 0xFF >> left_bit;
+	right_mask = right_bit ?
+	    (unsigned char)(0xFF << (8 - right_bit)) : 0xFF;
+
+	if (left_byte == right_byte) {
+		unsigned char mask = left_mask & right_mask;
+		if (use_bic)
+			row_base[left_byte] &= ~mask;
+		else
+			row_base[left_byte] |= mask;
+	} else {
+		if (use_bic) {
+			row_base[left_byte] &= ~left_mask;
+			for (b = left_byte + 1; b < right_byte; b++)
+				row_base[b] = 0x00;
+			row_base[right_byte] &= ~right_mask;
+		} else {
+			row_base[left_byte] |= left_mask;
+			for (b = left_byte + 1; b < right_byte; b++)
+				row_base[b] = 0xFF;
+			row_base[right_byte] |= right_mask;
+		}
 	}
 }
 
