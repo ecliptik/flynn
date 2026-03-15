@@ -242,6 +242,94 @@ offscreen_free(void)
 }
 
 /*
+ * offscreen_fill_rect - fill rectangle in offscreen buffer directly
+ *
+ * Writes to g_offscreen.baseAddr instead of EraseRect/PaintRect,
+ * avoiding QuickDraw trap overhead.  Handles non-byte-aligned
+ * boundaries with edge masking and uses long-word writes for the
+ * middle section.
+ *
+ * fill_val: 0x00 for white (normal erase), 0xFF for black (dark mode)
+ */
+static void
+offscreen_fill_rect(Rect *r, unsigned char fill_val)
+{
+	short y, rb;
+	short left, right, top, bot;
+	short left_byte, right_byte;
+	short left_bit, right_bit;
+	unsigned char left_mask, right_mask;
+	unsigned char *row_base;
+	char *base;
+
+	if (!g_offscreen_bits)
+		return;
+
+	base = g_offscreen.baseAddr;
+	rb = g_offscreen.rowBytes;
+	left = r->left - g_offscreen.bounds.left;
+	right = r->right - g_offscreen.bounds.left;
+	top = r->top - g_offscreen.bounds.top;
+	bot = r->bottom - g_offscreen.bounds.top;
+
+	if (left < 0) left = 0;
+	if (top < 0) top = 0;
+	if (right <= left || bot <= top)
+		return;
+
+	left_byte = left >> 3;
+	right_byte = (right - 1) >> 3;
+	left_bit = left & 7;
+	right_bit = right & 7;
+
+	/* Build edge masks:
+	 * left_mask covers bits from left_bit to end of byte
+	 * right_mask covers bits from start of byte to right_bit */
+	left_mask = 0xFF >> left_bit;
+	right_mask = right_bit ? (unsigned char)(0xFF << (8 - right_bit)) : 0xFF;
+
+	for (y = top; y < bot; y++) {
+		row_base = (unsigned char *)base + (long)y * rb;
+
+		if (left_byte == right_byte) {
+			/* Single byte spans entire rect */
+			unsigned char mask = left_mask & right_mask;
+			if (fill_val)
+				row_base[left_byte] |= mask;
+			else
+				row_base[left_byte] &= ~mask;
+		} else {
+			short b;
+
+			/* Left edge */
+			if (fill_val)
+				row_base[left_byte] |= left_mask;
+			else
+				row_base[left_byte] &= ~left_mask;
+
+			/* Middle full bytes — use long-word writes
+			 * when 4+ contiguous bytes */
+			b = left_byte + 1;
+			while (b + 3 <= right_byte - 1) {
+				*(unsigned long *)(row_base + b) =
+				    fill_val ? 0xFFFFFFFFUL : 0UL;
+				b += 4;
+			}
+			while (b < right_byte) {
+				row_base[b] = fill_val;
+				b++;
+			}
+
+			/* Right edge */
+			if (fill_val)
+				row_base[right_byte] |= right_mask;
+			else
+				row_base[right_byte] &= ~right_mask;
+		}
+	}
+}
+
+/*
  * term_ui_has_offscreen - check if valid offscreen buffer matches dimensions
  */
 short
@@ -526,6 +614,10 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			/* Color light mode: erase with white background */
 			set_bg_color(15);
 			EraseRect(&r);
+		} else if (use_offscreen) {
+			/* Direct offscreen fill: bypass QD traps */
+			offscreen_fill_rect(&r,
+			    g_mono_dark ? 0xFF : 0x00);
 		} else if (g_mono_dark) {
 			/* Mono dark: fill black directly (no white flash) */
 			PaintRect(&r);
