@@ -936,6 +936,11 @@ handle_update(EventRecord *event)
 				    r++)
 					sess->terminal.dirty[r] = 1;
 			}
+			/* Invalidate shadow so dirty rows
+			 * actually get redrawn even if
+			 * terminal content hasn't changed
+			 * (e.g. status window obscured area) */
+			term_ui_invalidate_offscreen();
 			term_ui_draw(sess->window,
 			    &sess->terminal);
 		}
