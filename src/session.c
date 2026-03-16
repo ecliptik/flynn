@@ -18,6 +18,7 @@
 #include "macutil.h"
 #include "tcp.h"
 #include "color.h"
+#include "menus.h"
 
 static Session *sessions[MAX_SESSIONS];
 static short num_sessions = 0;
@@ -77,6 +78,12 @@ session_new(void)
 		    documentProc, (WindowPtr)-1L, true, (long)s);
 	}
 	if (s->window == 0L) {
+		if (s->terminal.screen_color)
+			DisposePtr((Ptr)s->terminal.screen_color);
+		if (s->terminal.alt_color)
+			DisposePtr((Ptr)s->terminal.alt_color);
+		if (s->terminal.sb_color)
+			DisposePtr((Ptr)s->terminal.sb_color);
 		DisposePtr((Ptr)s);
 		return 0L;
 	}
@@ -191,6 +198,51 @@ session_any_connected(void)
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
 extern Session *active_session;
+
+void
+session_destroy_all(void)
+{
+	short i;
+	Session *s;
+
+	for (i = MAX_SESSIONS - 1; i >= 0; i--) {
+		s = session_get(i);
+		if (s)
+			session_destroy(s);
+	}
+}
+
+/*
+ * session_update_scrollbar - sync scroll bar with terminal scrollback state.
+ */
+void
+session_update_scrollbar(Session *sess)
+{
+	short max_val, cur_val;
+
+	if (!sess->scrollbar)
+		return;
+
+	max_val = sess->terminal.sb_count;
+	cur_val = max_val - sess->terminal.scroll_offset;
+
+	SetControlMaximum(sess->scrollbar, max_val);
+	SetControlValue(sess->scrollbar, cur_val);
+	HiliteControl(sess->scrollbar, max_val > 0 ? 0 : 255);
+}
+
+void
+session_destroy_and_fixup(Session *s)
+{
+	extern Session *active_session;
+	short was_active = (s == active_session);
+
+	if (was_active)
+		active_session = 0L;
+	session_destroy(s);
+	if (was_active)
+		active_session = session_from_window(FrontWindow());
+}
 
 /*
  * session_init_from_prefs - Initialize a new session's font, UI state,
@@ -340,10 +392,7 @@ do_font_change(short font_id, short font_size)
 	prefs.font_size = font_size;
 	prefs_save(&prefs);
 
-	{
-		extern void update_prefs_menu(void);
-		update_prefs_menu();
-	}
+	update_prefs_menu();
 }
 
 void

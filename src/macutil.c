@@ -91,3 +91,13 @@ clear_window_bg(WindowPtr win, Boolean dark_mode)
 	else
 		EraseRect(&win->portRect);
 }
+
+void
+show_error_alert(const char *msg)
+{
+	Str255 pmsg;
+
+	c2pstr(pmsg, msg);
+	ParamText(pmsg, "\p", "\p", "\p");
+	StopAlert(128, 0L);
+}

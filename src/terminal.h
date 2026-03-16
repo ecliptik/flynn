@@ -52,8 +52,6 @@
 #define CELL_TYPE_GLYPH		0x10	/* 10: glyph index */
 #define CELL_TYPE_BRAILLE	0x18	/* 11: braille dot pattern */
 
-#define CELL_IS_NORMAL(a)	(((a) & CELL_TYPE_MASK) == CELL_TYPE_NORMAL)
-#define CELL_IS_DEC(a)		(((a) & CELL_TYPE_MASK) == CELL_TYPE_DEC)
 #define CELL_IS_GLYPH(a)	(((a) & CELL_TYPE_MASK) == CELL_TYPE_GLYPH)
 #define CELL_IS_BRAILLE(a)	(((a) & CELL_TYPE_MASK) == CELL_TYPE_BRAILLE)
 
@@ -205,8 +203,6 @@ typedef struct {
 
 	/* Screen snapshot for disconnect recovery (saved on full clear) */
 	short		snap_valid;	/* 1 if snap_screen has data */
-	short		snap_rows;	/* active rows at snapshot time */
-	short		snap_cols;	/* active cols at snapshot time */
 
 	/* --- Color arrays: dynamically allocated on System 7 only --- */
 	CellColor	*screen_color;	/* NULL on System 6 */

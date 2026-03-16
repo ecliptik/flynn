@@ -24,23 +24,6 @@
 #define TCP_RCV_BUFSIZ   8192
 #define TCP_READ_BUFSIZ  4096
 
-/* Dialog resource ID */
-#define DLOG_CONNECT_ID  129
-
-/* Dialog item IDs (must match DITL ordering) */
-#define DLOG_OK          1
-#define DLOG_CANCEL      2
-#define DLOG_HOST_LABEL  3
-#define DLOG_HOST_FIELD  4
-#define DLOG_PORT_LABEL  5
-#define DLOG_PORT_FIELD  6
-#define DLOG_USER_LABEL  8
-#define DLOG_USER_FIELD  9
-#define DLOG_FAVORITES   10
-#define DLOG_TTYPE_LABEL 11
-#define DLOG_TTYPE_BTN   12
-#define DLOG_DEFAULT_BTN 13	/* UserItem for default button outline */
-
 /* Default port */
 #define DEFAULT_PORT     23
 

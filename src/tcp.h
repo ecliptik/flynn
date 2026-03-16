@@ -7,21 +7,6 @@
 #ifndef __TCP_H__
 #define __TCP_H__
 
-#define NUM_ALT_ADDRS	4
-
-struct hostInfo {
-	int _pad;
-	int	rtnCode;
-	char cname[255];
-	unsigned long addr[NUM_ALT_ADDRS];
-};
-
-typedef struct
-{
-	Handle next;
-	struct hostInfo hi;
-} HostInfoQ, *HostInfoQPtr, **HostInfoQHandle;
-
 typedef TCPNotifyUPP TCPNotifyProc;
 typedef UDPNotifyUPP UDPNotifyProc;
 typedef TCPIOCompletionUPP TCPIOCompletionProc;

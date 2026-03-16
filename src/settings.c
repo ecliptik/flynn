@@ -101,6 +101,8 @@ prefs_load(FlynnPrefs *prefs)
 			prefs->bookmarks[i].username[sizeof(prefs->bookmarks[i].username) - 1] = '\0';
 		}
 	}
+	prefs->finger_host[sizeof(prefs->finger_host) - 1] = '\0';
+	prefs->finger_user[sizeof(prefs->finger_user) - 1] = '\0';
 
 	/* Validate DNS server IP */
 	{

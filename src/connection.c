@@ -98,16 +98,11 @@ static Boolean
 conn_fail(Connection *conn, const char *msg)
 {
 	Str255 pmsg;
-	short len, i;
 
 	conn->state = CONN_STATE_IDLE;
 	InitCursor();
 
-	len = strlen(msg);
-	if (len > 255) len = 255;
-	pmsg[0] = len;
-	for (i = 0; i < len; i++)
-		pmsg[i + 1] = msg[i];
+	c2pstr(pmsg, msg);
 	ParamText(pmsg, "\p", "\p", "\p");
 	StopAlert(128, 0L);
 	return false;

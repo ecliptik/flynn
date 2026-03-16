@@ -32,12 +32,8 @@
 #define FILE_MENU_QUIT_ID       10
 
 /* Edit menu items */
-#define EDIT_MENU_UNDO_ID   1
-/* separator = 2 */
-#define EDIT_MENU_CUT_ID    3
 #define EDIT_MENU_COPY_ID   4
 #define EDIT_MENU_PASTE_ID  5
-#define EDIT_MENU_CLEAR_ID  6
 /* separator = 7 */
 #define EDIT_MENU_SELALL_ID 8
 
@@ -89,52 +85,6 @@
 /* separator = 7 */
 #define CTRL_MENU_BREAK     8
 #define CTRL_MENU_ESC       9
-
-/* Dialog resource IDs */
-#define DLOG_ABOUT_ID       130
-#define DLOG_FAVORITES_ID   131
-#define DLOG_FAV_EDIT_ID     132
-#define DLOG_DNS_ID         133
-#define DLOG_FINGER_ID      137
-
-/* Finger dialog items */
-#define FINGER_OK           1
-#define FINGER_CANCEL       2
-#define FINGER_HOST_LABEL   3
-#define FINGER_HOST_FIELD   4
-#define FINGER_USER_LABEL   5
-#define FINGER_USER_FIELD   6
-#define FINGER_VERBOSE_CHK  7
-#define FINGER_DEFAULT_BTN  8
-
-/* Bookmark manager dialog items */
-#define BM_DONE             1
-#define BM_ADD              2
-#define BM_EDIT             3
-#define BM_DELETE            4
-#define BM_CONNECT          5
-#define BM_LABEL            6
-#define BM_LIST             7	/* UserItem for list area */
-#define BM_DEFAULT_BTN      8	/* UserItem for default button outline */
-
-/* Bookmark add/edit dialog items */
-#define BME_OK              1
-#define BME_CANCEL          2
-#define BME_NAME_LABEL      3
-#define BME_NAME_FIELD      4
-#define BME_HOST_LABEL      5
-#define BME_HOST_FIELD      6
-#define BME_PORT_LABEL      7
-#define BME_PORT_FIELD      8
-#define BME_USER_LABEL      9
-#define BME_USER_FIELD      10
-#define BME_TTYPE_LABEL     11
-#define BME_TTYPE_BTN       12
-#define BME_FONT_LABEL      13
-#define BME_FONT_BTN        14
-#define BME_DEFAULT_BTN     15	/* UserItem for default button outline */
-#define BME_PROTO_LABEL     16
-#define BME_PROTO_BTN       17
 
 /* Max window content area for grid computation */
 #define MAX_WIN_WIDTH       500

@@ -5,7 +5,6 @@
 #include <Quickdraw.h>
 #include <Windows.h>
 #include <Files.h>
-#include <Memory.h>
 #include <StandardFile.h>
 #include <Multiverse.h>
 #include <Gestalt.h>
@@ -17,6 +16,7 @@
 #include "terminal.h"
 #include "glyphs.h"
 #include "savefile.h"
+#include "macutil.h"
 #include "sysutil.h"
 
 /* External references to main.c globals */
@@ -26,7 +26,7 @@ extern Session *active_session;
  * cell_to_char - Convert a TermCell to a plain text character
  * Same conversion logic as clipboard.c do_copy()
  */
-static char
+char
 cell_to_char(TermCell *cell)
 {
 	if (cell->ch == 0)
@@ -159,9 +159,7 @@ do_save_session(void)
 		err = FSpCreate(&sf_reply.sfFile, 'ttxt',
 		    'TEXT', smSystemScript);
 		if (err != noErr) {
-			ParamText("\pCould not create file.",
-			    "\p", "\p", "\p");
-			StopAlert(128, 0L);
+			show_error_alert("Could not create file.");
 			return;
 		}
 
@@ -169,10 +167,7 @@ do_save_session(void)
 		err = FSpOpenDF(&sf_reply.sfFile, fsWrPerm,
 		    &refNum);
 		if (err != noErr) {
-			ParamText(
-			    "\pCould not open file for writing.",
-			    "\p", "\p", "\p");
-			StopAlert(128, 0L);
+			show_error_alert("Could not open file for writing.");
 			return;
 		}
 
@@ -181,11 +176,8 @@ do_save_session(void)
 		FSClose(refNum);
 		FlushVol(0L, sf_reply.sfFile.vRefNum);
 
-		if (err != noErr) {
-			ParamText("\pError writing file.",
-			    "\p", "\p", "\p");
-			StopAlert(128, 0L);
-		}
+		if (err != noErr)
+			show_error_alert("Error writing file.");
 	} else {
 		/* System 6: SFPutFile with SFReply */
 		SFReply reply;
@@ -207,9 +199,7 @@ do_save_session(void)
 		err = Create(reply.fName, reply.vRefNum,
 		    'ttxt', 'TEXT');
 		if (err != noErr) {
-			ParamText("\pCould not create file.",
-			    "\p", "\p", "\p");
-			StopAlert(128, 0L);
+			show_error_alert("Could not create file.");
 			return;
 		}
 
@@ -217,10 +207,7 @@ do_save_session(void)
 		err = FSOpen(reply.fName, reply.vRefNum,
 		    &refNum);
 		if (err != noErr) {
-			ParamText(
-			    "\pCould not open file for writing.",
-			    "\p", "\p", "\p");
-			StopAlert(128, 0L);
+			show_error_alert("Could not open file for writing.");
 			return;
 		}
 
@@ -229,10 +216,7 @@ do_save_session(void)
 		FSClose(refNum);
 		FlushVol(0L, reply.vRefNum);
 
-		if (err != noErr) {
-			ParamText("\pError writing file.",
-			    "\p", "\p", "\p");
-			StopAlert(128, 0L);
-		}
+		if (err != noErr)
+			show_error_alert("Error writing file.");
 	}
 }

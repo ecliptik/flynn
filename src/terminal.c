@@ -429,10 +429,9 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				} else if (ch == 0x9B) {
 					/* CSI (8-bit C1) - same as ESC [ */
 					term->parse_state = PARSE_CSI;
+					term->params[0] = 0;
 					term->num_params = 0;
 					term->intermediate = 0;
-					memset(term->params, 0,
-					    sizeof(term->params));
 				} else if (ch == 0x9D) {
 					/* OSC (8-bit C1) - same as ESC ] */
 					term->parse_state = PARSE_OSC;
@@ -730,8 +729,6 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 	    !term->alt_active) {
 		memcpy(term->snap_screen, term->screen,
 		    sizeof(term->screen));
-		term->snap_rows = term->active_rows;
-		term->snap_cols = term->active_cols;
 		term->snap_valid = 1;
 	}
 
@@ -2418,6 +2415,8 @@ term_finish_osc(Terminal *term)
 				    (unsigned)rgb.red,
 				    (unsigned)rgb.green,
 				    (unsigned)rgb.blue);
+				if (term->response_len >= (short)sizeof(term->response))
+					term->response_len = sizeof(term->response) - 1;
 				term_flush_response(term);
 			}
 			/* Set (non-"?" payload): silently ignore */
@@ -2443,6 +2442,8 @@ term_finish_osc(Terminal *term)
 				    sizeof(term->response),
 				    "\033]10;rgb:0000/0000/"
 				    "0000\033\\");
+			if (term->response_len >= (short)sizeof(term->response))
+				term->response_len = sizeof(term->response) - 1;
 			term_flush_response(term);
 		}
 		/* Set (non-"?" payload): silently ignore */
@@ -2467,6 +2468,8 @@ term_finish_osc(Terminal *term)
 				    sizeof(term->response),
 				    "\033]11;rgb:ffff/ffff/"
 				    "ffff\033\\");
+			if (term->response_len >= (short)sizeof(term->response))
+				term->response_len = sizeof(term->response) - 1;
 			term_flush_response(term);
 		}
 		/* Set (non-"?" payload): silently ignore */

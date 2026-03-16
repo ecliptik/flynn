@@ -41,7 +41,6 @@ extern short g_font_size;
 #define TOP_MARGIN		0
 #define STATUSBAR_MARGIN	0
 #define SCROLLBAR_WIDTH		16
-#define RIGHT_MARGIN		(LEFT_MARGIN + SCROLLBAR_WIDTH)
 
 /* Cursor blink interval in ticks (30 ticks ~ 0.5s) */
 #define CURSOR_BLINK_TICKS	30
@@ -68,6 +67,9 @@ void term_ui_init(WindowPtr win, Terminal *term);
 
 /* Set terminal font and update cell metrics via GetFontInfo */
 void term_ui_set_font(WindowPtr win, short font_id, short font_size);
+
+/* Ensure font metrics are initialized (safe to call multiple times) */
+void term_ui_ensure_metrics(short font_id, short font_size);
 
 /* Draw terminal contents (only dirty rows + cursor) */
 void term_ui_draw(WindowPtr win, Terminal *term);
