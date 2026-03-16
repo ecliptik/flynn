@@ -259,8 +259,8 @@ offscreen_free(void)
  * color_offscreen_alloc - allocate/reallocate GWorld for color systems
  *
  * Returns 1 on success, 0 on failure (caller falls back to direct drawing).
- * Reuses existing GWorld if dimensions haven't changed.  Passes depth 0
- * to NewGWorld so it matches the screen's current pixel depth.
+ * Reuses existing GWorld if dimensions haven't changed.  Passes depth 8
+ * to NewGWorld to cap at 256 colors (saves memory vs 16/24-bit).
  */
 static short
 color_offscreen_alloc(WindowPtr win, short cols, short rows)
@@ -290,13 +290,34 @@ color_offscreen_alloc(WindowPtr win, short cols, short rows)
 	}
 
 	bounds = win->portRect;
-	err = NewGWorld(&g_color_gworld, 0, &bounds, 0L, 0L, 0);
+	err = NewGWorld(&g_color_gworld, 8, &bounds, 0L, 0L, 0);
 	if (err != noErr || !g_color_gworld) {
 		g_color_gworld = 0L;
 		return 0;
 	}
 
 	LockPixels(GetGWorldPixMap(g_color_gworld));
+
+	/* Erase new GWorld so no garbage shows through on partial
+	 * blits (NewGWorld content is undefined).  Use dark mode
+	 * background color when active to match terminal bg. */
+	{
+		CGrafPtr saved_gw;
+		GDHandle saved_gd;
+		GetGWorld(&saved_gw, &saved_gd);
+		SetGWorld((CGrafPtr)g_color_gworld, 0L);
+		if (g_dark_mode) {
+			RGBColor black_rgb = {0, 0, 0};
+			RGBBackColor(&black_rgb);
+		}
+		EraseRect(&bounds);
+		if (g_dark_mode) {
+			RGBColor white_rgb =
+			    {0xFFFF, 0xFFFF, 0xFFFF};
+			RGBBackColor(&white_rgb);
+		}
+		SetGWorld(saved_gw, saved_gd);
+	}
 
 	g_color_off_cols = cols;
 	g_color_off_rows = rows;
@@ -604,44 +625,56 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	 * instead of redrawing all rows.  Only the newly exposed
 	 * rows (marked dirty by term_scroll_up/down) need drawing. */
 	if (term->scroll_pending) {
-		short rgn_height = term->scroll_rgn_bot -
-		    term->scroll_rgn_top + 1;
+		/* Color systems: skip ScrollRect — GWorld can't be
+		 * scrolled in sync.  Instead, dirty all rows in the
+		 * scroll region so the full area gets redrawn via
+		 * GWorld and CopyBits. */
+		if (g_has_color_qd) {
+			short r;
+			for (r = term->scroll_rgn_top;
+			    r <= term->scroll_rgn_bot; r++)
+				term->dirty[r] = 1;
+		} else if (!g_has_color_qd) {
+			short rgn_height = term->scroll_rgn_bot -
+			    term->scroll_rgn_top + 1;
 
-		if (term->scroll_count < rgn_height) {
-			Rect scroll_r;
-			short dv;
+			if (term->scroll_count < rgn_height) {
+				Rect scroll_r;
+				short dv;
 
-			SetRect(&scroll_r, LEFT_MARGIN,
-			    row_top(term->scroll_rgn_top),
-			    LEFT_MARGIN +
-			    term->active_cols * g_cell_width,
-			    row_bottom(term->scroll_rgn_bot));
+				SetRect(&scroll_r, LEFT_MARGIN,
+				    row_top(term->scroll_rgn_top),
+				    LEFT_MARGIN +
+				    term->active_cols * g_cell_width,
+				    row_bottom(term->scroll_rgn_bot));
 
-			if (term->scroll_dir > 0)
-				dv = -(term->scroll_count *
-				    g_cell_height);
-			else
-				dv = term->scroll_count *
-				    g_cell_height;
+				if (term->scroll_dir > 0)
+					dv = -(term->scroll_count *
+					    g_cell_height);
+				else
+					dv = term->scroll_count *
+					    g_cell_height;
 
-			/* In dark mode, set background to black so
-			 * ScrollRect fills exposed region with black
-			 * instead of white */
-			if (g_dark_mode || g_mono_dark)
-				BackPat(&qd.black);
+				/* In dark mode, set background to
+				 * black so ScrollRect fills exposed
+				 * region with black instead of white */
+				if (g_dark_mode || g_mono_dark)
+					BackPat(&qd.black);
 
-			/* Use pre-allocated region to avoid
-			 * NewRgn/DisposeRgn overhead per draw */
-			if (!g_scroll_rgn)
-				g_scroll_rgn = NewRgn();
-			SetEmptyRgn(g_scroll_rgn);
-			ScrollRect(&scroll_r, 0, dv, g_scroll_rgn);
-			/* Validate so Window Manager doesn't
-			 * generate updateEvt → full redraw */
-			ValidRgn(g_scroll_rgn);
+				/* Use pre-allocated region to avoid
+				 * NewRgn/DisposeRgn overhead */
+				if (!g_scroll_rgn)
+					g_scroll_rgn = NewRgn();
+				SetEmptyRgn(g_scroll_rgn);
+				ScrollRect(&scroll_r, 0, dv,
+				    g_scroll_rgn);
+				/* Validate so Window Manager doesn't
+				 * generate updateEvt → full redraw */
+				ValidRgn(g_scroll_rgn);
 
-			if (g_dark_mode || g_mono_dark)
-				BackPat(&qd.white);
+				if (g_dark_mode || g_mono_dark)
+					BackPat(&qd.white);
+			}
 		}
 		term->scroll_pending = 0;
 	}
@@ -734,6 +767,9 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		if (use_color_offscreen) {
 			GetGWorld(&saved_gw, &saved_gd);
 			SetGWorld((CGrafPtr)g_color_gworld, 0L);
+			TextFont(g_font_id);
+			TextSize(g_font_size);
+			TextMode(srcOr);
 		}
 	}
 
@@ -1525,6 +1561,10 @@ glyph_cache_draw(unsigned char gid, short x, short y, unsigned char attr)
 	short idx, variant;
 	BitMap src;
 	Rect src_r, dst_r;
+
+	/* Color systems: fall through to draw_glyph_prim for native color */
+	if (g_has_color_qd)
+		return 0;
 
 	if (!g_glyph_cache.valid)
 		return 0;
