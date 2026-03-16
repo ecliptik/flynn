@@ -211,7 +211,11 @@ finger_connect(const char *host, const char *username,
 	}
 	query[qlen++] = '\r';
 	query[qlen++] = '\n';
-	conn_send(&s->conn, query, qlen);
+	if (conn_send(&s->conn, query, qlen) != noErr) {
+		session_destroy_and_fixup(s);
+		show_error_alert("Could not send finger query");
+		return 0L;
+	}
 
 	/* Set up terminal (no telnet negotiation) */
 	terminal_reset(&s->terminal);
@@ -225,11 +229,14 @@ finger_connect(const char *host, const char *username,
 	SetPort(s->window);
 	{
 		unsigned long deadline = TickCount() + 10 * 60;
+		Boolean got_data = false;
 
 		while (s->conn.state == CONN_STATE_CONNECTED &&
 		    TickCount() < deadline) {
+			SystemTask();
 			conn_idle(&s->conn);
 			if (s->conn.read_len > 0) {
+				got_data = true;
 				finger_process_data(
 				    &s->terminal,
 				    (unsigned char *)
@@ -237,6 +244,24 @@ finger_connect(const char *host, const char *username,
 				    s->conn.read_len);
 				s->conn.read_len = 0;
 			}
+		}
+		if (!got_data) {
+			static const char *nr =
+			    "(No response from server)\r\n";
+			static const char *nrv =
+			    "(No response from server"
+			    " \xd1 try without Verbose)\r\n";
+
+			if (verbose)
+				terminal_process(
+				    &s->terminal,
+				    (unsigned char *)nrv,
+				    strlen(nrv));
+			else
+				terminal_process(
+				    &s->terminal,
+				    (unsigned char *)nr,
+				    strlen(nr));
 		}
 	}
 
