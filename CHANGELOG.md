@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Finger protocol client (RFC 1288) — File > Finger... (Cmd+F)
+  - Query user information on remote hosts via TCP port 79
+  - Host, username, and verbose (/W) fields in Finger dialog
+  - Finger forwarding: user@host@gateway auto-splits and routes correctly
+  - Remembers last finger host/username across launches
+  - Status bar shows "finger | [user@]host"
+  - Window title includes "(finger)" suffix
+  - Per-bookmark protocol selection (Telnet or Finger) in bookmark editor
+  - Favorites submenu dispatches finger bookmarks correctly
+- Scrollback buffer increased from 96 to 192 lines (8 pages of history)
+- Optimized scrollbar arrow scrolling: ScrollRect + offscreen memmove
+  renders only 1 row per arrow click instead of full 24-row redraw
+
+### Fixed
+- Offscreen buffer reuse: clear pixel data when reusing for different
+  window with same dimensions (prevented stale session content bleed)
+- Scrollback ring buffer index: corrected formula for partially-filled
+  buffers (was sb_head+sb_count+sb_row, now sb_head+sb_row)
+- Drain loop data race: process pending TCP data before checking for
+  disconnect state transition
+
+### Changed
+- FlynnPrefs v12 (finger_host, finger_user, bookmark_protocol[])
+- File menu: Finger... inserted at position 2, items renumbered
+- Control menu disabled for finger sessions
+- Bookmark edit dialog: protocol popup (Telnet/Finger), dialog enlarged
+
 ## [1.9.5] - 2026-03-14
 
 ### Added

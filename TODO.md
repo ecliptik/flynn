@@ -6,3 +6,5 @@
 - [x] Multiple simultaneous sessions in separate windows (v1.5.0)
 - [x] 256-color support (System 7 / Color QuickDraw) — v1.9.0
 - [x] Expanded emoji and glyph coverage (202 primitives + 17 emoji) — v1.9.3
+- [x] Finger protocol support (RFC 1288) with forwarding
+- [ ] Gopher protocol support

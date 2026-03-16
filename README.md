@@ -1,6 +1,6 @@
 # Flynn
 
-A Telnet client for classic 68000 Macintosh systems, from the Mac Plus and up. Supports monochrome on System 6 and 256 colors on System 7. Works with MacTCP and Open Transport's MacTCP compatibility layer. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
+A Telnet and Finger client for classic 68000 Macintosh systems, from the Mac Plus and up. Supports monochrome on System 6 and 256 colors on System 7. Works with MacTCP and Open Transport's MacTCP compatibility layer. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 
 This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
@@ -66,8 +66,14 @@ No build toolchain required — just download and run.
 - **Local echo** for BBS sessions (WONT ECHO servers)
 - **Backspace DEL/BS toggle**
 
+**Finger Protocol (RFC 1288)**
+- **Finger client** (File > Finger..., Cmd+F)
+- **User and host queries** with optional verbose (/W) flag
+- **Finger forwarding** (user@host@gateway auto-split)
+- **Remembers last host/user** across launches
+
 **Session Management**
-- **Session bookmarks**
+- **Session bookmarks** (with per-bookmark Telnet/Finger protocol)
 - **Settings persistence**
 - **MultiFinder, Apple Events, and Notification Manager support**
 
@@ -92,6 +98,7 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | F1-F10 | Cmd+1..0 | For M0110 keyboards without function keys |
 | Bookmarks | Cmd+B | Open bookmark manager |
 | New Session | Cmd+N | New session (new window if connected) |
+| Finger | Cmd+F | Finger protocol query |
 | Save Contents | Cmd+S | Save scrollback and screen to text file |
 | Close Window | Cmd+W | Close active session window |
 | Quit | Cmd+Q | Quit Flynn |
