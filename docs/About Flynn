@@ -1,6 +1,6 @@
 =====================================================
                       Flynn
-              Telnet Client for Macintosh
+         Telnet and Finger Client for Macintosh
                     Version 1.9.5
 =====================================================
 
@@ -10,13 +10,14 @@ Connect your classic Macintosh to the modern world.
 About Flynn
 -----------
 
-Flynn is a Telnet client for the Apple Macintosh Plus
-and later models running System 6.0.8 or later. It
-connects to remote hosts over TCP/IP using MacTCP (also
-works under Open Transport's MacTCP compatibility layer),
-providing a full-featured terminal for
-interactive sessions with Linux, Unix, and other
-Telnet-capable servers.
+Flynn is a Telnet and Finger client for the Apple
+Macintosh Plus and later models running System 6.0.8
+or later. It connects to remote hosts over TCP/IP
+using MacTCP (also works under Open Transport's
+MacTCP compatibility layer), providing a full-featured
+terminal for interactive sessions with Linux, Unix,
+and other Telnet-capable servers, as well as Finger
+protocol queries (RFC 1288) for user information.
 
 Flynn emulates a VT220/xterm terminal with support for
 full-screen applications like vi, nano, tmux, and
@@ -80,6 +81,40 @@ Getting Started
    File menu, or simply close the window.
 
 
+Finger Protocol
+----------------
+
+Flynn includes a Finger protocol client (RFC 1288)
+for querying user information on remote hosts.
+
+1. Choose "Finger..." from the File menu, or press
+   Command-F.
+
+2. Enter the hostname of the finger server (e.g.,
+   graph.no for weather, happynetbox.com for users).
+
+3. Optionally enter a username to query a specific
+   user. Leave blank to list all users.
+
+4. Click Finger. Flynn connects to port 79, sends
+   the query, and displays the response.
+
+5. The response is displayed in a terminal window.
+   Use the scrollbar or Command-Up/Down to scroll
+   through longer responses.
+
+Finger Forwarding:
+  Flynn supports RFC 1288 forwarding. Enter
+  "user@host@gateway" in the Host field to connect
+  to the gateway and forward the query to the remote
+  host. For example: "joe@server@relay" connects to
+  relay and sends "joe@server" as the query.
+
+The Finger dialog remembers the last host and username
+used. Finger destinations can also be saved as
+bookmarks with the Finger protocol selected.
+
+
 Features
 --------
 
@@ -112,11 +147,11 @@ Features
     no-op on monochrome)
   - Alternate screen buffer for full-screen apps
     (vi, nano, less, tmux)
-  - 96-line scrollback buffer with position indicator
+  - 192-line scrollback buffer with position indicator
   - Mouse text selection with copy and paste
   - Select All (Cmd+A) for full-screen copy
   - Session bookmarks with per-bookmark username,
-    terminal type, and font settings
+    terminal type, font, and protocol settings
   - Save Contents (Cmd+S) exports scrollback and
     screen to a TEXT file via standard Save dialog
   - Recent bookmarks in File menu for quick access
@@ -138,6 +173,11 @@ Features
   - Multiple simultaneous sessions (up to 4 windows)
   - Window menu with session list
   - Connection progress window with status updates
+  - Status bar at bottom of window shows terminal
+    dimensions, protocol type, and connection info
+    (e.g., "80x24 xterm | host:23" for telnet,
+    "80x24 finger | user@host" for finger).
+    Toggle via Options > Status Bar.
   - Double-buffered rendering eliminates screen flash
   - Local echo for BBS sessions (WONT ECHO servers)
   - Keystroke buffering for reliable fast typing
@@ -164,6 +204,7 @@ and USB keyboards.
   Menu Commands
   ~~~~~~~~~~~~~
   Command-N       New session (new window if connected)
+  Command-F       Finger protocol query
   Command-W       Close active session window
   Command-S       Save Contents to file
   Command-B       Open Bookmark Manager

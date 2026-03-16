@@ -53,7 +53,8 @@ No build toolchain required — just download and run.
 
 **Display & Windowing**
 - **Multiple sessions** (up to 4 simultaneous windows)
-- **Resizable window and scrollback** (80x24 up to 132x50)
+- **Resizable window and scrollback** (80x24 up to 132x50, 192-line scrollback)
+- **Status bar** showing terminal size, protocol, and connection info
 - **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
 - **Dark mode**
 
