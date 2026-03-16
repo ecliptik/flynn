@@ -21,8 +21,6 @@
 #include <OSUtils.h>
 #include "tcp.h"
 
-#define OPEN_TIMEOUT 60
-
 /* Retro68 compatibility: PBControl/PBOpen -> Sync/Async variants */
 #define PBControl(pb, async) ((async) ? PBControlAsync(pb) : PBControlSync(pb))
 #define PBOpen(pb, async) ((async) ? PBOpenAsync(pb) : PBOpenSync(pb))
@@ -158,8 +156,6 @@ OSErr
 _TCPSend(TCPiopb *pb, StreamPtr stream, wdsEntry *wdsPtr, Ptr userData,
   TCPIOCompletionProc ioCompletion, Boolean async)
 {
-	memset(pb, 0, sizeof(*pb));
-
 	pb->csCode = TCPSend;
 	pb->ioCompletion = ioCompletion;
 	pb->ioCRefNum = gIPPDriverRefNum;
@@ -185,9 +181,7 @@ _TCPRcv(TCPiopb *pb, StreamPtr stream, Ptr rcvBufPtr,
   Boolean async)
 {
 	OSErr osErr;
-	
-	memset(pb, 0, sizeof(*pb));
-	
+
 	pb->csCode = TCPRcv;
 	pb->ioCompletion = ioCompletion;
 	pb->ioCRefNum = gIPPDriverRefNum;
@@ -251,13 +245,11 @@ _TCPStatus(TCPiopb *pb, StreamPtr stream, struct TCPStatusPB *status,
 {
 	OSErr osErr;
 
-	memset(pb, 0, sizeof(*pb));
-
-	pb->ioCompletion = ioCompletion;
-	pb->ioResult = 1;
 	pb->ioCRefNum = gIPPDriverRefNum;
 	pb->csCode = TCPStatus;
 	pb->tcpStream = stream;
+	pb->ioCompletion = ioCompletion;
+	pb->ioResult = 1;
 	pb->csParam.status.userDataPtr = userData;
 	
 	osErr = PBControl((ParmBlkPtr)pb, async);
@@ -396,8 +388,6 @@ _UDPRelease(UDPiopb *pb, StreamPtr stream, Ptr userData,
 	pb->ioCRefNum = gIPPDriverRefNum;
 	pb->udpStream = stream;
 	pb->ioResult = 1;
-	
-	//pb->csParam.status.userDataPtr = userData;
 	
 	osErr = PBControl((ParmBlkPtr)pb, async);
 

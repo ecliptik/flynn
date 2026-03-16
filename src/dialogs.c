@@ -11,7 +11,6 @@
 #include <Dialogs.h>
 #include <Memory.h>
 #include <ToolUtils.h>
-#include <Resources.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -28,15 +27,11 @@
 #include "macutil.h"
 #include "sysutil.h"
 #include "finger.h"
+#include "menus.h"
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
 extern Session *active_session;
-
-/* Functions now in menus.c */
-extern void update_menus(void);
-extern void rebuild_file_menu(void);
-extern void add_recent_bookmark(short index);
 
 /* Status window dimensions (centered on 512x342 screen) */
 #define STATUS_WIN_W   320
@@ -307,6 +302,80 @@ apply_bookmark_font(Session *s, Bookmark *bm)
 	do_window_resize(s, win_w, win_h);
 }
 
+/* ---- Terminal type popup helper ---- */
+
+/*
+ * show_ttype_popup - Show terminal type popup menu at a dialog item.
+ * If include_default is true, adds "Default" as first item (-1).
+ * Returns new ttype selection, or current_ttype if no change.
+ * Updates button title on selection.
+ */
+static short
+show_ttype_popup(DialogPtr dlg, short item_num,
+    short current_ttype, Boolean include_default)
+{
+	MenuHandle popup;
+	Point popup_pt;
+	long result;
+	short choice;
+	short item_type;
+	Handle item_h;
+	Rect item_rect;
+	short menu_id = include_default ? 202 : 201;
+	static const short t2m[] = { 1, 4, 3, 2, 5 };
+	static const short m2t[] = { 0, 3, 2, 1, 4 };
+	short offset = include_default ? 1 : 0;
+	short cur_item;
+
+	popup = NewMenu(menu_id, "\p");
+	if (include_default)
+		AppendMenu(popup, "\pDefault");
+	AppendMenu(popup, "\pxterm");
+	AppendMenu(popup, "\pxterm-256color");
+	AppendMenu(popup, "\pVT100");
+	AppendMenu(popup, "\pVT220");
+	AppendMenu(popup, "\pANSI-BBS");
+	InsertMenu(popup, -1);
+
+	if (include_default && current_ttype == -1)
+		cur_item = 1;
+	else if (current_ttype >= 0 &&
+	    current_ttype <= 4)
+		cur_item = t2m[current_ttype] + offset;
+	else
+		cur_item = 1;
+	CheckItem(popup, cur_item, true);
+
+	GetDialogItem(dlg, item_num,
+	    &item_type, &item_h, &item_rect);
+	popup_pt.h = item_rect.left;
+	popup_pt.v = item_rect.top;
+	LocalToGlobal(&popup_pt);
+
+	result = PopUpMenuSelect(popup,
+	    popup_pt.v, popup_pt.h, cur_item);
+	choice = LoWord(result);
+
+	DeleteMenu(menu_id);
+	DisposeMenu(popup);
+
+	if (choice > 0) {
+		char btn_text[32];
+		short new_ttype;
+
+		if (include_default && choice == 1)
+			new_ttype = -1;
+		else
+			new_ttype = m2t[choice - 1 - offset];
+		ttype_to_str(new_ttype, btn_text,
+		    sizeof(btn_text));
+		bme_set_btn_title(dlg, item_num,
+		    btn_text);
+		return new_ttype;
+	}
+	return current_ttype;
+}
+
 /* ---- Connect dialog ---- */
 
 static pascal Boolean
@@ -356,59 +425,9 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 		GetDialogItem(dlg, DLOG_TTYPE_BTN,
 		    &item_type, &item_h, &item_rect);
 		if (PtInRect(pt, &item_rect)) {
-			MenuHandle popup;
-			Point popup_pt;
-			long result;
-			short choice;
-
-			popup = NewMenu(201, "\p");
-			AppendMenu(popup, "\pxterm");
-			AppendMenu(popup, "\pxterm-256color");
-			AppendMenu(popup, "\pVT100");
-			AppendMenu(popup, "\pVT220");
-			AppendMenu(popup, "\pANSI-BBS");
-			InsertMenu(popup, -1);
-
-			{
-				/* Map internal ttype to menu item */
-				static const short t2m[] =
-				    { 1, 4, 3, 2, 5 };
-				static const short m2t[] =
-				    { 0, 3, 2, 1, 4 };
-				short cur_item;
-
-				cur_item = (g_connect_ttype >= 0 &&
-				    g_connect_ttype <= 4) ?
-				    t2m[g_connect_ttype] : 1;
-				CheckItem(popup, cur_item, true);
-
-				popup_pt.h = item_rect.left;
-				popup_pt.v = item_rect.top;
-				LocalToGlobal(&popup_pt);
-
-				result = PopUpMenuSelect(popup,
-				    popup_pt.v, popup_pt.h,
-				    cur_item);
-				choice = LoWord(result);
-
-				if (choice > 0) {
-					char btn_text[32];
-
-					g_connect_ttype =
-					    m2t[choice - 1];
-					ttype_to_str(
-					    g_connect_ttype,
-					    btn_text,
-					    sizeof(btn_text));
-					bme_set_btn_title(dlg,
-					    DLOG_TTYPE_BTN,
-					    btn_text);
-				}
-			}
-
-			DeleteMenu(201);
-			DisposeMenu(popup);
-
+			g_connect_ttype = show_ttype_popup(dlg,
+			    DLOG_TTYPE_BTN, g_connect_ttype,
+			    false);
 			*item = DLOG_TTYPE_BTN;
 			return true;
 		}
@@ -712,26 +731,12 @@ do_connect(void)
 				/* Ensure font metrics are set before
 				 * session_new() — it uses g_cell_width
 				 * and g_cell_height for window sizing */
-				if (g_cell_width == 0) {
-					GrafPtr save_port;
-					GrafPort temp_port;
-
-					GetPort(&save_port);
-					OpenPort(&temp_port);
-					term_ui_set_font(
-					    (WindowPtr)&temp_port,
-					    prefs.font_id,
-					    prefs.font_size);
-					ClosePort(&temp_port);
-					SetPort(save_port);
-				}
+				term_ui_ensure_metrics(prefs.font_id,
+				    prefs.font_size);
 
 				s = session_new();
 				if (!s) {
-					ParamText(
-					    "\pOut of memory",
-					    "\p", "\p", "\p");
-					StopAlert(128, 0L);
+					show_error_alert("Out of memory");
 					update_menus();
 					return;
 				}
@@ -807,14 +812,7 @@ do_connect(void)
 		    s->conn.state == CONN_STATE_IDLE) {
 			/* Connect failed or no host — destroy the
 			 * freshly created session */
-			if (s == active_session)
-				active_session = 0L;
-			session_destroy(s);
-			if (!active_session) {
-				WindowPtr front = FrontWindow();
-				active_session =
-				    session_from_window(front);
-			}
+			session_destroy_and_fixup(s);
 		}
 	}
 	update_menus();
@@ -834,8 +832,7 @@ do_connect_bookmark(short index)
 	if (!s) {
 		s = session_new();
 		if (!s) {
-			ParamText("\pOut of memory", "\p", "\p", "\p");
-			StopAlert(128, 0L);
+			show_error_alert("Out of memory");
 			return;
 		}
 		session_init_from_prefs(s);
@@ -847,9 +844,7 @@ do_connect_bookmark(short index)
 	if (s->conn.state == CONN_STATE_CONNECTED) {
 		s = session_new();
 		if (!s) {
-			ParamText("\pMaximum sessions reached",
-			    "\p", "\p", "\p");
-			StopAlert(128, 0L);
+			show_error_alert("Maximum sessions reached");
 			update_menus();
 			return;
 		}
@@ -883,16 +878,8 @@ do_connect_bookmark(short index)
 
 		if (!ok) {
 			if (created_session &&
-			    s->conn.state == CONN_STATE_IDLE) {
-				if (s == active_session)
-					active_session = 0L;
-				session_destroy(s);
-				if (!active_session) {
-					WindowPtr front = FrontWindow();
-					active_session =
-					    session_from_window(front);
-				}
-			}
+			    s->conn.state == CONN_STATE_IDLE)
+				session_destroy_and_fixup(s);
 			update_menus();
 			return;
 		}
@@ -1001,71 +988,9 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 		GetDialogItem(dlg, BME_TTYPE_BTN,
 		    &item_type, &item_h, &item_rect);
 		if (PtInRect(pt, &item_rect)) {
-			MenuHandle popup;
-			Point popup_pt;
-			long result;
-			short choice;
-
-			popup = NewMenu(202, "\p");
-			AppendMenu(popup, "\pDefault");
-			AppendMenu(popup, "\pxterm");
-			AppendMenu(popup, "\pxterm-256color");
-			AppendMenu(popup, "\pVT100");
-			AppendMenu(popup, "\pVT220");
-			AppendMenu(popup, "\pANSI-BBS");
-			InsertMenu(popup, -1);
-
-			{
-				/* Map internal ttype to menu item
-				 * (offset +2 for Default at item 1)
-				 * -1=Default(1), 0=xterm(2),
-				 * 3=xterm-256(3), 2=VT100(4),
-				 * 1=VT220(5), 4=ANSI-BBS(6) */
-				static const short bt2m[] =
-				    { 2, 5, 4, 3, 6 };
-				static const short bm2t[] =
-				    { 0, 3, 2, 1, 4 };
-				short cur_item;
-
-				if (g_bme_ttype == -1)
-					cur_item = 1;
-				else if (g_bme_ttype >= 0 &&
-				    g_bme_ttype <= 4)
-					cur_item = bt2m[g_bme_ttype];
-				else
-					cur_item = 1;
-				CheckItem(popup, cur_item, true);
-
-				popup_pt.h = item_rect.left;
-				popup_pt.v = item_rect.top;
-				LocalToGlobal(&popup_pt);
-
-				result = PopUpMenuSelect(popup,
-				    popup_pt.v, popup_pt.h,
-				    cur_item);
-				choice = LoWord(result);
-
-				if (choice > 0) {
-					char btn_text[32];
-
-					if (choice == 1)
-						g_bme_ttype = -1;
-					else
-						g_bme_ttype =
-						    bm2t[choice - 2];
-					ttype_to_str(
-					    g_bme_ttype,
-					    btn_text,
-					    sizeof(btn_text));
-					bme_set_btn_title(dlg,
-					    BME_TTYPE_BTN,
-					    btn_text);
-				}
-			}
-
-			DeleteMenu(202);
-			DisposeMenu(popup);
-
+			g_bme_ttype = show_ttype_popup(dlg,
+			    BME_TTYPE_BTN, g_bme_ttype,
+			    true);
 			*item = BME_TTYPE_BTN;
 			return true;
 		}
@@ -1638,9 +1563,7 @@ do_dns_server_dialog(void)
 
 	ip = ip2long(ip_cstr);
 	if (ip == 0) {
-		ParamText("\pInvalid DNS server IP address",
-		    "\p", "\p", "\p");
-		StopAlert(128, 0L);
+		show_error_alert("Invalid DNS server IP address");
 		return;
 	}
 

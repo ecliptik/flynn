@@ -15,6 +15,8 @@
 #include "terminal_ui.h"
 #include "glyphs.h"
 #include "clipboard.h"
+#include "savefile.h"
+#include "menus.h"
 
 /* External references to main.c globals */
 extern Session *active_session;
@@ -70,23 +72,10 @@ do_copy(void)
 			last_nonspace = -1;
 			for (col = c_start; col <= c_end; col++) {
 				char cc;
-				const GlyphInfo *gi;
 
 				cell = terminal_get_display_cell(
 				    &s->terminal, row, col);
-				if (CELL_IS_GLYPH(cell->attr) &&
-				    cell->ch == GLYPH_WIDE_SPACER) {
-					buf[len + (col - c_start)] = ' ';
-					continue;
-				}
-				if (CELL_IS_GLYPH(cell->attr)) {
-					gi = glyph_get_info(cell->ch);
-					cc = gi ? gi->copy_char : '?';
-				} else if (CELL_IS_BRAILLE(cell->attr)) {
-					cc = '.';
-				} else {
-					cc = cell->ch;
-				}
+				cc = cell_to_char(cell);
 				buf[len + (col - c_start)] = cc;
 				if (cc != ' ')
 					last_nonspace = col - c_start;
@@ -169,10 +158,6 @@ do_select_all(void)
 		SetPort(save);
 	}
 
-	/* Need to update menus to reflect selection state.
-	 * Call through extern since menus.c owns this. */
-	{
-		extern void update_menus(void);
-		update_menus();
-	}
+	/* Update menus to reflect selection state */
+	update_menus();
 }

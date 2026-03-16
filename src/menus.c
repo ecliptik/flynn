@@ -42,12 +42,6 @@ extern FlynnPrefs prefs;
 extern Session *active_session;
 extern Boolean running;
 
-/* External references to session helpers (session.c) */
-extern void session_save_font(Session *s);
-extern void session_load_font(Session *s);
-extern void do_font_change(short font_id, short font_size);
-extern void do_window_resize(Session *s, short width, short height);
-
 /* Map menu item (1-5) to internal ttype index (0-4) */
 static const short ttype_from_menu[] = { 0, 3, 2, 1, 4 };
 /* Map internal ttype index (0-4) to menu item (1-5) */
@@ -423,17 +417,7 @@ handle_file_menu(short item)
 			if (CautionAlert(128, 0L) != 1)
 				break;
 		}
-		{
-			short si;
-			Session *sess;
-
-			for (si = MAX_SESSIONS - 1;
-			    si >= 0; si--) {
-				sess = session_get(si);
-				if (sess)
-					session_destroy(sess);
-			}
-		}
+		session_destroy_all();
 		active_session = 0L;
 		running = false;
 		break;
@@ -489,55 +473,41 @@ handle_edit_menu(short item)
 static void
 handle_ctrl_menu(short item)
 {
-	if (active_session &&
-	    active_session->conn.state == CONN_STATE_CONNECTED) {
-		char ctrl_byte;
+	/* Lookup table: menu item -> control byte */
+	static const struct { short item; char byte; } ctrl_table[] = {
+		{ CTRL_MENU_CTRLC, 0x03 },
+		{ CTRL_MENU_CTRLD, 0x04 },
+		{ CTRL_MENU_CTRLH, 0x08 },
+		{ CTRL_MENU_CTRLL, 0x0C },
+		{ CTRL_MENU_CTRLX, 0x18 },
+		{ CTRL_MENU_CTRLZ, 0x1A },
+		{ CTRL_MENU_ESC,   0x1B }
+	};
+	short i;
 
-		switch (item) {
-		case CTRL_MENU_CTRLC:
-			ctrl_byte = 0x03;
-			conn_send(&active_session->conn,
-			    &ctrl_byte, 1);
-			break;
-		case CTRL_MENU_CTRLD:
-			ctrl_byte = 0x04;
-			conn_send(&active_session->conn,
-			    &ctrl_byte, 1);
-			break;
-		case CTRL_MENU_CTRLH:
-			ctrl_byte = 0x08;
-			conn_send(&active_session->conn,
-			    &ctrl_byte, 1);
-			break;
-		case CTRL_MENU_CTRLL:
-			ctrl_byte = 0x0C;
-			conn_send(&active_session->conn,
-			    &ctrl_byte, 1);
-			break;
-		case CTRL_MENU_CTRLX:
-			ctrl_byte = 0x18;
-			conn_send(&active_session->conn,
-			    &ctrl_byte, 1);
-			break;
-		case CTRL_MENU_CTRLZ:
-			ctrl_byte = 0x1A;
-			conn_send(&active_session->conn,
-			    &ctrl_byte, 1);
-			break;
-		case CTRL_MENU_BREAK: {
-			char brk_seq[2];
+	if (!active_session ||
+	    active_session->conn.state != CONN_STATE_CONNECTED)
+		return;
 
-			brk_seq[0] = (char)0xFF;  /* IAC */
-			brk_seq[1] = (char)0xF3;  /* BRK */
-			conn_send(&active_session->conn,
-			    brk_seq, 2);
-			break;
-		}
-		case CTRL_MENU_ESC:
-			ctrl_byte = 0x1B;
+	/* Special case: Break sends IAC BRK */
+	if (item == CTRL_MENU_BREAK) {
+		char brk_seq[2];
+
+		brk_seq[0] = (char)0xFF;  /* IAC */
+		brk_seq[1] = (char)0xF3;  /* BRK */
+		conn_send(&active_session->conn, brk_seq, 2);
+		return;
+	}
+
+	/* Table lookup for single-byte control codes */
+	for (i = 0; i < (short)(sizeof(ctrl_table) /
+	    sizeof(ctrl_table[0])); i++) {
+		if (ctrl_table[i].item == item) {
+			char ctrl_byte = ctrl_table[i].byte;
+
 			conn_send(&active_session->conn,
 			    &ctrl_byte, 1);
-			break;
+			return;
 		}
 	}
 }

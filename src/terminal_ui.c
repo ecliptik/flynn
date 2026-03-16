@@ -542,6 +542,7 @@ term_ui_cleanup(void)
 {
 	offscreen_free();
 	color_offscreen_free();
+	if (g_scroll_rgn) { DisposeRgn(g_scroll_rgn); g_scroll_rgn = 0L; }
 }
 
 /*
@@ -734,7 +735,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	/* Check if any rows are dirty */
 	any_dirty = 0;
 	for (row = 0; row < term->active_rows; row++) {
-		if (terminal_is_row_dirty(term, row)) {
+		if (term->dirty[row]) {
 			any_dirty = 1;
 			break;
 		}
@@ -830,7 +831,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	{
 		short di;
 		for (di = 0; di < TERM_ROWS; di++)
-			was_dirty[di] = terminal_is_row_dirty(term, di);
+			was_dirty[di] = term->dirty[di];
 	}
 
 	/* Invalidate shadow on scroll — content shifted */
@@ -1931,9 +1932,11 @@ draw_row(Terminal *term, short row)
 	col = 0;
 	while (col < eff_cols) {
 		unsigned char cell_attr;
+		short has_non_space;
 
 		run_start = col;
 		run_len = 0;
+		has_non_space = 0;
 
 		if (use_color) {
 			/* Color path: collect run matching attr+color */
@@ -1967,23 +1970,17 @@ draw_row(Terminal *term, short row)
 				}
 
 				buf[run_len] = cell->ch;
+				if (cell->ch != ' ')
+					has_non_space = 1;
 				run_len++;
 				col++;
 			}
 
 			/* Skip plain spaces unless they have bg */
 			if (run_attr == ATTR_NORMAL &&
-			    run_bg == COLOR_DEFAULT) {
-				short all_space = 1, i;
-				for (i = 0; i < run_len; i++) {
-					if (buf[i] != ' ') {
-						all_space = 0;
-						break;
-					}
-				}
-				if (all_space)
-					continue;
-			}
+			    run_bg == COLOR_DEFAULT &&
+			    !has_non_space)
+				continue;
 		} else {
 			/* Mono path: collect run by attr only */
 			run_fg = COLOR_DEFAULT;
@@ -2004,22 +2001,15 @@ draw_row(Terminal *term, short row)
 				}
 
 				buf[run_len] = cell->ch;
+				if (cell->ch != ' ')
+					has_non_space = 1;
 				run_len++;
 				col++;
 			}
 
 			/* Skip plain spaces (already erased) */
-			if (run_attr == ATTR_NORMAL) {
-				short all_space = 1, i;
-				for (i = 0; i < run_len; i++) {
-					if (buf[i] != ' ') {
-						all_space = 0;
-						break;
-					}
-				}
-				if (all_space)
-					continue;
-			}
+			if (run_attr == ATTR_NORMAL && !has_non_space)
+				continue;
 		}
 
 		/* Pre-compute run pixel position and width */
@@ -2263,7 +2253,7 @@ draw_row(Terminal *term, short row)
 				}
 				font_cache_blit_run(buf,
 				    run_len,
-				    col_left(run_start),
+				    run_x,
 				    row_y, run_attr);
 				continue;
 			}
@@ -2310,12 +2300,12 @@ draw_row(Terminal *term, short row)
 					    run_attr);
 					if (use_bic)
 						TextMode(srcBic);
-					MoveTo(col_left(run_start),
+					MoveTo(run_x,
 					    baseline);
 					DrawText(buf, 0, run_len);
 					if (run_attr & ATTR_BOLD) {
 						MoveTo(
-						    col_left(run_start)
+						    run_x
 						    + 1, baseline);
 						DrawText(buf, 0,
 						    run_len);
@@ -2327,12 +2317,12 @@ draw_row(Terminal *term, short row)
 					 * Color inverse: batched
 					 * DrawText for all cases.
 					 */
-					MoveTo(col_left(run_start),
+					MoveTo(run_x,
 					    baseline);
 					DrawText(buf, 0, run_len);
 					if (run_attr & ATTR_BOLD) {
 						MoveTo(
-						    col_left(run_start)
+						    run_x
 						    + 1, baseline);
 						DrawText(buf, 0,
 						    run_len);
@@ -2364,9 +2354,9 @@ draw_row(Terminal *term, short row)
 				 */
 				if (g_mono_dark)
 					TextMode(srcBic);
-				MoveTo(col_left(run_start), baseline);
+				MoveTo(run_x, baseline);
 				DrawText(buf, 0, run_len);
-				MoveTo(col_left(run_start) + 1,
+				MoveTo(run_x + 1,
 				    baseline);
 				DrawText(buf, 0, run_len);
 				if (g_mono_dark)
@@ -2377,7 +2367,7 @@ draw_row(Terminal *term, short row)
 				 */
 				if (g_mono_dark)
 					TextMode(srcBic);
-				MoveTo(col_left(run_start), baseline);
+				MoveTo(run_x, baseline);
 				DrawText(buf, 0, run_len);
 				if (g_mono_dark)
 					TextMode(srcOr);
@@ -4995,6 +4985,23 @@ draw_status_bar(WindowPtr win, Session *s)
 	}
 	ForeColor(blackColor);
 	BackColor(whiteColor);
+}
+
+/*
+ * term_ui_ensure_metrics - ensure font metrics are initialized.
+ * If g_cell_width is zero (no window has been opened yet), creates a
+ * temporary GrafPort to measure the given font.  Safe to call multiple
+ * times; no-op once metrics are set.
+ */
+void
+term_ui_ensure_metrics(short font_id, short font_size)
+{
+	if (g_cell_width == 0) {
+		GrafPort temp_port;
+		OpenPort(&temp_port);
+		term_ui_set_font((WindowPtr)&temp_port, font_id, font_size);
+		ClosePort(&temp_port);
+	}
 }
 
 /*

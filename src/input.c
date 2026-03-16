@@ -145,16 +145,7 @@ handle_key_down(Session *s, EventRecord *event)
 			term_ui_draw(s->window, &s->terminal);
 
 			/* Update scroll bar to match new offset */
-			if (s->scrollbar) {
-				SetControlMaximum(s->scrollbar,
-				    s->terminal.sb_count);
-				SetControlValue(s->scrollbar,
-				    s->terminal.sb_count -
-				    s->terminal.scroll_offset);
-				HiliteControl(s->scrollbar,
-				    s->terminal.sb_count > 0 ?
-				    0 : 255);
-			}
+			session_update_scrollbar(s);
 
 			if (s->terminal.scroll_offset > 0)
 				set_wtitlef(s->window, "Flynn [-%d]",

@@ -16,7 +16,6 @@
  */
 
 #include <Quickdraw.h>
-#include <Fonts.h>
 #include <Events.h>
 #include <Windows.h>
 #include <Menus.h>
@@ -41,9 +40,6 @@
 /* External references */
 extern FlynnPrefs prefs;
 extern Session *active_session;
-extern void session_save_font(Session *s);
-extern void session_load_font(Session *s);
-extern void do_window_resize(Session *s, short width, short height);
 
 /*
  * finger_process_data - feed raw TCP data to terminal with
@@ -168,23 +164,11 @@ finger_connect(const char *host, const char *username,
 	}
 
 	/* Ensure font metrics initialized */
-	if (g_cell_width == 0) {
-		GrafPtr save_port;
-		GrafPort temp_port;
-
-		GetPort(&save_port);
-		OpenPort(&temp_port);
-		term_ui_set_font((WindowPtr)&temp_port,
-		    prefs.font_id, prefs.font_size);
-		ClosePort(&temp_port);
-		SetPort(save_port);
-	}
+	term_ui_ensure_metrics(prefs.font_id, prefs.font_size);
 
 	s = session_new();
 	if (!s) {
-		ParamText("\pOut of memory",
-		    "\p", "\p", "\p");
-		StopAlert(128, 0L);
+		show_error_alert("Out of memory");
 		return 0L;
 	}
 	session_init_from_prefs(s);
@@ -196,9 +180,7 @@ finger_connect(const char *host, const char *username,
 	sw = conn_status_show(smsg);
 	if (!conn_connect(&s->conn, connect_host, FINGER_PORT, sw)) {
 		conn_status_close(sw);
-		if (s == active_session)
-			active_session = 0L;
-		session_destroy(s);
+		session_destroy_and_fixup(s);
 		return 0L;
 	}
 	conn_status_close(sw);

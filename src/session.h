@@ -82,4 +82,13 @@ void do_font_change(short font_id, short font_size);
 /* Resize session window and update terminal grid */
 void do_window_resize(Session *s, short width, short height);
 
+/* Destroy all sessions (reverse order) */
+void session_destroy_all(void);
+
+/* Sync scroll bar with terminal scrollback state */
+void session_update_scrollbar(Session *s);
+
+/* Destroy session and fix up active_session pointer */
+void session_destroy_and_fixup(Session *s);
+
 #endif /* SESSION_H */

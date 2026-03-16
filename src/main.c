@@ -48,6 +48,10 @@ static short saved_key_rep_thresh;
 static NMRec nm_rec;
 static Boolean notification_posted = false;
 
+/* Pre-allocated scroll bar action UPP (avoid leak on every click) */
+static pascal void scrollbar_action(ControlHandle control, short part);
+static ControlActionUPP g_scroll_action_upp = 0L;
+
 /* Shared buffers for telnet/terminal processing (static to avoid stack) */
 static unsigned char out_buf[TCP_READ_BUFSIZ];
 static unsigned char send_buf[TCP_READ_BUFSIZ];
@@ -129,6 +133,7 @@ main(void)
 	init_apple_events();
 	color_detect();
 	init_menus();
+	g_scroll_action_upp = NewControlActionUPP(scrollbar_action);
 
 	/* Load prefs and fast init before showing window */
 	prefs_load(&prefs);
@@ -374,25 +379,6 @@ session_process_data(Session *sess)
 	}
 
 	sess->conn.read_len = 0;
-}
-
-/*
- * session_update_scrollbar - sync scroll bar with terminal scrollback state.
- */
-static void
-session_update_scrollbar(Session *sess)
-{
-	short max_val, cur_val;
-
-	if (!sess->scrollbar)
-		return;
-
-	max_val = sess->terminal.sb_count;
-	cur_val = max_val - sess->terminal.scroll_offset;
-
-	SetControlMaximum(sess->scrollbar, max_val);
-	SetControlValue(sess->scrollbar, cur_val);
-	HiliteControl(sess->scrollbar, max_val > 0 ? 0 : 255);
 }
 
 /*
@@ -726,22 +712,14 @@ main_event_loop(void)
 	}
 
 	/* Clean up all sessions before quit */
-	{
-		short si;
-		Session *sess;
-
-		for (si = MAX_SESSIONS - 1; si >= 0; si--) {
-			sess = session_get(si);
-			if (sess)
-				session_destroy(sess);
-		}
-	}
+	session_destroy_all();
 	active_session = 0L;
 
 	/* Restore system key repeat settings */
 	LMSetKeyThresh(saved_key_thresh);
 	LMSetKeyRepThresh(saved_key_rep_thresh);
 
+	term_ui_cleanup();
 	ExitToShell();
 }
 
@@ -951,8 +929,7 @@ handle_mouse_down(EventRecord *event)
 				} else {
 					TrackControl(hit_ctl,
 					    local_pt,
-					    NewControlActionUPP(
-					    scrollbar_action));
+					    g_scroll_action_upp);
 				}
 				SetPort(save);
 			} else {

@@ -27,4 +27,7 @@ void dlg_get_text(DialogPtr dlg, short item, char *buf, short buflen);
 /* Clear window background: PaintRect if dark, EraseRect if light */
 void clear_window_bg(WindowPtr win, Boolean dark_mode);
 
+/* Show a StopAlert with a C string message */
+void show_error_alert(const char *msg);
+
 #endif /* MACUTIL_H */

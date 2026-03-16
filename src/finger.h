@@ -5,6 +5,17 @@
 #ifndef FINGER_H
 #define FINGER_H
 
+/* Finger dialog resource ID and items */
+#define DLOG_FINGER_ID      137
+#define FINGER_OK           1
+#define FINGER_CANCEL       2
+#define FINGER_HOST_LABEL   3
+#define FINGER_HOST_FIELD   4
+#define FINGER_USER_LABEL   5
+#define FINGER_USER_FIELD   6
+#define FINGER_VERBOSE_CHK  7
+#define FINGER_DEFAULT_BTN  8
+
 /* Show the Finger dialog and connect */
 void do_finger(void);
 
