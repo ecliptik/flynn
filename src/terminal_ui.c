@@ -937,6 +937,36 @@ do_draw:
 		 */
 	}
 
+	/* Fill area below terminal grid with black in dark mode.
+	 * The offscreen buffer is zeroed (white) on allocation, so
+	 * the gap between the last terminal row and the status bar
+	 * remains white unless explicitly filled. */
+	{
+		short grid_bottom = row_bottom(term->active_rows - 1);
+		short content_bottom = win->portRect.bottom -
+		    status_bar_height();
+
+		if (grid_bottom < content_bottom) {
+			Rect gap_r;
+			SetRect(&gap_r, 0, grid_bottom,
+			    win->portRect.right - SCROLLBAR_WIDTH,
+			    content_bottom);
+
+			if (use_offscreen && (g_dark_mode ||
+			    g_mono_dark)) {
+				offscreen_fill_rect(&gap_r, 0xFF);
+			} else if (use_color_offscreen &&
+			    g_dark_mode) {
+				set_bg_color(0);
+				EraseRect(&gap_r);
+			} else if (g_dark_mode || g_mono_dark) {
+				PaintRect(&gap_r);
+			} else {
+				EraseRect(&gap_r);
+			}
+		}
+	}
+
 	/* Validate shadow after all rows processed */
 	if (term->scroll_offset == 0)
 		g_shadow_valid = 1;

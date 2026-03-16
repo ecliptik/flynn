@@ -618,22 +618,26 @@ handle_prefs_menu(short item)
 		update_prefs_menu();
 		break;
 	case PREFS_STATUS_BAR_ID: {
-		short win_w, win_h;
+		short si;
 
 		prefs.show_status_bar = !prefs.show_status_bar;
 		prefs_save(&prefs);
 		update_prefs_menu();
-		/* Resize window to add/remove status bar area */
-		if (active_session) {
-			session_load_font(active_session);
+		/* Resize ALL session windows to add/remove
+		 * status bar area — not just the active one */
+		for (si = 0; si < MAX_SESSIONS; si++) {
+			Session *sess = session_get(si);
+			short win_w, win_h;
+			if (!sess)
+				continue;
+			session_load_font(sess);
 			win_w = LEFT_MARGIN * 2 +
-			    active_session->terminal.active_cols *
+			    sess->terminal.active_cols *
 			    g_cell_width + SCROLLBAR_WIDTH;
 			win_h = status_bar_height() +
-			    active_session->terminal.active_rows *
+			    sess->terminal.active_rows *
 			    g_cell_height;
-			do_window_resize(active_session,
-			    win_w, win_h);
+			do_window_resize(sess, win_w, win_h);
 		}
 		break;
 	}

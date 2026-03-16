@@ -975,41 +975,13 @@ handle_update(EventRecord *event)
 		    sess->terminal.active_rows)) {
 			term_ui_blit_offscreen(sess->window);
 		} else {
-			/* Fallback: redraw via offscreen.
-			 * No clear_window_bg — term_ui_draw handles
-			 * erase+draw in offscreen then blits.
-			 * Use visRgn to only dirty exposed rows. */
-			{
-				Rect clip_box;
-				short first_row, last_row, r;
-
-				clip_box =
-				    (**(win->visRgn)).rgnBBox;
-				first_row =
-				    (clip_box.top - TOP_MARGIN) /
-				    g_cell_height;
-				last_row =
-				    (clip_box.bottom - TOP_MARGIN +
-				    g_cell_height - 1) /
-				    g_cell_height;
-
-				if (first_row < 0)
-					first_row = 0;
-				if (last_row >=
-				    sess->terminal.active_rows)
-					last_row =
-					    sess->terminal.active_rows
-					    - 1;
-
-				for (r = first_row; r <= last_row;
-				    r++)
-					sess->terminal.dirty[r] = 1;
-			}
-			/* Invalidate shadow so dirty rows
-			 * actually get redrawn even if
-			 * terminal content hasn't changed
-			 * (e.g. status window obscured area) */
+			/* Fallback: recreate offscreen from scratch.
+			 * Dirty ALL rows so the entire offscreen is
+			 * fully populated — partial dirty leaves
+			 * white holes that corrupt future fast-path
+			 * blits. */
 			term_ui_invalidate_offscreen();
+			term_dirty_all(&sess->terminal);
 			term_ui_draw(sess->window,
 			    &sess->terminal);
 		}

@@ -398,11 +398,14 @@ do_font_change(short font_id, short font_size)
 void
 do_window_resize(Session *s, short width, short height)
 {
-	short new_cols, new_rows;
+	short new_cols, new_rows, old_cols, old_rows;
 	GrafPtr save;
 
 	/* Ensure we use this session's font metrics */
 	session_load_font(s);
+
+	old_cols = s->terminal.active_cols;
+	old_rows = s->terminal.active_rows;
 
 	/* Compute grid from pixel dimensions (exclude scroll bar + status bar) */
 	new_cols = (width - LEFT_MARGIN * 2 - SCROLLBAR_WIDTH) / g_cell_width;
@@ -477,8 +480,9 @@ do_window_resize(Session *s, short width, short height)
 		draw_status_bar(s->window, s);
 	SetPort(save);
 
-	/* Send NAWS if connected */
-	if (s->conn.state == CONN_STATE_CONNECTED) {
+	/* Send NAWS only if grid dimensions actually changed */
+	if (s->conn.state == CONN_STATE_CONNECTED &&
+	    (new_cols != old_cols || new_rows != old_rows)) {
 		unsigned char naws_buf[32];
 		short naws_len = 0;
 
