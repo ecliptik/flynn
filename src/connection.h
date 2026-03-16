@@ -15,6 +15,11 @@
 #define CONN_STATE_CONNECTED   3
 #define CONN_STATE_CLOSING     4
 
+/* Protocol types */
+#define PROTO_TELNET    0
+#define PROTO_FINGER    1
+#define FINGER_PORT     79
+
 /* TCP buffer sizes */
 #define TCP_RCV_BUFSIZ   8192
 #define TCP_READ_BUFSIZ  4096
@@ -53,6 +58,7 @@ typedef struct {
 	unsigned long pending_data;	/* unread data after last read */
 	char        host[256];
 	short       port;
+	short       protocol;	/* PROTO_TELNET(0) or PROTO_FINGER(1) */
 	char        username[64];
 	ip_addr     dns_server;	/* DNS server to use for lookups */
 } Connection;

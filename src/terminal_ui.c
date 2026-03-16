@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include "terminal_ui.h"
 #include "session.h"
+#include "connection.h"
 #include "settings.h"
 #include "color.h"
 #include "glyphs.h"
@@ -210,11 +211,17 @@ offscreen_alloc(WindowPtr win, short cols, short rows)
 		return 1;
 
 	/* Same dimensions, different window: reuse buffer,
-	 * just update bounds and owner (no realloc needed) */
+	 * but clear pixels and invalidate shadow to prevent
+	 * stale content from previous session bleeding through */
 	if (g_offscreen_bits && g_offscreen_cols == cols &&
 	    g_offscreen_rows == rows) {
+		long buf_size = (long)g_offscreen.rowBytes *
+		    pixel_h;
+
+		memset(g_offscreen_bits, 0, buf_size);
 		g_offscreen.bounds = win->portRect;
 		g_offscreen_win = win;
+		g_shadow_valid = 0;
 		return 1;
 	}
 
@@ -466,6 +473,49 @@ term_ui_blit_offscreen(WindowPtr win)
 }
 
 /*
+ * term_ui_scroll_offscreen - shift offscreen pixels by one cell row.
+ * Used by scrollbar arrow optimization to avoid full 24-row redraw.
+ * direction: +1 = content moves down (scroll back), -1 = moves up.
+ * Returns the row index that needs fresh rendering, or -1 on failure.
+ */
+short
+term_ui_scroll_offscreen(WindowPtr win, short direction,
+    short active_rows)
+{
+	short ch, rb;
+	long row_size, area_size;
+	Ptr base;
+
+	/* Must have a valid offscreen for this window */
+	if (!g_offscreen_bits || g_offscreen_win != win)
+		return -1;
+
+	ch = g_cell_height;
+	rb = g_offscreen.rowBytes;
+	row_size = (long)ch * rb;
+	area_size = (long)active_rows * ch * rb;
+
+	base = g_offscreen_bits;
+
+	if (direction > 0) {
+		/* Scroll back: content shifts down, new row at top */
+		memmove(base + row_size, base,
+		    area_size - row_size);
+		memset(base, 0, row_size);
+		g_shadow_valid = 0;
+		return 0;
+	} else {
+		/* Scroll forward: content shifts up, new row at bottom */
+		memmove(base, base + row_size,
+		    area_size - row_size);
+		memset(base + area_size - row_size, 0,
+		    row_size);
+		g_shadow_valid = 0;
+		return active_rows - 1;
+	}
+}
+
+/*
  * term_ui_invalidate_offscreen - force reallocation on next draw
  *
  * Called on session switch to prevent stale offscreen blits.
@@ -473,12 +523,14 @@ term_ui_blit_offscreen(WindowPtr win)
 void
 term_ui_invalidate_offscreen(void)
 {
-	g_offscreen_cols = 0;
-	g_offscreen_rows = 0;
-	g_offscreen_win = 0L;
-	g_color_off_cols = 0;
-	g_color_off_rows = 0;
-	g_color_off_win = 0L;
+	/* Free offscreen buffers to prevent stale reuse when same-sized
+	 * windows are created in sequence (e.g. multiple finger sessions).
+	 * Without this, offscreen_alloc would detect "same dimensions"
+	 * and reuse the buffer without clearing, leaving phantom data
+	 * from the previous session's rendering. */
+	offscreen_free();
+	color_offscreen_free();
+
 	g_shadow_valid = 0;
 }
 
@@ -1846,8 +1898,7 @@ draw_row(Terminal *term, short row)
 	} else {
 		short sb_row = row - term->scroll_offset;
 		if (sb_row < 0) {
-			short sb_idx = term->sb_head +
-			    (term->sb_count + sb_row);
+			short sb_idx = term->sb_head + sb_row;
 			if (sb_idx < 0)
 				sb_idx += TERM_SCROLLBACK_LINES;
 			if (sb_idx >= TERM_SCROLLBACK_LINES)
@@ -4872,19 +4923,39 @@ draw_status_bar(WindowPtr win, Session *s)
 	{
 		char ttype[16];
 
-		ttype_to_str(prefs.terminal_type, ttype,
-		    sizeof(ttype));
-		if (s->conn.state == CONN_STATE_CONNECTED) {
-			snprintf(status, sizeof(status),
-			    " %dx%d %s | %s:%d",
-			    s->terminal.active_cols,
-			    s->terminal.active_rows,
-			    ttype, s->conn.host, s->conn.port);
+		if (s->conn.protocol == PROTO_FINGER) {
+			if (s->conn.username[0])
+				snprintf(status, sizeof(status),
+				    " %dx%d finger | %s@%s",
+				    s->terminal.active_cols,
+				    s->terminal.active_rows,
+				    s->conn.username,
+				    s->conn.host);
+			else
+				snprintf(status, sizeof(status),
+				    " %dx%d finger | %s",
+				    s->terminal.active_cols,
+				    s->terminal.active_rows,
+				    s->conn.host);
 		} else {
-			snprintf(status, sizeof(status),
-			    " %dx%d %s | Disconnected",
-			    s->terminal.active_cols,
-			    s->terminal.active_rows, ttype);
+			ttype_to_str(prefs.terminal_type, ttype,
+			    sizeof(ttype));
+			if (s->conn.state ==
+			    CONN_STATE_CONNECTED) {
+				snprintf(status, sizeof(status),
+				    " %dx%d %s | %s:%d",
+				    s->terminal.active_cols,
+				    s->terminal.active_rows,
+				    ttype, s->conn.host,
+				    s->conn.port);
+			} else {
+				snprintf(status,
+				    sizeof(status),
+				    " %dx%d %s | Disconnected",
+				    s->terminal.active_cols,
+				    s->terminal.active_rows,
+				    ttype);
+			}
 		}
 	}
 

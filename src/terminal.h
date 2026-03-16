@@ -30,8 +30,8 @@
 #define TERM_DEFAULT_COLS	80
 #define TERM_DEFAULT_ROWS	24
 
-/* Scrollback: 4 pages of default rows */
-#define TERM_SCROLLBACK_LINES	(TERM_DEFAULT_ROWS * 4)
+/* Scrollback: 8 pages of default rows (192 lines, ~51KB/session) */
+#define TERM_SCROLLBACK_LINES	192
 
 /* Maximum CSI parameters per sequence */
 #define TERM_MAX_PARAMS		16
@@ -221,7 +221,7 @@ typedef struct {
 	/* Alternate screen buffer (13,200 bytes) */
 	TermCell	alt_screen[TERM_ROWS][TERM_COLS];
 
-	/* Scrollback ring buffer (25,344 bytes) */
+	/* Scrollback ring buffer (50,688 bytes) */
 	TermCell	scrollback[TERM_SCROLLBACK_LINES][TERM_COLS];
 
 	/* Disconnect recovery snapshot (13,200 bytes) */

@@ -21,14 +21,15 @@
 
 /* File menu items (fully static) */
 #define FILE_MENU_CONNECT_ID    1
-#define FILE_MENU_DISCONNECT_ID 2
-/* separator = 3 */
-#define FILE_MENU_SAVE_ID       4
-#define FILE_MENU_DNS_ID        5
-/* separator = 6 */
-#define FILE_MENU_FAVORITES_ID  7   /* Favorites hierarchical submenu */
-/* separator = 8 */
-#define FILE_MENU_QUIT_ID       9
+#define FILE_MENU_FINGER_ID     2   /* Finger... */
+#define FILE_MENU_DISCONNECT_ID 3
+/* separator = 4 */
+#define FILE_MENU_SAVE_ID       5
+#define FILE_MENU_DNS_ID        6
+/* separator = 7 */
+#define FILE_MENU_FAVORITES_ID  8   /* Favorites hierarchical submenu */
+/* separator = 9 */
+#define FILE_MENU_QUIT_ID       10
 
 /* Edit menu items */
 #define EDIT_MENU_UNDO_ID   1
@@ -94,6 +95,17 @@
 #define DLOG_FAVORITES_ID   131
 #define DLOG_FAV_EDIT_ID     132
 #define DLOG_DNS_ID         133
+#define DLOG_FINGER_ID      137
+
+/* Finger dialog items */
+#define FINGER_OK           1
+#define FINGER_CANCEL       2
+#define FINGER_HOST_LABEL   3
+#define FINGER_HOST_FIELD   4
+#define FINGER_USER_LABEL   5
+#define FINGER_USER_FIELD   6
+#define FINGER_VERBOSE_CHK  7
+#define FINGER_DEFAULT_BTN  8
 
 /* Bookmark manager dialog items */
 #define BM_DONE             1
@@ -121,6 +133,8 @@
 #define BME_FONT_LABEL      13
 #define BME_FONT_BTN        14
 #define BME_DEFAULT_BTN     15	/* UserItem for default button outline */
+#define BME_PROTO_LABEL     16
+#define BME_PROTO_BTN       17
 
 /* Max window content area for grid computation */
 #define MAX_WIN_WIDTH       500

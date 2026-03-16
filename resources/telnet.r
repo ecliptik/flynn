@@ -21,6 +21,7 @@ resource 'MENU' (129, "File") {
 	129, textMenuProc, allEnabled, enabled, "File",
 	{
 		"New Session\311", noIcon, "N", noMark, plain;
+		"Finger\311", noIcon, "F", noMark, plain;
 		"Close Session", noIcon, "W", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Save Contents\311", noIcon, "S", noMark, plain;
@@ -308,7 +309,7 @@ resource 'DITL' (131, "Favorites") {
 
 /* Favorite add/edit dialog */
 resource 'DLOG' (132, "Edit Favorite") {
-	{40, 90, 310, 420},
+	{40, 90, 340, 420},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -321,11 +322,11 @@ resource 'DLOG' (132, "Edit Favorite") {
 resource 'DITL' (132, "Edit Favorite") {
 	{
 		/* 1: OK button */
-		{235, 245, 255, 315},
+		{265, 245, 285, 315},
 		Button { enabled, "OK" };
 
 		/* 2: Cancel button */
-		{235, 155, 255, 225},
+		{265, 155, 285, 225},
 		Button { enabled, "Cancel" };
 
 		/* 3: Name label */
@@ -377,8 +378,16 @@ resource 'DITL' (132, "Edit Favorite") {
 		Button { enabled, "Default" };
 
 		/* 15: Default button outline (UserItem) */
-		{231, 241, 259, 319},
+		{261, 241, 289, 319},
 		UserItem { disabled };
+
+		/* 16: Protocol label */
+		{200, 15, 216, 90},
+		StaticText { disabled, "Protocol:" };
+
+		/* 17: Protocol button */
+		{198, 95, 218, 205},
+		Button { enabled, "Telnet" };
 	}
 };
 
@@ -418,6 +427,54 @@ resource 'DITL' (133, "DNS Server") {
 
 		/* 6: Default button outline (UserItem) */
 		{81, 206, 109, 284},
+		UserItem { disabled };
+	}
+};
+
+/* Finger dialog */
+resource 'DLOG' (137, "Finger") {
+	{80, 100, 220, 400},
+	dBoxProc,
+	visible,
+	noGoAway,
+	0x0,
+	137,
+	"Finger",
+	noAutoCenter
+};
+
+resource 'DITL' (137, "Finger") {
+	{
+		/* 1: Finger button */
+		{105, 210, 125, 280},
+		Button { enabled, "Finger" };
+
+		/* 2: Cancel button */
+		{105, 120, 125, 190},
+		Button { enabled, "Cancel" };
+
+		/* 3: Host label */
+		{15, 15, 31, 85},
+		StaticText { disabled, "Host:" };
+
+		/* 4: Host field */
+		{15, 90, 31, 280},
+		EditText { enabled, "" };
+
+		/* 5: Username label */
+		{45, 15, 61, 85},
+		StaticText { disabled, "Username:" };
+
+		/* 6: Username field */
+		{45, 90, 61, 230},
+		EditText { enabled, "" };
+
+		/* 7: Verbose checkbox */
+		{75, 15, 91, 155},
+		CheckBox { enabled, "Verbose (/W)" };
+
+		/* 8: Default button outline (UserItem) */
+		{101, 206, 129, 284},
 		UserItem { disabled };
 	}
 };

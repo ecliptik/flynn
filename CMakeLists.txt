@@ -15,6 +15,7 @@ add_application(Flynn
     src/terminal_ui.c
     src/tcp.c
     src/dns.c
+    src/finger.c
     src/glyphs.c
     src/color.c
     src/cp437.c

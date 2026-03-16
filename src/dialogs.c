@@ -27,6 +27,7 @@
 #include "color.h"
 #include "macutil.h"
 #include "sysutil.h"
+#include "finger.h"
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -50,6 +51,7 @@ static short g_connect_ttype;     /* terminal type selected in connect dialog */
 static short g_bme_ttype;
 static short g_bme_font_id;
 static short g_bme_font_size;
+static short g_bme_protocol;
 
 /* Bookmark manager state */
 static short bm_selection = -1;
@@ -1148,12 +1150,59 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			*item = BME_FONT_BTN;
 			return true;
 		}
+
+		/* Protocol popup menu */
+		GetDialogItem(dlg, BME_PROTO_BTN,
+		    &item_type, &item_h, &item_rect);
+		if (PtInRect(pt, &item_rect)) {
+			MenuHandle popup;
+			Point popup_pt;
+			long result;
+			short choice;
+			short cur_item;
+
+			popup = NewMenu(204, "\p");
+			AppendMenu(popup, "\pTelnet");
+			AppendMenu(popup, "\pFinger");
+			InsertMenu(popup, -1);
+
+			cur_item = (g_bme_protocol ==
+			    PROTO_FINGER) ? 2 : 1;
+			CheckItem(popup, cur_item, true);
+
+			popup_pt.h = item_rect.left;
+			popup_pt.v = item_rect.top;
+			LocalToGlobal(&popup_pt);
+
+			result = PopUpMenuSelect(popup,
+			    popup_pt.v, popup_pt.h,
+			    cur_item);
+			choice = LoWord(result);
+
+			if (choice > 0) {
+				g_bme_protocol =
+				    (choice == 2) ?
+				    PROTO_FINGER :
+				    PROTO_TELNET;
+				bme_set_btn_title(dlg,
+				    BME_PROTO_BTN,
+				    (g_bme_protocol ==
+				    PROTO_FINGER) ?
+				    "Finger" : "Telnet");
+			}
+
+			DeleteMenu(204);
+			DisposeMenu(popup);
+
+			*item = BME_PROTO_BTN;
+			return true;
+		}
 	}
 	return false;
 }
 
 static Boolean
-bm_edit_dialog(Bookmark *bm, Boolean is_new)
+bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
 {
 	DialogPtr dlg;
 	short item_hit;
@@ -1168,6 +1217,9 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	g_bme_ttype = bm->terminal_type;
 	g_bme_font_id = bm->font_id;
 	g_bme_font_size = bm->font_size;
+	g_bme_protocol = (bm_idx >= 0 &&
+	    bm_idx < MAX_BOOKMARKS) ?
+	    prefs.bookmark_protocol[bm_idx] : 0;
 
 	/* Pre-fill fields from bookmark struct */
 	if (bm->name[0])
@@ -1190,6 +1242,11 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	font_to_str(g_bme_font_id, g_bme_font_size, btn_text,
 	    sizeof(btn_text));
 	bme_set_btn_title(dlg, BME_FONT_BTN, btn_text);
+
+	/* Set protocol button text */
+	bme_set_btn_title(dlg, BME_PROTO_BTN,
+	    (g_bme_protocol == PROTO_FINGER) ?
+	    "Finger" : "Telnet");
 
 	/* Register default button outline */
 	setup_default_button_outline(dlg, BME_DEFAULT_BTN);
@@ -1243,10 +1300,13 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new)
 	dlg_get_text(dlg, BME_USER_FIELD, bm->username,
 	    sizeof(bm->username));
 
-	/* Store terminal type and font from filter proc state */
+	/* Store terminal type, font from filter proc state */
 	bm->terminal_type = g_bme_ttype;
 	bm->font_id = g_bme_font_id;
 	bm->font_size = g_bme_font_size;
+	/* Store protocol in prefs array */
+	if (bm_idx >= 0 && bm_idx < MAX_BOOKMARKS)
+		prefs.bookmark_protocol[bm_idx] = g_bme_protocol;
 
 	DisposeDialog(dlg);
 	return true;
@@ -1336,9 +1396,10 @@ do_bookmarks(void)
 			    0, sizeof(Bookmark));
 			prefs.bookmarks[prefs.bookmark_count].port = 23;
 			prefs.bookmarks[prefs.bookmark_count].terminal_type = -1;
+			prefs.bookmark_protocol[prefs.bookmark_count] = 0;
 			if (bm_edit_dialog(
 			    &prefs.bookmarks[prefs.bookmark_count],
-			    true)) {
+			    true, prefs.bookmark_count)) {
 				prefs.bookmark_count++;
 				bm_selection = prefs.bookmark_count - 1;
 				changed = true;
@@ -1355,7 +1416,8 @@ do_bookmarks(void)
 				continue;
 			}
 			if (bm_edit_dialog(
-			    &prefs.bookmarks[bm_selection], false))
+			    &prefs.bookmarks[bm_selection], false,
+			    bm_selection))
 				changed = true;
 			SetPort(dlg);
 			bm_list_draw((WindowPtr)dlg, BM_LIST);
@@ -1371,9 +1433,12 @@ do_bookmarks(void)
 			}
 			del_idx = bm_selection;
 			for (j = del_idx;
-			    j < prefs.bookmark_count - 1; j++)
+			    j < prefs.bookmark_count - 1; j++) {
 				prefs.bookmarks[j] =
 				    prefs.bookmarks[j + 1];
+				prefs.bookmark_protocol[j] =
+				    prefs.bookmark_protocol[j + 1];
+			}
 			prefs.bookmark_count--;
 			if (bm_selection >= prefs.bookmark_count)
 				bm_selection = prefs.bookmark_count - 1;
@@ -1421,7 +1486,11 @@ do_bookmarks(void)
 			DisposeDialog(dlg);
 			if (changed)
 				prefs_save(&prefs);
-			do_connect_bookmark(bm_selection);
+			if (prefs.bookmark_protocol[bm_selection]
+			    == PROTO_FINGER)
+				do_finger_bookmark(bm_selection);
+			else
+				do_connect_bookmark(bm_selection);
 			return;
 		}
 	}
@@ -1488,7 +1557,7 @@ do_save_as_bookmark(void)
 			    sizeof(bm.name) - 1);
 	}
 
-	if (bm_edit_dialog(&bm, true)) {
+	if (bm_edit_dialog(&bm, true, prefs.bookmark_count)) {
 		prefs.bookmarks[prefs.bookmark_count] = bm;
 		prefs.bookmark_count++;
 		s->bookmark_index = prefs.bookmark_count - 1;

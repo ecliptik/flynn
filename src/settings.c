@@ -209,6 +209,26 @@ prefs_load(FlynnPrefs *prefs)
 		 * Enable by default for ANSI-BBS. */
 		prefs->local_echo =
 		    (prefs->terminal_type == 4) ? 1 : 0;
+		/* fall through to v10→v11 migration */
+		prefs->version = 10;
+	}
+
+	if (prefs->version == 10) {
+		/* v10→v11 migration: add bookmark_protocol array.
+		 * Appended at end of struct — no layout shift. */
+		{
+			short i;
+			for (i = 0; i < MAX_BOOKMARKS; i++)
+				prefs->bookmark_protocol[i] = 0;
+		}
+		/* fall through to v11→v12 migration */
+		prefs->version = 11;
+	}
+
+	if (prefs->version == 11) {
+		/* v11→v12 migration: add finger_host/finger_user */
+		prefs->finger_host[0] = '\0';
+		prefs->finger_user[0] = '\0';
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

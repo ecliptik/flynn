@@ -27,6 +27,7 @@
 #include "savefile.h"
 #include "macutil.h"
 #include "menus.h"
+#include "finger.h"
 
 /* Number of static items in Favorites submenu (Manage + Add) */
 #define FAV_STATIC_ITEMS  2
@@ -114,8 +115,10 @@ update_menus(void)
 	connected = (active_session &&
 	    active_session->conn.state == CONN_STATE_CONNECTED);
 
-	/* File menu: New Session always enabled, Close when session exists */
+	/* File menu: New Session and Finger always enabled,
+	 * Close when session exists */
 	EnableItem(file_menu, FILE_MENU_CONNECT_ID);
+	EnableItem(file_menu, FILE_MENU_FINGER_ID);
 	if (active_session)
 		EnableItem(file_menu, FILE_MENU_DISCONNECT_ID);
 	else
@@ -155,12 +158,17 @@ update_menus(void)
 	else
 		DisableItem(edit_menu, EDIT_MENU_SELALL_ID);
 
-	/* Control menu: enable only when connected */
+	/* Control menu: enable only when connected to telnet
+	 * (not applicable to finger sessions) */
 	if (ctrl_menu) {
 		short ci;
+		Boolean ctrl_enabled;
 
-		for (ci = CTRL_MENU_CTRLC; ci <= CTRL_MENU_ESC; ci++) {
-			if (connected)
+		ctrl_enabled = connected &&
+		    active_session->conn.protocol != PROTO_FINGER;
+		for (ci = CTRL_MENU_CTRLC; ci <= CTRL_MENU_ESC;
+		    ci++) {
+			if (ctrl_enabled)
 				EnableItem(ctrl_menu, ci);
 			else
 				DisableItem(ctrl_menu, ci);
@@ -378,6 +386,9 @@ handle_file_menu(short item)
 	case FILE_MENU_CONNECT_ID:
 		do_connect();
 		break;
+	case FILE_MENU_FINGER_ID:
+		do_finger();
+		break;
 	case FILE_MENU_DISCONNECT_ID:
 		if (active_session) {
 			if (active_session->conn.state ==
@@ -446,7 +457,11 @@ handle_favorites_submenu(short item)
 		if (bm_idx >= 0 &&
 		    bm_idx < prefs.bookmark_count) {
 			add_recent_bookmark(bm_idx);
-			do_connect_bookmark(bm_idx);
+			if (prefs.bookmark_protocol[bm_idx]
+			    == PROTO_FINGER)
+				do_finger_bookmark(bm_idx);
+			else
+				do_connect_bookmark(bm_idx);
 		}
 		break;
 	}

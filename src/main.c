@@ -32,6 +32,7 @@
 #include "clipboard.h"
 #include "macutil.h"
 #include "color.h"
+#include "finger.h"
 
 /* Globals */
 Boolean running = true;
@@ -179,6 +180,36 @@ session_handle_disconnect(Session *sess)
 	GrafPtr save;
 	short was_ttype;
 
+	/* Finger: server closure is expected.  Skip telnet reset,
+	 * snapshot restore, and full redraw — the screen content
+	 * was already drawn by session_draw() in the drain loop.
+	 * Just update scrollbar, status bar, and menus. */
+	if (sess->conn.protocol == PROTO_FINGER) {
+		/* Update scrollbar for scrollback access */
+		if (sess->scrollbar) {
+			short max_val =
+			    sess->terminal.sb_count;
+			SetControlMaximum(sess->scrollbar,
+			    max_val);
+			SetControlValue(sess->scrollbar,
+			    max_val);
+			HiliteControl(sess->scrollbar,
+			    max_val > 0 ? 0 : 255);
+		}
+		if (prefs.show_status_bar) {
+			GrafPtr save;
+
+			GetPort(&save);
+			SetPort(sess->window);
+			draw_status_bar(sess->window, sess);
+			SetPort(save);
+		}
+		if (sess == active_session)
+			update_menus();
+		term_ui_save_state(&sess->ui);
+		return;
+	}
+
 	/* Save session's terminal type before telnet_init() zeroes it.
 	 * Needed to decide whether to restore snapshot (xterm/VT types
 	 * clear screen on logout) or keep current screen (ANSI-BBS). */
@@ -280,6 +311,13 @@ session_process_data(Session *sess)
 {
 	short out_len = 0;
 	short send_len = 0;
+
+	/* Finger: data is handled synchronously in finger_connect(),
+	 * so no data should arrive here.  Safety drain only. */
+	if (sess->conn.protocol == PROTO_FINGER) {
+		sess->conn.read_len = 0;
+		return;
+	}
 
 	telnet_process(&sess->telnet,
 	    (unsigned char *)sess->conn.read_buf,
@@ -429,6 +467,17 @@ main_event_loop(void)
 					    active_session->conn.state;
 					conn_idle(&active_session->conn);
 
+					/* Process any data read before
+					 * checking for disconnect —
+					 * server may close after
+					 * sending final data */
+					if (active_session->conn
+					    .read_len > 0) {
+						session_process_data(
+						    active_session);
+						drain++;
+					}
+
 					if (prev_state ==
 					    CONN_STATE_CONNECTED &&
 					    active_session->conn.state ==
@@ -441,10 +490,6 @@ main_event_loop(void)
 					if (active_session->conn.read_len
 					    == 0)
 						break;
-
-					session_process_data(
-					    active_session);
-					drain++;
 				} while (drain < 16);
 
 				if (drain > 0) {
@@ -528,6 +573,15 @@ main_event_loop(void)
 						    sess->conn.state;
 						conn_idle(&sess->conn);
 
+						/* Process data before
+						 * disconnect check */
+						if (sess->conn
+						    .read_len > 0) {
+							session_process_data(
+							    sess);
+							drain++;
+						}
+
 						if (prev_state ==
 						    CONN_STATE_CONNECTED
 						    && sess->conn.state
@@ -541,10 +595,6 @@ main_event_loop(void)
 						if (sess->conn.read_len
 						    == 0)
 							break;
-
-						session_process_data(
-						    sess);
-						drain++;
 					} while (drain < 8);
 
 					if (drain > 0) {
@@ -736,11 +786,53 @@ scrollbar_action(ControlHandle control, short part)
 		new_offset = term->sb_count;
 
 	if (new_offset != term->scroll_offset) {
+		short delta = new_offset - term->scroll_offset;
+		short new_row;
+
 		term->scroll_offset = new_offset;
 		SetControlValue(control,
 		    term->sb_count - new_offset);
-		term_dirty_all(term);
-		term_ui_draw(sess->window, term);
+
+		/* Single-line scroll: ScrollRect shifts screen
+		 * pixels, memmove shifts offscreen to match,
+		 * then only the 1 new row needs rendering.
+		 * ~24x faster than full 24-row redraw. */
+		if ((delta == 1 || delta == -1) &&
+		    (new_row = term_ui_scroll_offscreen(
+		    sess->window, delta,
+		    term->active_rows)) >= 0) {
+			GrafPtr save;
+			Rect content_r;
+			RgnHandle upd_rgn;
+			short shift;
+
+			GetPort(&save);
+			SetPort(sess->window);
+
+			/* Shift screen pixels via ScrollRect */
+			shift = (delta > 0) ?
+			    g_cell_height : -g_cell_height;
+			SetRect(&content_r, 0, 0,
+			    sess->window->portRect.right -
+			    SCROLLBAR_WIDTH,
+			    term->active_rows *
+			    g_cell_height);
+			upd_rgn = NewRgn();
+			ScrollRect(&content_r, 0, shift,
+			    upd_rgn);
+			DisposeRgn(upd_rgn);
+
+			SetPort(save);
+
+			/* Render only the 1 exposed row */
+			term->dirty[new_row] = 1;
+			term_ui_draw(sess->window, term);
+		} else {
+			/* Page scroll or no offscreen: full
+			 * redraw */
+			term_dirty_all(term);
+			term_ui_draw(sess->window, term);
+		}
 	}
 }
 

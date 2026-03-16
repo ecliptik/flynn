@@ -5,7 +5,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	10
+#define PREFS_VERSION	12
 #define MAX_BOOKMARKS	8
 #define MAX_RECENT	5
 
@@ -37,6 +37,9 @@ typedef struct {
 	unsigned char	local_echo;	/* 1=echo locally when server WONT ECHO */
 	unsigned char	show_status_bar;	/* 1=show status bar, 0=hide */
 	/* NOTE: always append new fields here, never insert above */
+	short		bookmark_protocol[MAX_BOOKMARKS];	/* PROTO_TELNET(0) or PROTO_FINGER(1) */
+	char		finger_host[128];	/* last finger host */
+	char		finger_user[64];	/* last finger username */
 } FlynnPrefs;
 
 /* Load preferences from "Flynn Preferences" file. Returns defaults if not found. */
