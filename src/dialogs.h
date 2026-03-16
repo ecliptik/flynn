@@ -55,6 +55,7 @@
 #define BME_DEFAULT_BTN     15	/* UserItem for default button outline */
 #define BME_PROTO_LABEL     16
 #define BME_PROTO_BTN       17
+#define BME_VERBOSE_CHK     18
 
 /* Draw a 3-pixel rounded rect outline around the default button */
 pascal void draw_default_button(WindowPtr dlg, short item);

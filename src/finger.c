@@ -394,7 +394,7 @@ do_finger_bookmark(short bm_idx)
 	bm = &prefs.bookmarks[bm_idx];
 
 	s = finger_connect(bm->host, bm->username,
-	    true, bm_idx);
+	    prefs.bookmark_verbose[bm_idx] != 0, bm_idx);
 	if (s) {
 		if (active_session &&
 		    active_session->conn.state ==

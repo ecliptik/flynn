@@ -47,6 +47,7 @@ static short g_bme_ttype;
 static short g_bme_font_id;
 static short g_bme_font_size;
 static short g_bme_protocol;
+static short g_bme_verbose;
 
 /* Bookmark manager state */
 static short bm_selection = -1;
@@ -1105,6 +1106,10 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			choice = LoWord(result);
 
 			if (choice > 0) {
+				short it;
+				Handle ih;
+				Rect ir;
+
 				g_bme_protocol =
 				    (choice == 2) ?
 				    PROTO_FINGER :
@@ -1114,6 +1119,15 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 				    (g_bme_protocol ==
 				    PROTO_FINGER) ?
 				    "Finger" : "Telnet");
+				/* Show/hide verbose checkbox */
+				GetDialogItem(dlg,
+				    BME_VERBOSE_CHK,
+				    &it, &ih, &ir);
+				HiliteControl(
+				    (ControlHandle)ih,
+				    (g_bme_protocol ==
+				    PROTO_FINGER) ?
+				    0 : 255);
 			}
 
 			DeleteMenu(204);
@@ -1173,6 +1187,24 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
 	    (g_bme_protocol == PROTO_FINGER) ?
 	    "Finger" : "Telnet");
 
+	/* Verbose checkbox: init from prefs, disable if not finger */
+	g_bme_verbose = (bm_idx >= 0 &&
+	    bm_idx < MAX_BOOKMARKS) ?
+	    prefs.bookmark_verbose[bm_idx] : 0;
+	{
+		short it;
+		Handle ih;
+		Rect ir;
+
+		GetDialogItem(dlg, BME_VERBOSE_CHK,
+		    &it, &ih, &ir);
+		SetControlValue((ControlHandle)ih,
+		    g_bme_verbose);
+		HiliteControl((ControlHandle)ih,
+		    (g_bme_protocol == PROTO_FINGER) ?
+		    0 : 255);
+	}
+
 	/* Register default button outline */
 	setup_default_button_outline(dlg, BME_DEFAULT_BTN);
 
@@ -1188,6 +1220,21 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
 		}
 		if (item_hit == BME_OK)
 			break;
+
+		if (item_hit == BME_VERBOSE_CHK) {
+			short it;
+			Handle ih;
+			Rect ir;
+			short val;
+
+			GetDialogItem(dlg, BME_VERBOSE_CHK,
+			    &it, &ih, &ir);
+			val = GetControlValue(
+			    (ControlHandle)ih);
+			SetControlValue(
+			    (ControlHandle)ih, !val);
+			g_bme_verbose = !val;
+		}
 
 		/* Terminal type and font handled by filter
 		 * proc popup menus */
@@ -1229,9 +1276,12 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
 	bm->terminal_type = g_bme_ttype;
 	bm->font_id = g_bme_font_id;
 	bm->font_size = g_bme_font_size;
-	/* Store protocol in prefs array */
-	if (bm_idx >= 0 && bm_idx < MAX_BOOKMARKS)
+	/* Store protocol and verbose in prefs arrays */
+	if (bm_idx >= 0 && bm_idx < MAX_BOOKMARKS) {
 		prefs.bookmark_protocol[bm_idx] = g_bme_protocol;
+		prefs.bookmark_verbose[bm_idx] =
+		    g_bme_verbose ? 1 : 0;
+	}
 
 	DisposeDialog(dlg);
 	return true;
@@ -1363,6 +1413,8 @@ do_bookmarks(void)
 				    prefs.bookmarks[j + 1];
 				prefs.bookmark_protocol[j] =
 				    prefs.bookmark_protocol[j + 1];
+				prefs.bookmark_verbose[j] =
+				    prefs.bookmark_verbose[j + 1];
 			}
 			prefs.bookmark_count--;
 			if (bm_selection >= prefs.bookmark_count)
@@ -1481,6 +1533,11 @@ do_save_as_bookmark(void)
 			strncpy(bm.name, s->conn.host,
 			    sizeof(bm.name) - 1);
 	}
+
+	/* Pre-set protocol and verbose so edit dialog picks them up */
+	prefs.bookmark_protocol[prefs.bookmark_count] =
+	    s->conn.protocol;
+	prefs.bookmark_verbose[prefs.bookmark_count] = 0;
 
 	if (bm_edit_dialog(&bm, true, prefs.bookmark_count)) {
 		prefs.bookmarks[prefs.bookmark_count] = bm;

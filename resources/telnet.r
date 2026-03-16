@@ -309,7 +309,7 @@ resource 'DITL' (131, "Favorites") {
 
 /* Favorite add/edit dialog */
 resource 'DLOG' (132, "Edit Favorite") {
-	{40, 90, 340, 420},
+	{40, 90, 310, 420},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -322,11 +322,11 @@ resource 'DLOG' (132, "Edit Favorite") {
 resource 'DITL' (132, "Edit Favorite") {
 	{
 		/* 1: OK button */
-		{265, 245, 285, 315},
+		{235, 245, 255, 315},
 		Button { enabled, "OK" };
 
 		/* 2: Cancel button */
-		{265, 155, 285, 225},
+		{235, 155, 255, 225},
 		Button { enabled, "Cancel" };
 
 		/* 3: Name label */
@@ -378,7 +378,7 @@ resource 'DITL' (132, "Edit Favorite") {
 		Button { enabled, "Default" };
 
 		/* 15: Default button outline (UserItem) */
-		{261, 241, 289, 319},
+		{231, 241, 259, 319},
 		UserItem { disabled };
 
 		/* 16: Protocol label */
@@ -388,6 +388,10 @@ resource 'DITL' (132, "Edit Favorite") {
 		/* 17: Protocol button */
 		{198, 95, 218, 205},
 		Button { enabled, "Telnet" };
+
+		/* 18: Verbose checkbox (finger only, right of protocol) */
+		{201, 215, 217, 315},
+		CheckBox { enabled, "Verbose (/W)" };
 	}
 };
 

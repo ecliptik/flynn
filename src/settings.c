@@ -231,6 +231,17 @@ prefs_load(FlynnPrefs *prefs)
 		/* v11→v12 migration: add finger_host/finger_user */
 		prefs->finger_host[0] = '\0';
 		prefs->finger_user[0] = '\0';
+		/* fall through to v12→v13 migration */
+		prefs->version = 12;
+	}
+
+	if (prefs->version == 12) {
+		/* v12→v13 migration: add bookmark_verbose */
+		{
+			short i;
+			for (i = 0; i < MAX_BOOKMARKS; i++)
+				prefs->bookmark_verbose[i] = 0;
+		}
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;

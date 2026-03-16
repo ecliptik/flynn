@@ -124,11 +124,13 @@ update_menus(void)
 	else
 		DisableItem(file_menu, FILE_MENU_SAVE_ID);
 
-	/* Favorites submenu: Add Favorite enable/disable */
+	/* Favorites submenu: Add Favorite enable/disable.
+	 * Allow saving when host is set (not just connected) —
+	 * finger sessions disconnect after response but should
+	 * still be saveable as favorites. */
 	if (favorites_submenu) {
 		if (active_session &&
-		    active_session->conn.state ==
-		    CONN_STATE_CONNECTED &&
+		    active_session->conn.host[0] &&
 		    active_session->bookmark_index < 0 &&
 		    prefs.bookmark_count < MAX_BOOKMARKS)
 			EnableItem(favorites_submenu, FAV_ADD_ID);
