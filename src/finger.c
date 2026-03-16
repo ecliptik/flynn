@@ -122,6 +122,50 @@ finger_connect(const char *host, const char *username,
 	char query[256];
 	short qlen;
 	GrafPtr save;
+	char connect_host[128];
+	char forward_query[192];
+
+	/* RFC 1288 forwarding: user@host1@gateway connects to
+	 * gateway and sends "user@host1\r\n".  Also handles
+	 * host field containing "host@gateway" with separate
+	 * username.  Split on the LAST '@' in host. */
+	strncpy(connect_host, host,
+	    sizeof(connect_host) - 1);
+	connect_host[sizeof(connect_host) - 1] = '\0';
+	forward_query[0] = '\0';
+	{
+		char *last_at;
+		short i, last_pos = -1;
+
+		for (i = 0; connect_host[i]; i++) {
+			if (connect_host[i] == '@')
+				last_pos = i;
+		}
+		if (last_pos > 0) {
+			/* Split: everything before last @ is
+			 * the forwarded query, after is the
+			 * connect host */
+			connect_host[last_pos] = '\0';
+			if (username[0])
+				snprintf(forward_query,
+				    sizeof(forward_query),
+				    "%s@%s", username,
+				    connect_host);
+			else
+				strncpy(forward_query,
+				    connect_host,
+				    sizeof(forward_query) - 1);
+			forward_query[
+			    sizeof(forward_query) - 1] = '\0';
+			/* Shift connect_host to the part after @ */
+			memmove(connect_host,
+			    host + last_pos + 1,
+			    strlen(host + last_pos + 1) + 1);
+			/* Use forwarded query as the username
+			 * for query building below */
+			username = forward_query;
+		}
+	}
 
 	/* Ensure font metrics initialized */
 	if (g_cell_width == 0) {
@@ -148,9 +192,9 @@ finger_connect(const char *host, const char *username,
 
 	/* Connect to port 79 */
 	snprintf(smsg, sizeof(smsg),
-	    "Finger %.50s\311", host);
+	    "Finger %.50s\311", connect_host);
 	sw = conn_status_show(smsg);
-	if (!conn_connect(&s->conn, host, FINGER_PORT, sw)) {
+	if (!conn_connect(&s->conn, connect_host, FINGER_PORT, sw)) {
 		conn_status_close(sw);
 		if (s == active_session)
 			active_session = 0L;
@@ -214,14 +258,19 @@ finger_connect(const char *host, const char *username,
 		}
 	}
 
-	/* Set window title */
-	if (username[0])
+	/* Set window title — show original host for forwarded
+	 * queries (e.g. "user@host1@gateway") */
+	if (forward_query[0])
 		set_wtitlef(s->window,
 		    "Flynn - %s@%s (finger)",
-		    username, host);
+		    forward_query, connect_host);
+	else if (username[0])
+		set_wtitlef(s->window,
+		    "Flynn - %s@%s (finger)",
+		    username, connect_host);
 	else
 		set_wtitlef(s->window,
-		    "Flynn - %s (finger)", host);
+		    "Flynn - %s (finger)", connect_host);
 
 	/* Single draw after all data received — avoids
 	 * shadow buffer / partial CopyBits interaction that
