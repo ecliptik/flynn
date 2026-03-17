@@ -26,8 +26,8 @@ full-featured 119KB multi-session powerhouse for System 7.
 # Smallest possible build
 ./scripts/build.sh --preset minimal
 
-# Everything enabled, 4 sessions
-./scripts/build.sh --preset full
+# Mac Plus — everything except color, 1 session
+./scripts/build.sh --preset lite
 ```
 
 ## Build Presets
@@ -96,11 +96,11 @@ to disable. Presets are applied first, then individual flags override.
 # Start with minimal, add back finger and bookmarks
 ./scripts/build.sh --preset minimal --finger --bookmarks
 
-# Default build but with 2 sessions and no dark mode
+# Default (full) but with 2 sessions and no dark mode
 ./scripts/build.sh --sessions 2 --no-darkmode
 
-# Full build but disable color (targeting a mono System 7 Mac)
-./scripts/build.sh --preset full --no-color
+# Disable color (targeting a mono System 7 Mac)
+./scripts/build.sh --no-color
 ```
 
 ### Numeric Flags
@@ -274,11 +274,14 @@ Build complete (v1.9.6, full preset):
 ## Examples
 
 ```bash
-# Mac Plus, single session, maximum scrollback
-./scripts/build.sh --scrollback 256
+# Mac Plus, single session, no color
+./scripts/build.sh --preset lite
 
-# Mac SE/30 with System 7, color, 2 sessions
-./scripts/build.sh --sessions 2 --color --scrollback 192
+# Mac Plus, single session, maximum scrollback
+./scripts/build.sh --preset lite --scrollback 256
+
+# Default but with 2 sessions instead of 4
+./scripts/build.sh --sessions 2
 
 # 1MB Mac 512Ke, absolute minimum
 ./scripts/build.sh --preset minimal --no-clipboard --no-altscreen
@@ -286,8 +289,8 @@ Build complete (v1.9.6, full preset):
 # BBS user: needs CP437 and glyphs, skip everything else
 ./scripts/build.sh --preset minimal --glyphs --cp437
 
-# CI build: all features for maximum test coverage
-./scripts/build.sh --preset full -j$(nproc)
+# CI build: all features, parallel make
+./scripts/build.sh -j$(nproc)
 ```
 
 ## Deploying to HFS Disk Image
