@@ -131,10 +131,10 @@ Flynn supports fully customizable builds. Three presets cover common configurati
 | Preset | Sessions | Scrollback | Features | Memory |
 |--------|----------|------------|----------|----------------|
 | `minimal` | 1 | none | clipboard, alt screen only | ~256KB |
-| `macplus` | 1 | 96 lines | everything except color and double-width | ~384KB |
+| `lite` | 1 | 96 lines | everything except color | ~384KB |
 | `full` | 4 | 192 lines | everything | ~768KB |
 
-The default build uses the **macplus** preset. Select a preset with `--preset`:
+The default build uses the **full** preset. Select a preset with `--preset`:
 
 ```bash
 ./scripts/build.sh --preset minimal    # stripped, for 1MB Macs

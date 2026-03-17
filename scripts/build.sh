@@ -6,18 +6,18 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLCHAIN="$SCRIPT_DIR/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake"
 BUILD_DIR="$SCRIPT_DIR/build"
 
-# --- Feature flag defaults (= macplus preset) ---
-FLYNN_MAX_SESSIONS=1
-FLYNN_SCROLLBACK=96
+# --- Feature flag defaults (= full preset) ---
+FLYNN_MAX_SESSIONS=4
+FLYNN_SCROLLBACK=192
 FLYNN_FINGER=ON
-FLYNN_COLOR=OFF
+FLYNN_COLOR=ON
 FLYNN_GLYPHS=ON
 FLYNN_CP437=ON
 FLYNN_CLIPBOARD=ON
 FLYNN_SAVEFILE=ON
 FLYNN_BOOKMARKS=ON
 FLYNN_DARK_MODE=ON
-FLYNN_DBLWIDTH=OFF
+FLYNN_DBLWIDTH=ON
 FLYNN_ALT_SCREEN=ON
 FLYNN_OFFSCREEN=ON
 FLYNN_STATUS_BAR=ON
@@ -47,8 +47,8 @@ apply_preset() {
             FLYNN_CURSOR_STYLES=OFF
             FLYNN_TAB_STOPS=OFF
             ;;
-        macplus|default)
-            # Already the defaults, but set explicitly for clarity
+        lite|macplus)
+            # "macplus" is a legacy alias for "lite"
             FLYNN_MAX_SESSIONS=1
             FLYNN_SCROLLBACK=96
             FLYNN_FINGER=ON
@@ -59,14 +59,15 @@ apply_preset() {
             FLYNN_SAVEFILE=ON
             FLYNN_BOOKMARKS=ON
             FLYNN_DARK_MODE=ON
-            FLYNN_DBLWIDTH=OFF
+            FLYNN_DBLWIDTH=ON
             FLYNN_ALT_SCREEN=ON
             FLYNN_OFFSCREEN=ON
             FLYNN_STATUS_BAR=ON
             FLYNN_CURSOR_STYLES=ON
             FLYNN_TAB_STOPS=ON
             ;;
-        full)
+        full|default)
+            # Already the defaults, but set explicitly for clarity
             FLYNN_MAX_SESSIONS=4
             FLYNN_SCROLLBACK=192
             FLYNN_FINGER=ON
@@ -85,7 +86,7 @@ apply_preset() {
             FLYNN_TAB_STOPS=ON
             ;;
         *)
-            echo "Error: unknown preset '$1' (valid: minimal, macplus, full)"
+            echo "Error: unknown preset '$1' (valid: minimal, lite, full; macplus is alias for lite)"
             exit 1
             ;;
     esac
@@ -322,13 +323,24 @@ if [ -f "$BUILD_DIR/Flynn.dsk" ]; then
     humount
 fi
 
-# Create versioned copies (use display version with SHA for non-tagged builds)
-cp "$BUILD_DIR/Flynn.bin" "$BUILD_DIR/Flynn-${VERSION_DISPLAY}.bin"
-cp "$BUILD_DIR/Flynn.dsk" "$BUILD_DIR/Flynn-${VERSION_DISPLAY}.dsk"
-[ -f "$BUILD_DIR/Flynn.hqx" ] && cp "$BUILD_DIR/Flynn.hqx" "$BUILD_DIR/Flynn-${VERSION_DISPLAY}.hqx"
+# --- Determine file prefix from preset ---
+PRESET_LABEL="${PRESET:-full}"
+# Normalize macplus → lite for display/filenames
+[ "$PRESET_LABEL" = "macplus" ] && PRESET_LABEL="lite"
+# Normalize default → full for display/filenames
+[ "$PRESET_LABEL" = "default" ] && PRESET_LABEL="full"
+case "$PRESET_LABEL" in
+    full)    FILE_PREFIX="Flynn" ;;
+    minimal) FILE_PREFIX="Flynn-Minimal" ;;
+    *)       FILE_PREFIX="Flynn-Lite" ;;
+esac
+
+# Create versioned copies with preset in filename
+cp "$BUILD_DIR/Flynn.bin" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.bin"
+cp "$BUILD_DIR/Flynn.dsk" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.dsk"
+[ -f "$BUILD_DIR/Flynn.hqx" ] && cp "$BUILD_DIR/Flynn.hqx" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.hqx"
 
 # --- Build summary ---
-PRESET_LABEL="${PRESET:-macplus}"
 ENABLED=""
 DISABLED=""
 for feat in finger glyphs cp437 clipboard savefile bookmarks darkmode altscreen offscreen statusbar cursorstyles tabstops color dblwidth; do
@@ -361,7 +373,7 @@ echo "  Sessions: ${FLYNN_MAX_SESSIONS}, Scrollback: ${FLYNN_SCROLLBACK} lines"
 echo "  Features:${ENABLED}"
 [ -n "$DISABLED" ] && echo "  Disabled:${DISABLED}"
 echo "  SIZE: ${SIZE_PREFERRED}KB preferred / ${SIZE_MINIMUM}KB minimum"
-ls -la "$BUILD_DIR"/Flynn-${VERSION_DISPLAY}.* 2>/dev/null
+ls -la "$BUILD_DIR"/${FILE_PREFIX}-${VERSION_DISPLAY}.* 2>/dev/null
 [ -f "$ABOUT_OUT" ] && echo "  About Flynn included in disk image"
 
 echo ""

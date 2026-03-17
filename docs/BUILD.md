@@ -18,7 +18,7 @@ full-featured 119KB multi-session powerhouse for System 7.
 ## Quick Start
 
 ```bash
-# Default build (macplus preset) — good for most users
+# Default build (full preset) — good for most users
 ./scripts/build.sh
 
 # Smallest possible build
@@ -49,10 +49,10 @@ glyphs or box-drawing characters, no file save, no dark mode, no offscreen buffe
 (may see flicker), no status bar, no custom cursor styles or tab stops, no
 double-width/height line rendering.
 
-### macplus / lite (~384KB partition, ~115KB binary) — DEFAULT
+### lite (~384KB partition, ~115KB binary)
 
-Recommended for Macintosh Plus and other compact Macs running System 6. This is what
-you get with a plain `./scripts/build.sh` with no arguments. Released as **Flynn Lite**.
+Recommended for Macintosh Plus and other compact Macs running System 6. Released as
+**Flynn Lite**. `--preset macplus` is accepted as a legacy alias for `--preset lite`.
 
 | Feature         | Status |
 |-----------------|--------|
@@ -70,13 +70,14 @@ you get with a plain `./scripts/build.sh` with no arguments. Released as **Flynn
 | Status bar      | ON     |
 | Cursor styles   | ON     |
 | Tab stops       | ON     |
+| Double-width    | ON     |
 | Color           | OFF (no Color QuickDraw on Plus) |
-| Double-width    | OFF (rarely used) |
 
-### full (~768KB partition, ~119KB binary)
+### full (~768KB partition, ~119KB binary) — DEFAULT
 
-Everything enabled. For System 7 machines with Color QuickDraw and plenty of RAM.
-Released as **Flynn** (no suffix, backwards compatible with prior releases).
+Everything enabled. This is what you get with a plain `./scripts/build.sh` with no
+arguments. For System 7 machines with Color QuickDraw and plenty of RAM. Released as
+**Flynn** (no suffix, backwards compatible with prior releases).
 
 | Feature         | Status |
 |-----------------|--------|
@@ -104,22 +105,22 @@ to disable. Presets are applied first, then individual flags override.
 
 | Flag | Range | Default | Description |
 |------|-------|---------|-------------|
-| `--sessions N` | 1-4 | 1 | Maximum simultaneous terminal sessions |
-| `--scrollback N` | 0-256 | 96 | Scrollback buffer lines (0 = disabled) |
+| `--sessions N` | 1-4 | 4 | Maximum simultaneous terminal sessions |
+| `--scrollback N` | 0-256 | 192 | Scrollback buffer lines (0 = disabled) |
 
 ### Boolean Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--finger / --no-finger` | ON | Finger protocol client (RFC 1288) |
-| `--color / --no-color` | OFF | 256-color support (requires System 7 + Color QuickDraw) |
+| `--color / --no-color` | ON | 256-color support (requires System 7 + Color QuickDraw) |
 | `--glyphs / --no-glyphs` | ON | Unicode glyph rendering (box-drawing, emoji, symbols) |
 | `--cp437 / --no-cp437` | ON | Code Page 437 character set (ANSI-BBS) |
 | `--clipboard / --no-clipboard` | ON | Copy/paste and text selection |
 | `--savefile / --no-savefile` | ON | Save session text to file |
 | `--bookmarks / --no-bookmarks` | ON | Favorites/bookmarks system |
 | `--darkmode / --no-darkmode` | ON | Dark mode toggle (white on black) |
-| `--dblwidth / --no-dblwidth` | OFF | Double-width/height line rendering (DECDWL/DECDHL) |
+| `--dblwidth / --no-dblwidth` | ON | Double-width/height line rendering (DECDWL/DECDHL) |
 | `--altscreen / --no-altscreen` | ON | Alternate screen buffer (used by vi, less, tmux) |
 | `--offscreen / --no-offscreen` | ON | Offscreen double-buffer rendering (eliminates flicker) |
 | `--statusbar / --no-statusbar` | ON | Status bar display |
@@ -253,19 +254,19 @@ The build produces three artifacts in the `build/` directory:
 - **Flynn.dsk** — 800K floppy disk image (bootable, includes About Flynn)
 - **Flynn.hqx** — BinHex archive (for email/BBS distribution, requires `macutils`)
 
-Versioned copies are also created (e.g., `Flynn-1.9.6.bin`).
+Versioned copies include the preset name (e.g., `Flynn-1.9.6.bin` for full,
+`Flynn-Lite-1.9.6.bin` for lite, `Flynn-Minimal-1.9.6.bin` for minimal).
 
 ## Build Summary
 
 After building, a summary shows the configuration:
 
 ```
-Build complete (v1.9.6, macplus preset):
-  Sessions: 1, Scrollback: 96 lines
+Build complete (v1.9.6, full preset):
+  Sessions: 4, Scrollback: 192 lines
   Features: finger glyphs cp437 clipboard savefile bookmarks
-            darkmode altscreen offscreen statusbar cursorstyles tabstops
-  Disabled: color dblwidth
-  SIZE: 384KB preferred / 320KB minimum
+            darkmode altscreen offscreen statusbar cursorstyles tabstops color dblwidth
+  SIZE: 768KB preferred / 704KB minimum
 ```
 
 ## Examples

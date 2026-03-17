@@ -133,36 +133,24 @@ release_github() {
     echo "  GitHub release complete: https://github.com/$GITHUB_REPO/releases/tag/$tag"
 }
 
-# Build all three presets and create versioned artifacts
+# Build all three presets (build.sh produces correctly-named artifacts)
 build_all_presets() {
     local ver="$1"
     local build_dir="$SCRIPT_DIR/build"
 
     echo "Building all presets for $ver..."
 
-    # Full preset — artifacts named Flynn-{ver}.*  (backwards compatible)
+    # Full preset → Flynn-{ver}.*
     echo "  Building full preset..."
     "$SCRIPT_DIR/scripts/build.sh" --preset full
-    for ext in dsk hqx; do
-        [ -f "$build_dir/Flynn.${ext}" ] && \
-            cp "$build_dir/Flynn.${ext}" "$build_dir/Flynn-${ver}.${ext}"
-    done
 
-    # Lite preset (macplus) — artifacts named Flynn-Lite-{ver}.*
+    # Lite preset → Flynn-Lite-{ver}.*
     echo "  Building lite preset..."
-    "$SCRIPT_DIR/scripts/build.sh" --preset macplus
-    for ext in dsk hqx; do
-        [ -f "$build_dir/Flynn.${ext}" ] && \
-            cp "$build_dir/Flynn.${ext}" "$build_dir/Flynn-Lite-${ver}.${ext}"
-    done
+    "$SCRIPT_DIR/scripts/build.sh" --preset lite
 
-    # Minimal preset — artifacts named Flynn-Minimal-{ver}.*
+    # Minimal preset → Flynn-Minimal-{ver}.*
     echo "  Building minimal preset..."
     "$SCRIPT_DIR/scripts/build.sh" --preset minimal
-    for ext in dsk hqx; do
-        [ -f "$build_dir/Flynn.${ext}" ] && \
-            cp "$build_dir/Flynn.${ext}" "$build_dir/Flynn-Minimal-${ver}.${ext}"
-    done
 
     echo "  All presets built:"
     ls -la "$build_dir"/Flynn*-${ver}.* 2>/dev/null

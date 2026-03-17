@@ -1,0 +1,505 @@
+=====================================================
+                      Flynn
+         Telnet and Finger Client for Macintosh
+                    Version 1.9.6
+=====================================================
+
+Connect your classic Macintosh to the modern world.
+
+
+About Flynn
+-----------
+
+Flynn is a Telnet and Finger client for the Apple
+Macintosh Plus and later models running System 6.0.8
+or later. It connects to remote hosts over TCP/IP
+using MacTCP (also works under Open Transport's
+MacTCP compatibility layer), providing a full-featured
+terminal for interactive sessions with Linux, Unix,
+and other Telnet-capable servers, as well as Finger
+protocol queries (RFC 1288) for user information.
+
+Flynn emulates a VT220/xterm terminal with support for
+full-screen applications like vi, nano, tmux, and
+Midnight Commander. It renders box-drawing characters,
+handles UTF-8 text, and provides all the keyboard
+mappings needed to work comfortably on the original
+Macintosh keyboard.
+
+Flynn also supports CP437/ANSI-BBS mode for connecting
+to bulletin board systems (BBSes). The ANSI-BBS
+terminal type enables raw CP437 byte rendering for
+correct display of BBS ANSI art, including block
+elements, shade characters, and the full CP437
+character set.
+
+On System 7 with Color QuickDraw, Flynn supports full
+256-color rendering (16 ANSI + 216 color cube + 24
+grayscale). Truecolor sequences are downgraded to the
+nearest 256-color match. Color support is automatic
+and has zero impact on System 6 monochrome systems.
+
+
+System Requirements
+-------------------
+
+  - Macintosh Plus or later (68000 CPU)
+  - System 6.0.8 or later (tested through 7.5.5)
+  - MacTCP 2.1 (configured with a valid TCP/IP
+    connection; also works under Open Transport's
+    MacTCP compatibility layer)
+  - 4 MB RAM recommended
+  - Network connection (Ethernet or compatible)
+
+
+Getting Started
+---------------
+
+1. Make sure MacTCP is installed and configured in
+   your Control Panel. You will need a working TCP/IP
+   connection to your network.
+
+2. Double-click the Flynn application to launch it.
+
+3. Choose "New Session..." from the File menu, or
+   press Command-N.
+
+4. Enter the hostname or IP address of the server
+   you wish to connect to. The default port is 23
+   (standard Telnet).
+
+5. Optionally enter a username. If provided, Flynn
+   will automatically send it after connecting.
+
+6. Click Connect. Flynn will resolve the hostname
+   and establish a TCP connection.
+
+7. You should see a login prompt from the remote
+   host. Type your password to begin your session.
+
+8. To disconnect, choose "Close Session" from the
+   File menu, or simply close the window.
+
+
+Finger Protocol
+----------------
+
+Flynn includes a Finger protocol client (RFC 1288)
+for querying user information on remote hosts.
+
+1. Choose "Finger..." from the File menu, or press
+   Command-F.
+
+2. Enter the hostname of the finger server (e.g.,
+   graph.no for weather, happynetbox.com for users).
+
+3. Optionally enter a username to query a specific
+   user. Leave blank to list all users.
+
+4. Click Finger. Flynn connects to port 79, sends
+   the query, and displays the response.
+
+5. The response is displayed in a terminal window.
+   Use the scrollbar or Command-Up/Down to scroll
+   through longer responses.
+
+Finger Forwarding:
+  Flynn supports RFC 1288 forwarding. Enter
+  "user@host@gateway" in the Host field to connect
+  to the gateway and forward the query to the remote
+  host. For example: "joe@server@relay" connects to
+  relay and sends "joe@server" as the query.
+
+The Finger dialog remembers the last host and username
+used. Finger destinations can also be saved as
+bookmarks with the Finger protocol selected.
+
+
+Features
+--------
+
+  - Sub-1-second startup to Connect dialog
+  - Client-side Telnet protocol with full IAC
+    negotiation (BINARY, ECHO, SGA, TTYPE, NAWS)
+  - VT220 terminal emulation with xterm compatibility
+  - DEC Special Graphics for box-drawing characters
+    (tmux borders, dialog boxes, Midnight Commander)
+  - UTF-8 support for accented characters, curly
+    quotes, em dashes, and other Unicode symbols
+  - 256-color support on System 7 with Color QuickDraw
+    (automatic detection, zero impact on System 6)
+  - CP437/ANSI-BBS mode for bulletin board systems
+    (full 256-character CP437 rendering, sextant and
+    fractional block characters for BBS ANSI art)
+  - True SGR attributes: italic, strikethrough, dim,
+    and blink (DOS-style bright background on color)
+  - Bold-to-bright color promotion for standard
+    ANSI/BBS color rendering
+  - Unicode glyph rendering: 180 QuickDraw primitives
+    (arrows, shapes, blocks, triangles, diamonds,
+    circles, superscripts, subscripts, card suits,
+    double-line box drawing, fractional blocks,
+    flowers, snowflake), 57 sextant characters,
+    18 monochrome bitmap emoji, and braille patterns
+  - OSC sequences: window title (OSC 0/2), palette
+    color query (OSC 4), foreground/background color
+    query (OSC 10/11), cursor color (OSC 12/112,
+    no-op on monochrome)
+  - Alternate screen buffer for full-screen apps
+    (vi, nano, less, tmux)
+  - 192-line scrollback buffer with position indicator
+  - Mouse text selection with copy and paste
+  - Select All (Cmd+A) for full-screen copy
+  - Session bookmarks with per-bookmark username,
+    terminal type, font, and protocol settings
+  - Save Contents (Cmd+S) exports scrollback and
+    screen to a TEXT file via standard Save dialog
+  - Recent bookmarks in File menu for quick access
+  - Resizable window (drag the grow box to resize)
+  - Six font choices: Monaco 9, Monaco 12, Courier
+    10, Chicago 12, Geneva 9, Geneva 10
+  - Per-session font and terminal type overrides
+  - Terminal type: xterm, VT220, VT100, xterm-256color,
+    ANSI-BBS
+  - Dark mode (white text on black background)
+  - Custom DNS server configuration
+  - Username auto-login
+  - Backspace mode toggle: DEL (0x7F) for xterm/VT220,
+    BS (0x08) for ANSI-BBS (auto-switches with terminal
+    type, or manual override in Options menu)
+  - Control menu for sending Ctrl-C, Ctrl-D, Ctrl-H,
+    Ctrl-X, Ctrl-Z, Escape, Ctrl-L, and Break without
+    a Ctrl key
+  - Multiple simultaneous sessions (up to 4 windows)
+  - Window menu with session list
+  - Connection progress window with status updates
+  - Status bar at bottom of window shows terminal
+    dimensions, protocol type, and connection info
+    (e.g., "80x24 xterm | host:23" for telnet,
+    "80x24 finger | user@host" for finger).
+    Toggle via Options > Status Bar.
+  - Double-buffered rendering eliminates screen flash
+  - Local echo for BBS sessions (WONT ECHO servers)
+  - Keystroke buffering for reliable fast typing
+  - Application cursor keys and keypad mode
+  - Bracketed paste mode
+  - Apple HIG compliant dialogs (default button
+    outlines, Cmd+. cancel, tab field cycling)
+  - All preferences saved across launches
+  - System 7 Preferences folder support
+  - System 7 enhancements: modern save dialog,
+    Apple Events support, MultiFinder suspend/resume,
+    background disconnect notification, machine type
+    in About dialog (all conditional — System 6
+    behavior unchanged)
+
+
+Keyboard Shortcuts
+------------------
+
+Flynn is designed for the Apple M0110 and M0110A
+keyboards. All shortcuts also work on extended ADB
+and USB keyboards.
+
+  Menu Commands
+  ~~~~~~~~~~~~~
+  Command-N       New session (new window if connected)
+  Command-F       Finger protocol query
+  Command-W       Close active session window
+  Command-S       Save Contents to file
+  Command-B       Open Bookmark Manager
+  Command-A       Select All (entire terminal screen)
+  Command-C       Copy selected text
+  Command-V       Paste clipboard to connection
+  Command-Q       Quit Flynn
+
+  Scrollback
+  ~~~~~~~~~~
+  Command-Up      Scroll up one line
+  Command-Down    Scroll down one line
+  Cmd-Shift-Up    Scroll up one page
+  Cmd-Shift-Down  Scroll down one page
+
+  Special Keys
+  ~~~~~~~~~~~~
+  Command-.       Send Escape
+  Clear key       Send Escape (M0110A keypad)
+  Esc key         Send Escape (extended keyboards)
+  Option+letter   Send Ctrl+letter
+  Command-1..0    Send F1 through F10
+
+  Text Selection
+  ~~~~~~~~~~~~~~
+  Click-drag      Select text
+  Double-click    Select a word
+  Shift-click     Extend selection to click point
+
+
+M0110 Keyboard Notes
+--------------------
+
+The original Macintosh keyboard (M0110) and the
+M0110A with numeric keypad do not have Escape,
+Control, or Function keys. Flynn provides complete
+mappings for all of these:
+
+  Escape:  The M0110 has no Escape key. Press
+  Command-. (Command-period) to send Escape. This
+  follows the standard Macintosh convention for
+  "Cancel." On the M0110A, the Clear key on the
+  numeric keypad also sends Escape.
+
+  Control:  The M0110 has no Control key. Hold
+  the Option key and press a letter to send the
+  corresponding control character. For example,
+  Option-C sends Ctrl-C (interrupt), and Option-D
+  sends Ctrl-D (end of file).
+
+  Function Keys:  The M0110 has no function keys.
+  Press Command-1 through Command-0 to send F1
+  through F10. On extended ADB keyboards, the
+  physical function keys F1-F12 work natively.
+
+  Arrow Keys:  Arrow keys send standard VT100
+  cursor sequences. When an application enables
+  cursor key mode (vi, tmux), Flynn automatically
+  switches to application cursor sequences. On
+  M0110A keyboards, arrow keys also work via
+  charCode fallback for compatibility.
+
+
+Window Resizing
+---------------
+
+Flynn's terminal window can be resized by dragging
+the grow box in the lower-right corner. The window
+snaps to cell boundaries so text always aligns
+properly.
+
+  - Default size: 80 columns x 24 rows
+  - Maximum size: 132 columns x 50 rows
+  - Minimum size: 20 columns x 5 rows
+
+When connected, resizing the window automatically
+notifies the server of the new terminal dimensions
+(via NAWS), so programs like vi and tmux will
+adjust their layout accordingly.
+
+The window size adapts to the selected font. Larger
+fonts produce fewer columns and rows; smaller fonts
+produce more.
+
+
+Multiple Sessions
+-----------------
+
+Flynn supports up to 4 simultaneous sessions in
+separate windows. Each window has its own terminal
+buffer, connection state, cursor, and text selection.
+
+  Opening Additional Sessions:
+  - Press Command-N while already connected to open
+    a new session window. If not connected, the
+    current window's connect dialog appears instead.
+  - Select a bookmark from the File menu to connect
+    in a new window if the current session is active.
+
+  Switching Between Sessions:
+  - Click on any session window to bring it forward.
+  - The Window menu lists all open sessions with a
+    checkmark on the active window.
+
+  Closing a Session:
+  - Close the window via the close box or Command-W.
+  - Choose "Close Session" from the File menu.
+  - If connected, you will be asked to confirm.
+  - Flynn quits when the last session window closes.
+
+Font and terminal type changes from the Options
+menu apply only to the active session window. Dark
+mode applies to all windows. The Options menu
+checkmarks update to reflect the active session.
+
+
+Session Bookmarks
+-----------------
+
+Flynn can store up to 8 session bookmarks for
+servers you connect to frequently.
+
+  Adding a Bookmark:
+  1. Choose "Bookmarks..." from the File menu,
+     or press Command-B.
+  2. Click the "Add" button.
+  3. Enter a name, hostname, and port (default 23).
+  4. Optionally set a username, terminal type,
+     and font for this bookmark.
+  5. Click OK.
+
+  Per-Bookmark Settings:
+  Each bookmark can override the global defaults
+  for username, terminal type, and font. When set
+  to "Default," the global preference is used.
+  These overrides apply only to the session opened
+  from that bookmark, not to other windows.
+
+  Add Bookmark:
+  While connected, choose "Add Bookmark..." from
+  the File menu to save the current session as a
+  bookmark. The name, host, port, username, and
+  settings are pre-filled from the active session.
+
+  Connecting via Bookmark:
+  - Your 5 most recently used bookmarks appear in
+    the File menu under Bookmarks for quick access.
+  - You can also open the Bookmark Manager and
+    click "Connect."
+  - In the Connect dialog, click "Bookmarks" to
+    select a bookmark from a popup menu.
+
+  Editing or Deleting:
+  - Select a bookmark in the list, then click
+    "Edit" or "Delete."
+
+Bookmarks and all preferences are saved to a file
+called "Flynn Preferences" in the System Folder.
+
+
+Options
+-------
+
+The Options menu uses hierarchical submenus for
+fonts, terminal type, and bookmarks, with
+additional items for networking and display mode.
+
+  Fonts (submenu)
+  ~~~~~~~~~~~~~~~
+  Monaco 9pt    80 columns x 24 rows (default)
+  Monaco 12pt   Larger text, fewer columns/rows
+  Courier 10pt  Classic fixed-width alternative
+  Chicago 12pt  The classic Mac system font
+  Geneva 9pt    Compact proportional font
+  Geneva 10pt   Slightly larger proportional font
+
+  The terminal grid is automatically recomputed when
+  you change font, and the server is notified of
+  the new window size if connected.
+
+  Note: Proportional fonts (Chicago, Geneva) use
+  per-character positioning to maintain alignment
+  with the cell grid. Fixed-width fonts (Monaco,
+  Courier) may render slightly faster.
+
+  Terminal Type (submenu)
+  ~~~~~~~~~~~~~~~~~~~~~~
+  Choose the terminal type reported to the server:
+  xterm (default), xterm-256color, VT100, VT220, or
+  ANSI-BBS. The first four use UTF-8 text encoding;
+  ANSI-BBS uses raw CP437 byte encoding for correct
+  BBS ANSI art rendering. Changes take effect on the
+  next connection.
+
+  Networking
+  ~~~~~~~~~~
+  DNS Server: Configure a custom DNS server IP
+  address. Default is 1.1.1.1 (Cloudflare DNS).
+
+  Backspace Sends BS
+  ~~~~~~~~~~~~~~~~~~
+  Toggle backspace behavior between DEL (0x7F, default
+  for xterm/VT220) and BS (0x08, required for BBSes).
+  Automatically set when changing terminal type:
+  ANSI-BBS enables BS, all others use DEL.
+
+  Dark Mode
+  ~~~~~~~~~
+  Toggle between light mode (black text on white) and
+  dark mode (white text on black). Box-drawing
+  characters and cursor blink work in both modes.
+
+All preferences are saved across launches.
+
+
+Troubleshooting
+---------------
+
+  "Application is busy or damaged"
+  Make sure Flynn was copied to the hard drive
+  correctly. Try deleting and recopying the file.
+
+  Cannot connect / connection refused
+  Verify that MacTCP is installed and properly
+  configured in the Control Panel. Check that you
+  can reach the remote host. Make sure the Telnet
+  service is running on the server (port 23).
+
+  DNS resolution fails
+  Flynn uses its own DNS resolver (default server:
+  1.1.1.1). You can change the DNS server in
+  Options > Networking > DNS Server. You can
+  also try connecting by IP address instead of
+  hostname.
+
+  No response after connecting
+  Some servers require you to press Return after
+  connecting. If the screen remains blank, try
+  pressing Return or Command-. (Escape).
+
+  Garbled display
+  If the screen becomes garbled, try disconnecting
+  and reconnecting. This resets the terminal state.
+  Some programs that use 256 colors or truecolor
+  may not display correctly on a monochrome screen,
+  but text should remain readable.
+
+  Box-drawing characters look wrong
+  Flynn renders box-drawing via QuickDraw. If you
+  see question marks instead, the remote program
+  may be sending characters that Flynn does not
+  yet map.
+
+  Window too small or too large
+  Drag the grow box in the lower-right corner to
+  resize the terminal window. The grid snaps to
+  cell boundaries automatically.
+
+
+Credits
+-------
+
+Flynn was created by Micheal Waltz with assistance
+from Claude, an AI by Anthropic.
+
+Flynn is cross-compiled on Linux using Retro68, the
+68k Macintosh cross-compilation toolchain by
+Wolfgang Thaller.
+
+This project incorporates code from two open-source
+classic Macintosh applications by joshua stein:
+
+  wallops - IRC client for classic Macintosh
+  MacTCP wrapper, DNS resolution, and utility
+  functions are used directly from this project.
+
+  subtext - BBS server for classic Macintosh
+  The Telnet protocol implementation served as the
+  reference for Flynn's client-side telnet engine.
+
+Both projects are released under the ISC license.
+
+
+License
+-------
+
+Flynn is released under the ISC license.
+Copyright (c) 2026 Flynn contributors.
+See the LICENSE file for details.
+
+
+Contact
+-------
+
+  https://www.ecliptik.com
+  https://github.com/ecliptik/flynn
+
+=====================================================

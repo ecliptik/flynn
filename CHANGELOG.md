@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
   - Per-bookmark protocol selection (Telnet or Finger) in bookmark editor
   - Favorites submenu dispatches finger bookmarks correctly
 - Configurable build system with 16 compile-time feature flags
-  - 3 build presets: minimal (~256KB), macplus/lite (~384KB), full (~768KB)
+  - 3 build presets: minimal (~256KB), lite (~384KB), full (~768KB)
   - Every major feature can be toggled: `--finger`, `--color`, `--glyphs`,
     `--cp437`, `--clipboard`, `--savefile`, `--bookmarks`, `--darkmode`,
     `--dblwidth`, `--altscreen`, `--offscreen`, `--statusbar`,
@@ -30,7 +30,7 @@ All notable changes to this project will be documented in this file.
   - Three-layer guard pattern: CMake source exclusion, header no-op stubs,
     inline #ifdef guards (~163 guard sites across 26 files)
   - FlynnPrefs struct unchanged for cross-build prefs compatibility
-- Three release editions: Flynn (full), Flynn Lite (macplus), Flynn Minimal
+- Three release editions: Flynn (full), Flynn Lite, Flynn Minimal
 - Build documentation: `docs/BUILD.md` with complete flag reference,
   memory costs, presets, and examples
 - Direct offscreen memory writes bypass QuickDraw traps for rendering
@@ -55,8 +55,7 @@ All notable changes to this project will be documented in this file.
 - 68000 address error in offscreen_fill_rect
 
 ### Changed
-- Default build uses macplus preset: 1 session, 96-line scrollback, ~384KB
-  partition (was 4 sessions, 192-line scrollback, ~768KB)
+- Default build uses full preset: 4 sessions, 192-line scrollback, ~768KB
 - Binary size: 91KB minimal, 125KB default, 130KB full
 - Release script builds all 3 presets and uploads 6 artifacts per release
 - FlynnPrefs v12 (finger_host, finger_user, bookmark_protocol[])
