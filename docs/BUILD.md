@@ -7,13 +7,15 @@ full-featured 119KB multi-session powerhouse for System 7.
 ## Prerequisites
 
 - Linux host (cross-compilation)
+- Debian/Ubuntu packages:
+  ```
+  sudo apt-get install cmake libgmp-dev libmpfr-dev libmpc-dev libboost-all-dev bison flex texinfo ruby hfsutils macutils
+  ```
 - [Retro68](https://github.com/autc04/Retro68) toolchain built from source:
   ```
   cd Retro68-build
   bash ../Retro68/build-toolchain.bash --no-ppc --no-carbon --prefix=$(pwd)/toolchain
   ```
-- `hfsutils` for disk image manipulation (`hmount`, `hcopy`, etc.)
-- `macutils` for BinHex output (optional: `sudo apt install macutils`)
 
 ## Quick Start
 
