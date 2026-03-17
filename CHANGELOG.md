@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.9.6] - 2026-03-16
+
 ### Added
 - Finger protocol client (RFC 1288) — File > Finger... (Cmd+F)
   - Query user information on remote hosts via TCP port 79
@@ -14,23 +16,55 @@ All notable changes to this project will be documented in this file.
   - Window title includes "(finger)" suffix
   - Per-bookmark protocol selection (Telnet or Finger) in bookmark editor
   - Favorites submenu dispatches finger bookmarks correctly
-- Scrollback buffer increased from 96 to 192 lines (8 pages of history)
+- Configurable build system with 16 compile-time feature flags
+  - 3 build presets: minimal (~256KB), macplus/lite (~384KB), full (~768KB)
+  - Every major feature can be toggled: `--finger`, `--color`, `--glyphs`,
+    `--cp437`, `--clipboard`, `--savefile`, `--bookmarks`, `--darkmode`,
+    `--dblwidth`, `--altscreen`, `--offscreen`, `--statusbar`,
+    `--cursorstyles`, `--tabstops`
+  - Configurable sessions (1-4) and scrollback lines (0-256)
+  - SIZE resource (Finder memory partition) dynamically computed from
+    enabled features
+  - Presets applied first, individual flags override:
+    `--preset minimal --finger --bookmarks`
+  - Three-layer guard pattern: CMake source exclusion, header no-op stubs,
+    inline #ifdef guards (~163 guard sites across 26 files)
+  - FlynnPrefs struct unchanged for cross-build prefs compatibility
+- Three release editions: Flynn (full), Flynn Lite (macplus), Flynn Minimal
+- Build documentation: `docs/BUILD.md` with complete flag reference,
+  memory costs, presets, and examples
+- Direct offscreen memory writes bypass QuickDraw traps for rendering
+  (font bitmap cache, direct glyph blit, direct erase/fill)
+- Shadow buffer skips unchanged rows via memcmp
+- Scroll sync uses memmove instead of CopyBits
+- Color GWorld offscreen buffer eliminates flicker on System 7
 - Optimized scrollbar arrow scrolling: ScrollRect + offscreen memmove
   renders only 1 row per arrow click instead of full 24-row redraw
 
 ### Fixed
+- Dark mode rendering bugs: white bar at window bottom, status bar
+  artifacts, stale offscreen content
 - Offscreen buffer reuse: clear pixel data when reusing for different
   window with same dimensions (prevented stale session content bleed)
 - Scrollback ring buffer index: corrected formula for partially-filled
   buffers (was sb_head+sb_count+sb_row, now sb_head+sb_row)
 - Drain loop data race: process pending TCP data before checking for
   disconnect state transition
+- System 7 GWorld rendering stability and artifact fixes
+- icl8/ics8 icon polarity for System 7 color displays
+- 68000 address error in offscreen_fill_rect
 
 ### Changed
+- Default build uses macplus preset: 1 session, 96-line scrollback, ~384KB
+  partition (was 4 sessions, 192-line scrollback, ~768KB)
+- Binary size: 91KB minimal, 125KB default, 130KB full
+- Release script builds all 3 presets and uploads 6 artifacts per release
 - FlynnPrefs v12 (finger_host, finger_user, bookmark_protocol[])
 - File menu: Finger... inserted at position 2, items renumbered
 - Control menu disabled for finger sessions
 - Bookmark edit dialog: protocol popup (Telnet/Finger), dialog enlarged
+- Performance and security review: hardening, leak fixes, dead code
+  removal, optimizations, and refactoring
 
 ## [1.9.5] - 2026-03-14
 

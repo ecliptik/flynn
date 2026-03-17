@@ -253,14 +253,14 @@ The build produces three artifacts in the `build/` directory:
 - **Flynn.dsk** — 800K floppy disk image (bootable, includes About Flynn)
 - **Flynn.hqx** — BinHex archive (for email/BBS distribution, requires `macutils`)
 
-Versioned copies are also created (e.g., `Flynn-1.9.5.bin`).
+Versioned copies are also created (e.g., `Flynn-1.9.6.bin`).
 
 ## Build Summary
 
 After building, a summary shows the configuration:
 
 ```
-Build complete (v1.9.5, macplus preset):
+Build complete (v1.9.6, macplus preset):
   Sessions: 1, Scrollback: 96 lines
   Features: finger glyphs cp437 clipboard savefile bookmarks
             darkmode altscreen offscreen statusbar cursorstyles tabstops
