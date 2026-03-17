@@ -156,6 +156,27 @@ build_all_presets() {
     ls -la "$build_dir"/Flynn*-${ver}.* 2>/dev/null
 }
 
+# Update README.md download links to point to this version
+update_readme_downloads() {
+    local tag="$1"
+    local ver="${tag#v}"
+    local readme="$SCRIPT_DIR/README.md"
+
+    if [ ! -f "$readme" ]; then
+        echo "  Warning: README.md not found, skipping download link update"
+        return 0
+    fi
+
+    # Replace version in GitHub release download URLs
+    # Matches: /releases/download/vX.Y.Z/Flynn...-X.Y.Z.ext
+    if grep -q "releases/download/v" "$readme"; then
+        sed -i -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/([A-Za-z-]*)-[0-9]+\.[0-9]+\.[0-9]+\.|releases/download/${tag}/\1-${ver}.|g" "$readme"
+        echo "  Updated README.md download links to $tag"
+    else
+        echo "  Warning: No download links found in README.md"
+    fi
+}
+
 # Release a single version
 do_release() {
     local tag="$1"
@@ -211,6 +232,7 @@ See [BUILD.md](https://github.com/$GITHUB_REPO/blob/main/docs/BUILD.md) for cust
     local name="Flynn $tag"
     release_forgejo "$tag" "$name" "$body"
     release_github "$tag" "$name" "$body"
+    update_readme_downloads "$tag"
     echo ""
 }
 

@@ -31,11 +31,11 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 
 Pre-built binaries are available on the [Releases](https://github.com/ecliptik/flynn/releases) page, [Macintosh Garden](https://macintoshgarden.org/apps/flynn), and [Macintosh Repository](https://www.macintoshrepository.org/87841-flynn):
 
-| Edition | Description | Memory |
-|---------|-------------|--------|
-| **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB |
-| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~384KB |
-| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB |
+| Edition | Description | Memory | Download |
+|---------|-------------|--------|----------|
+| **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-1.9.6.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-1.9.6.hqx) |
+| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~384KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-Lite-1.9.6.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-Lite-1.9.6.hqx) |
+| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-Minimal-1.9.6.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-Minimal-1.9.6.hqx) |
 
 Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). No build toolchain required — just download and run. See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
