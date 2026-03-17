@@ -30,8 +30,11 @@
 #define TERM_DEFAULT_COLS	80
 #define TERM_DEFAULT_ROWS	24
 
-/* Scrollback: 8 pages of default rows (192 lines, ~51KB/session) */
-#define TERM_SCROLLBACK_LINES	192
+/* Scrollback lines: set by build flag FLYNN_SCROLLBACK_LINES (default 96) */
+#ifndef FLYNN_SCROLLBACK_LINES
+#define FLYNN_SCROLLBACK_LINES	96
+#endif
+#define TERM_SCROLLBACK_LINES	FLYNN_SCROLLBACK_LINES
 
 /* Maximum CSI parameters per sequence */
 #define TERM_MAX_PARAMS		16
@@ -127,8 +130,10 @@ typedef struct {
 	/* Dirty flags: one per row, nonzero means row needs redraw */
 	unsigned char	dirty[TERM_ROWS];
 
+#ifdef FLYNN_DBLWIDTH
 	/* Line attributes: one per row */
 	unsigned char	line_attr[TERM_ROWS];	/* LINE_ATTR_* per row */
+#endif
 
 	/* Scrollback state */
 	short		sb_head;	/* next line to write in ring */
@@ -145,20 +150,30 @@ typedef struct {
 	unsigned char	insert_mode;		/* IRM: 0=replace, 1=insert */
 	unsigned char	bracketed_paste;	/* 0=off, 1=on */
 	unsigned char	cp437_mode;		/* 0=UTF-8/VT220, 1=CP437/ANSI-BBS */
+#ifdef FLYNN_TAB_STOPS
 	unsigned char	tab_stops[TERM_COLS];	/* custom tab stops, 1=set */
+#endif
 
 	/* Cursor visibility (DECTCEM: ESC[?25h / ESC[?25l) */
 	unsigned char	cursor_visible;
+#ifdef FLYNN_CURSOR_STYLES
 	unsigned char	cursor_style;		/* DECSCUSR: 0-1=blink block, 2=steady block, 3=blink underline, 4=steady underline, 5=blink bar, 6=steady bar */
+#endif
 
+#ifdef FLYNN_ALT_SCREEN
 	/* Alternate screen state */
 	short		alt_cur_row;
 	short		alt_cur_col;
 	unsigned char	alt_cur_attr;
 	unsigned char	alt_active;
+#ifdef FLYNN_DBLWIDTH
 	unsigned char	alt_line_attr[TERM_ROWS];	/* saved line attrs for main screen */
+#endif
 	unsigned char	alt_cur_fg;	/* alt screen saved fg */
 	unsigned char	alt_cur_bg;	/* alt screen saved bg */
+#else
+	unsigned char	alt_active;	/* always 0 when alt screen disabled */
+#endif
 
 	/* Color state (System 7 only, zero-cost on System 6) */
 	unsigned char	has_color;	/* runtime: Color QD available + alloc'd */
@@ -214,11 +229,15 @@ typedef struct {
 	/* Screen buffer: rows x cols (13,200 bytes) */
 	TermCell	screen[TERM_ROWS][TERM_COLS];
 
+#ifdef FLYNN_ALT_SCREEN
 	/* Alternate screen buffer (13,200 bytes) */
 	TermCell	alt_screen[TERM_ROWS][TERM_COLS];
+#endif
 
-	/* Scrollback ring buffer (50,688 bytes) */
+#if FLYNN_SCROLLBACK_LINES > 0
+	/* Scrollback ring buffer */
 	TermCell	scrollback[TERM_SCROLLBACK_LINES][TERM_COLS];
+#endif
 
 	/* Disconnect recovery snapshot (13,200 bytes) */
 	TermCell	snap_screen[TERM_ROWS][TERM_COLS];
@@ -239,11 +258,16 @@ TermCell *terminal_get_display_cell(Terminal *term, short row, short col);
 /* Get display color accounting for scroll_offset (NULL if no color) */
 CellColor *terminal_get_display_color(Terminal *term, short row, short col);
 
+#if FLYNN_SCROLLBACK_LINES > 0
 /* Scroll back N lines into scrollback buffer */
 void terminal_scroll_back(Terminal *term, short lines);
 
 /* Scroll forward N lines toward live view */
 void terminal_scroll_forward(Terminal *term, short lines);
+#else
+#define terminal_scroll_back(t, l)    ((void)0)
+#define terminal_scroll_forward(t, l) ((void)0)
+#endif
 
 /* Check if a row is dirty (needs redraw) */
 short terminal_is_row_dirty(Terminal *term, short row);
@@ -256,5 +280,8 @@ void term_dirty_all(Terminal *term);
 
 /* Get current cursor position */
 void terminal_get_cursor(Terminal *term, short *row, short *col);
+
+/* Convert a TermCell to a plain text character for clipboard/file export */
+char cell_to_char(TermCell *cell);
 
 #endif /* TERMINAL_H */

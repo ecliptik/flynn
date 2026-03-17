@@ -44,6 +44,7 @@
  * Cached indices skip redundant RGBForeColor/RGBBackColor trap calls.
  * Reset to -1 at the start of each term_ui_draw() pass.
  */
+#ifdef FLYNN_COLOR
 static short cached_fg_idx = -1;
 static short cached_bg_idx = -1;
 
@@ -68,6 +69,10 @@ set_bg_color(unsigned char index)
 	color_get_rgb(index, &rgb);
 	RGBBackColor(&rgb);
 }
+#else
+#define set_fg_color(i)  ((void)0)
+#define set_bg_color(i)  ((void)0)
+#endif
 
 /* Cursor state */
 static unsigned long	cursor_last_tick;
@@ -76,8 +81,10 @@ static short		cursor_prev_row;
 static short		cursor_prev_col;
 static short		cursor_initialized;
 
+#ifdef FLYNN_CLIPBOARD
 /* Selection state */
 static Selection	sel;
+#endif
 
 /* Runtime cell dimensions */
 short			g_cell_width = CELL_WIDTH;
@@ -90,6 +97,7 @@ static short		g_dark_mode = 0;
 static short		g_mono_dark = 0;	/* monochrome dark mode active */
 static RgnHandle	g_scroll_rgn = 0L;	/* pre-allocated for ScrollRect */
 
+#ifdef FLYNN_OFFSCREEN
 /* Offscreen double buffer (Phase 1) */
 static BitMap	g_offscreen;		/* offscreen bitmap descriptor */
 static Ptr	g_offscreen_bits;	/* pixel data (NewPtr) */
@@ -110,6 +118,11 @@ static short	g_shadow_valid;
 
 /* Set when rendering to offscreen buffer (Phase 1+5 direct blit) */
 static short	g_use_offscreen_now;
+#else
+/* Without offscreen: always render directly to screen */
+#define g_use_offscreen_now  0
+#define g_shadow_valid       0
+#endif
 
 /* Current effective colors for glyph shade blending (set by draw_row) */
 static unsigned char	g_eff_fg = 0;
@@ -173,19 +186,26 @@ static void draw_line_char(unsigned char ch, short x, short y,
 	    unsigned char attr);
 static void draw_braille(unsigned char pattern, short x, short y,
 	    unsigned char attr);
+#ifdef FLYNN_GLYPHS
 static void draw_glyph_prim(unsigned char glyph_id, short x, short y,
 	    unsigned char attr);
 static void draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	    unsigned char attr);
+#endif
 static void draw_cursor(Terminal *term, short on);
 static void cursor_set_rect(Rect *r, short crow, short ccol,
 	    unsigned char style);
+#ifdef FLYNN_CLIPBOARD
 static void sel_normalize(short *sr, short *sc, short *er, short *ec);
 static void find_word_bounds(Terminal *term, short row, short col,
 	    short *start, short *end);
+#endif
+#ifdef FLYNN_GLYPHS
 static void glyph_cache_rebuild(void);
+#endif
 static void font_cache_rebuild(void);
 
+#ifdef FLYNN_OFFSCREEN
 /*
  * offscreen_alloc - allocate/reallocate offscreen buffer for given dimensions
  *
@@ -544,6 +564,7 @@ term_ui_cleanup(void)
 	color_offscreen_free();
 	if (g_scroll_rgn) { DisposeRgn(g_scroll_rgn); g_scroll_rgn = 0L; }
 }
+#endif /* FLYNN_OFFSCREEN */
 
 /*
  * term_ui_init - set up font and cursor state
@@ -597,14 +618,18 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 	TextFace(0);
 	TextMode(srcOr);
 
+#ifdef FLYNN_GLYPHS
 	/* Rebuild glyph bitmap cache for new font metrics */
 	glyph_cache_rebuild();
+#endif
 
 	/* Rebuild ASCII font bitmap cache for direct offscreen blit */
 	font_cache_rebuild();
 
+#ifdef FLYNN_OFFSCREEN
 	/* Invalidate shadow buffer — font change alters rendering */
 	g_shadow_valid = 0;
+#endif
 
 	SetPort(old_port);
 }
@@ -612,12 +637,16 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 /*
  * term_ui_set_dark_mode - enable/disable dark mode rendering
  */
+#ifdef FLYNN_DARK_MODE
 void
 term_ui_set_dark_mode(short enabled)
 {
 	g_dark_mode = enabled;
+#ifdef FLYNN_OFFSCREEN
 	g_shadow_valid = 0;
+#endif
 }
+#endif
 
 /*
  * term_ui_draw - render terminal contents, only dirty rows
@@ -630,10 +659,12 @@ void
 term_ui_draw(WindowPtr win, Terminal *term)
 {
 	short row, any_dirty;
+#ifdef FLYNN_OFFSCREEN
 	short use_offscreen;
 	short use_color_offscreen = 0;
 	CGrafPtr saved_gw = 0L;
 	GDHandle saved_gd = 0L;
+#endif
 	short was_dirty[TERM_ROWS];
 	Rect r;
 
@@ -642,16 +673,23 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	g_mono_dark = g_dark_mode && !g_has_color_qd;
 
 	/* Reset color cache so first set_fg/bg_color takes effect */
+#ifdef FLYNN_COLOR
 	cached_fg_idx = -1;
 	cached_bg_idx = -1;
+#endif
 
 	/* Step 1: Erase cursor XOR artifact on REAL screen.
 	 * ScrollRect would blit the XOR mark to wrong positions,
 	 * and dirty row redraws need clean pixels underneath. */
 	if (cursor_initialized && cursor_visible) {
 		Rect cur_r;
+#ifdef FLYNN_CURSOR_STYLES
 		cursor_set_rect(&cur_r, cursor_prev_row,
 		    cursor_prev_col, term->cursor_style);
+#else
+		cursor_set_rect(&cur_r, cursor_prev_row,
+		    cursor_prev_col, 0);
+#endif
 		PenMode(patXor);
 		PaintRect(&cur_r);
 		PenNormal();
@@ -746,6 +784,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 	 * invisible offscreen buffer — no visible flash.
 	 * Disabled on color systems: 1-bit BitMap can't carry
 	 * color info, so PmForeColor/RGBForeColor produce garbage. */
+#ifdef FLYNN_OFFSCREEN
 	use_offscreen = any_dirty && !g_has_color_qd &&
 	    offscreen_alloc(win, term->active_cols, term->active_rows);
 	g_use_offscreen_now = 0;
@@ -825,6 +864,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			TextMode(srcOr);
 		}
 	}
+#endif /* FLYNN_OFFSCREEN */
 
 	/* Save dirty flags before render loop clears them —
 	 * needed for partial CopyBits after rendering */
@@ -834,15 +874,18 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			was_dirty[di] = term->dirty[di];
 	}
 
+#ifdef FLYNN_OFFSCREEN
 	/* Invalidate shadow on scroll — content shifted */
 	if (had_scroll)
 		g_shadow_valid = 0;
+#endif
 
 	/* Step 5: Dirty row loop (renders to offscreen if active) */
 	for (row = 0; row < term->active_rows; row++) {
 		if (!was_dirty[row])
 			continue;
 
+#ifdef FLYNN_OFFSCREEN
 		/* Shadow buffer: skip row if content unchanged */
 		if (g_shadow_valid && term->scroll_offset == 0 &&
 		    !had_scroll) {
@@ -870,6 +913,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 				}
 			}
 		}
+#endif /* FLYNN_OFFSCREEN */
 
 		/* Erase the row background */
 		SetRect(&r, LEFT_MARGIN, row_top(row),
@@ -884,10 +928,12 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			/* Color light mode: erase with white background */
 			set_bg_color(15);
 			EraseRect(&r);
+#ifdef FLYNN_OFFSCREEN
 		} else if (use_offscreen) {
 			/* Direct offscreen fill: bypass QD traps */
 			offscreen_fill_rect(&r,
 			    g_mono_dark ? 0xFF : 0x00);
+#endif
 		} else if (g_mono_dark) {
 			/* Mono dark: fill black directly (no white flash) */
 			PaintRect(&r);
@@ -922,11 +968,13 @@ term_ui_draw(WindowPtr win, Terminal *term)
 do_draw:
 		draw_row(term, row);
 
+#ifdef FLYNN_OFFSCREEN
 		/* Copy rendered row to shadow buffer */
 		if (term->scroll_offset == 0)
 			memcpy(&g_shadow[row][0],
 			    &term->screen[row][0],
 			    term->active_cols * sizeof(TermCell));
+#endif
 
 		/*
 		 * On color systems, draw_row() handles dark mode
@@ -952,6 +1000,7 @@ do_draw:
 			    win->portRect.right - SCROLLBAR_WIDTH,
 			    content_bottom);
 
+#ifdef FLYNN_OFFSCREEN
 			if (use_offscreen && (g_dark_mode ||
 			    g_mono_dark)) {
 				offscreen_fill_rect(&gap_r, 0xFF);
@@ -959,7 +1008,9 @@ do_draw:
 			    g_dark_mode) {
 				set_bg_color(0);
 				EraseRect(&gap_r);
-			} else if (g_dark_mode || g_mono_dark) {
+			} else
+#endif
+			if (g_dark_mode || g_mono_dark) {
 				PaintRect(&gap_r);
 			} else {
 				EraseRect(&gap_r);
@@ -967,9 +1018,11 @@ do_draw:
 		}
 	}
 
+#ifdef FLYNN_OFFSCREEN
 	/* Validate shadow after all rows processed */
 	if (term->scroll_offset == 0)
 		g_shadow_valid = 1;
+#endif
 
 	terminal_clear_dirty(term);
 
@@ -979,6 +1032,7 @@ do_draw:
 	 * contiguous rectangles to minimise trap calls.  Falls back
 	 * to full-screen blit when ≥20 rows dirty (cheaper than
 	 * many small blits due to per-call trap overhead). */
+#ifdef FLYNN_OFFSCREEN
 	if (use_offscreen) {
 		short dirty_count, first;
 
@@ -1109,6 +1163,7 @@ do_draw:
 			PaintRect(&m);
 		}
 	}
+#endif /* FLYNN_OFFSCREEN */
 
 	/* Step 8: Draw cursor on REAL screen (after blit).
 	 * During scroll draws, suppress cursor to avoid XOR
@@ -1175,6 +1230,7 @@ try_merge_dec_run(unsigned char ch, const char *buf, short pos,
 	return 0;
 }
 
+#ifdef FLYNN_GLYPHS
 /*
  * try_merge_glyph_run - merge consecutive identical glyphs into one call
  *
@@ -1351,7 +1407,9 @@ try_merge_glyph_run(unsigned char gid, const char *buf, short pos,
 		return 0;
 	}
 }
+#endif /* FLYNN_GLYPHS */
 
+#ifdef FLYNN_OFFSCREEN
 /*
  * offscreen_blit_glyph - blit a 1-bit glyph bitmap to offscreen buffer
  *
@@ -1492,6 +1550,7 @@ offscreen_hline(short x0, short x1, short y, short use_bic)
 		}
 	}
 }
+#endif /* FLYNN_OFFSCREEN */
 
 /*
  * Bitmap cache for frequently used multi-call glyphs.
@@ -1570,6 +1629,7 @@ glyph_cache_find(unsigned char gid)
 	return -1;
 }
 
+#ifdef FLYNN_GLYPHS
 /*
  * glyph_cache_rebuild - re-render all cached glyphs for current font
  *
@@ -1631,7 +1691,9 @@ glyph_cache_rebuild(void)
 	g_glyph_cache.rowBytes = rb;
 	g_glyph_cache.valid = 1;
 }
+#endif /* FLYNN_GLYPHS */
 
+#ifdef FLYNN_GLYPHS
 /*
  * glyph_cache_draw - render a cached glyph via CopyBits
  *
@@ -1693,6 +1755,7 @@ glyph_cache_draw(unsigned char gid, short x, short y, unsigned char attr)
 
 	return 1;
 }
+#endif /* FLYNN_GLYPHS */
 
 /* ASCII font bitmap cache: pre-rendered glyphs for direct buffer copy */
 #define FONT_CACHE_FIRST	0x20	/* space */
@@ -1786,6 +1849,7 @@ font_cache_rebuild(void)
 	g_font_cache.valid = 1;
 }
 
+#ifdef FLYNN_OFFSCREEN
 /*
  * font_cache_blit_run - render ASCII text run directly to offscreen buffer
  *
@@ -1836,6 +1900,7 @@ font_cache_blit_run(const char *buf, short len, short x, short y,
 		offscreen_hline(start_x, x, st_y, use_bic);
 	}
 }
+#endif /* FLYNN_OFFSCREEN */
 
 /*
  * draw_row - render one row of terminal cells
@@ -1866,7 +1931,9 @@ draw_row(Terminal *term, short row)
 	short row_y;
 	short sel_start_col, sel_end_col;
 	short cell_w, eff_cols;
+#ifdef FLYNN_DBLWIDTH
 	unsigned char lattr;
+#endif
 	short use_color;
 	short color_dirty = 0;
 	TermCell *row_cells;
@@ -1878,13 +1945,16 @@ draw_row(Terminal *term, short row)
 	use_color = g_has_color_qd && term->has_color;
 
 	/* Double-width/height: halve columns, double cell width */
+#ifdef FLYNN_DBLWIDTH
 	lattr = term->line_attr[row];
 	if (lattr == LINE_ATTR_DBLW ||
 	    lattr == LINE_ATTR_DBLH_TOP ||
 	    lattr == LINE_ATTR_DBLH_BOT) {
 		cell_w = g_cell_width * 2;
 		eff_cols = term->active_cols / 2;
-	} else {
+	} else
+#endif
+	{
 		cell_w = g_cell_width;
 		eff_cols = term->active_cols;
 	}
@@ -1895,6 +1965,7 @@ draw_row(Terminal *term, short row)
 	 */
 	sel_start_col = -1;
 	sel_end_col = -1;
+#ifdef FLYNN_CLIPBOARD
 	if (sel.active) {
 		short sr, sc, er, ec;
 
@@ -1917,15 +1988,19 @@ draw_row(Terminal *term, short row)
 			}
 		}
 	}
+#endif
 
 	/* Pre-compute row pointers to avoid per-cell function calls */
+#if FLYNN_SCROLLBACK_LINES > 0
 	if (term->scroll_offset == 0) {
+#endif
 		row_cells = &term->screen[row][0];
 		if (use_color)
 			row_colors = &term->screen_color[
 			    row * TERM_COLS];
 		else
 			row_colors = 0L;
+#if FLYNN_SCROLLBACK_LINES > 0
 	} else {
 		short sb_row = row - term->scroll_offset;
 		if (sb_row < 0) {
@@ -1958,6 +2033,7 @@ draw_row(Terminal *term, short row)
 				row_colors = 0L;
 		}
 	}
+#endif
 
 	col = 0;
 	while (col < eff_cols) {
@@ -2171,6 +2247,7 @@ draw_row(Terminal *term, short row)
 					color_dirty = 1;
 				continue;
 			}
+#ifdef FLYNN_GLYPHS
 			case CELL_TYPE_GLYPH: {
 				short i, x, merged;
 				unsigned char gid;
@@ -2219,6 +2296,7 @@ draw_row(Terminal *term, short row)
 					color_dirty = 1;
 				continue;
 			}
+#endif /* FLYNN_GLYPHS */
 			default:
 				break;  /* fall through to normal text */
 			}
@@ -2260,6 +2338,7 @@ draw_row(Terminal *term, short row)
 			if (use_color)
 				set_fg_color(eff_fg);
 
+#ifdef FLYNN_OFFSCREEN
 			/*
 			 * Phase 1: direct offscreen font cache
 			 * path — bypass DrawText/CopyBits traps.
@@ -2287,6 +2366,7 @@ draw_row(Terminal *term, short row)
 				    row_y, run_attr);
 				continue;
 			}
+#endif
 
 			if (run_attr & ATTR_INVERSE) {
 				if (cell_w != g_cell_width) {
@@ -2606,6 +2686,7 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 
 }
 
+#ifdef FLYNN_GLYPHS
 /*
  * draw_glyph_prim - render a primitive symbol using QuickDraw
  *
@@ -4465,6 +4546,7 @@ draw_glyph_bitmap(unsigned char glyph_id, short x, short y,
 	    mono_eff_inv(attr) ? srcBic : srcOr,
 	    NULL);
 }
+#endif /* FLYNN_GLYPHS */
 
 /*
  * draw_braille - render a Braille pattern (U+2800-U+28FF)
@@ -4564,8 +4646,12 @@ draw_cursor(Terminal *term, short on)
 	terminal_get_cursor(term, &crow, &ccol);
 
 	if (on) {
+#ifdef FLYNN_CURSOR_STYLES
 		cursor_set_rect(&cur_r, crow, ccol,
 		    term->cursor_style);
+#else
+		cursor_set_rect(&cur_r, crow, ccol, 0);
+#endif
 		PenMode(patXor);
 		PaintRect(&cur_r);
 		PenNormal();
@@ -4591,13 +4677,21 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	Rect cur_r;
 	unsigned char style;
 
-	if (!cursor_initialized || !term->cursor_visible || sel.active)
+	if (!cursor_initialized || !term->cursor_visible
+#ifdef FLYNN_CLIPBOARD
+	    || sel.active
+#endif
+	    )
 		return;
 
+#ifdef FLYNN_CURSOR_STYLES
 	/* Steady cursor styles don't blink */
 	style = term->cursor_style;
 	if (style == 2 || style == 4 || style == 6)
 		return;
+#else
+	style = 0;
+#endif
 
 	now = TickCount();
 	if (now - cursor_last_tick < CURSOR_BLINK_TICKS)
@@ -4629,6 +4723,7 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	SetPort(old_port);
 }
 
+#ifdef FLYNN_CLIPBOARD
 /*
  * sel_normalize - ensure start <= end in reading order
  */
@@ -4702,7 +4797,9 @@ term_ui_sel_start(short row, short col, short scroll_offset)
 	sel.extent_col = col;
 	sel.scroll_offset = scroll_offset;
 	sel.word_mode = 0;
+#ifdef FLYNN_OFFSCREEN
 	g_shadow_valid = 0;
+#endif
 }
 
 /*
@@ -4770,7 +4867,9 @@ term_ui_sel_clear(void)
 	sel.active = 0;
 	sel.selecting = 0;
 	sel.word_mode = 0;
+#ifdef FLYNN_OFFSCREEN
 	g_shadow_valid = 0;
+#endif
 }
 
 /*
@@ -4878,6 +4977,7 @@ term_ui_sel_dirty_all(Terminal *term)
 	for (r = sr; r <= er; r++)
 		term->dirty[r] = 1;
 }
+#endif /* FLYNN_CLIPBOARD */
 
 /*
  * status_bar_height - return bottom inset for the status bar area.
@@ -4887,8 +4987,12 @@ term_ui_sel_dirty_all(Terminal *term)
 short
 status_bar_height(void)
 {
+#ifdef FLYNN_STATUS_BAR
 	return prefs.show_status_bar ?
 	    STATUSBAR_MARGIN + SCROLLBAR_WIDTH : 0;
+#else
+	return 0;
+#endif
 }
 
 /*
@@ -4898,6 +5002,7 @@ status_bar_height(void)
  * SCROLLBAR_WIDTH (15px) tall, spanning from the left edge to the
  * scroll bar.  A 1px separator line divides it from the terminal content.
  */
+#ifdef FLYNN_STATUS_BAR
 void
 draw_status_bar(WindowPtr win, Session *s)
 {
@@ -5009,13 +5114,16 @@ draw_status_bar(WindowPtr win, Session *s)
 	TextMode(srcOr);
 
 	/* Reset colors to defaults */
+#ifdef FLYNN_COLOR
 	if (g_has_color_qd) {
 		cached_fg_idx = -1;
 		cached_bg_idx = -1;
 	}
+#endif
 	ForeColor(blackColor);
 	BackColor(whiteColor);
 }
+#endif /* FLYNN_STATUS_BAR */
 
 /*
  * term_ui_ensure_metrics - ensure font metrics are initialized.
@@ -5045,7 +5153,9 @@ term_ui_save_state(UIState *dst)
 	dst->cursor_prev_row = cursor_prev_row;
 	dst->cursor_prev_col = cursor_prev_col;
 	dst->cursor_initialized = cursor_initialized;
+#ifdef FLYNN_CLIPBOARD
 	dst->sel = sel;
+#endif
 }
 
 /*
@@ -5059,5 +5169,7 @@ term_ui_load_state(UIState *src)
 	cursor_prev_row = src->cursor_prev_row;
 	cursor_prev_col = src->cursor_prev_col;
 	cursor_initialized = src->cursor_initialized;
+#ifdef FLYNN_CLIPBOARD
 	sel = src->sel;
+#endif
 }

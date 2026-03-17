@@ -26,13 +26,24 @@ extract_changelog() {
     sed -n "/^## \[${ver}\]/,/^## \[/{/^## \[${ver}\]/d;/^## \[/d;p}" "$SCRIPT_DIR/CHANGELOG.md"
 }
 
+# Collect all release artifact files into RELEASE_FILES array
+collect_artifacts() {
+    local ver="$1"
+    local build_dir="$SCRIPT_DIR/build"
+    RELEASE_FILES=()
+    for artifact in \
+        "Flynn-${ver}.dsk" "Flynn-${ver}.hqx" \
+        "Flynn-Lite-${ver}.dsk" "Flynn-Lite-${ver}.hqx" \
+        "Flynn-Minimal-${ver}.dsk" "Flynn-Minimal-${ver}.hqx"; do
+        [ -f "$build_dir/$artifact" ] && RELEASE_FILES+=("$build_dir/$artifact")
+    done
+}
+
 # Create a release on Forgejo
 release_forgejo() {
     local tag="$1"
     local name="$2"
     local body="$3"
-    local dsk="$4"
-    local hqx="$5"
 
     if [ -z "$FORGEJO_TOKEN" ]; then
         echo "Warning: FORGEJO_TOKEN not set, skipping Forgejo release"
@@ -71,17 +82,15 @@ release_forgejo() {
     echo "  Created release ID: $release_id"
 
     # Upload artifacts
-    for file in "$dsk" "$hqx"; do
-        if [ -f "$file" ]; then
-            local filename
-            filename=$(basename "$file")
-            echo "  Uploading $filename..."
-            curl -s -X POST \
-                "$FORGEJO_URL/api/v1/repos/$FORGEJO_REPO/releases/$release_id/assets?name=$filename" \
-                -H "Authorization: token $FORGEJO_TOKEN" \
-                -H "Content-Type: application/octet-stream" \
-                --data-binary @"$file" > /dev/null
-        fi
+    for file in "${RELEASE_FILES[@]}"; do
+        local filename
+        filename=$(basename "$file")
+        echo "  Uploading $filename..."
+        curl -s -X POST \
+            "$FORGEJO_URL/api/v1/repos/$FORGEJO_REPO/releases/$release_id/assets?name=$filename" \
+            -H "Authorization: token $FORGEJO_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$file" > /dev/null
     done
     echo "  Forgejo release complete: $FORGEJO_URL/$FORGEJO_REPO/releases/tag/$tag"
 }
@@ -91,8 +100,6 @@ release_github() {
     local tag="$1"
     local name="$2"
     local body="$3"
-    local dsk="$4"
-    local hqx="$5"
 
     if ! command -v gh >/dev/null 2>&1; then
         echo "Warning: gh CLI not installed, skipping GitHub release"
@@ -117,18 +124,48 @@ release_github() {
         git push github "$tag" 2>/dev/null || true
     fi
 
-    # Build file args
-    local files=()
-    [ -f "$dsk" ] && files+=("$dsk")
-    [ -f "$hqx" ] && files+=("$hqx")
-
     gh release create "$tag" \
         --repo "$GITHUB_REPO" \
         --title "$name" \
         --notes "$body" \
-        "${files[@]}"
+        "${RELEASE_FILES[@]}"
 
     echo "  GitHub release complete: https://github.com/$GITHUB_REPO/releases/tag/$tag"
+}
+
+# Build all three presets and create versioned artifacts
+build_all_presets() {
+    local ver="$1"
+    local build_dir="$SCRIPT_DIR/build"
+
+    echo "Building all presets for $ver..."
+
+    # Full preset — artifacts named Flynn-{ver}.*  (backwards compatible)
+    echo "  Building full preset..."
+    "$SCRIPT_DIR/scripts/build.sh" --preset full
+    for ext in dsk hqx; do
+        [ -f "$build_dir/Flynn.${ext}" ] && \
+            cp "$build_dir/Flynn.${ext}" "$build_dir/Flynn-${ver}.${ext}"
+    done
+
+    # Lite preset (macplus) — artifacts named Flynn-Lite-{ver}.*
+    echo "  Building lite preset..."
+    "$SCRIPT_DIR/scripts/build.sh" --preset macplus
+    for ext in dsk hqx; do
+        [ -f "$build_dir/Flynn.${ext}" ] && \
+            cp "$build_dir/Flynn.${ext}" "$build_dir/Flynn-Lite-${ver}.${ext}"
+    done
+
+    # Minimal preset — artifacts named Flynn-Minimal-{ver}.*
+    echo "  Building minimal preset..."
+    "$SCRIPT_DIR/scripts/build.sh" --preset minimal
+    for ext in dsk hqx; do
+        [ -f "$build_dir/Flynn.${ext}" ] && \
+            cp "$build_dir/Flynn.${ext}" "$build_dir/Flynn-Minimal-${ver}.${ext}"
+    done
+
+    echo "  All presets built:"
+    ls -la "$build_dir"/Flynn*-${ver}.* 2>/dev/null
 }
 
 # Release a single version
@@ -152,18 +189,40 @@ do_release() {
         return 1
     fi
 
-    # Find artifacts (check versioned names, fall back to build dir)
-    local dsk="$SCRIPT_DIR/build/Flynn-${ver}.dsk"
-    local hqx="$SCRIPT_DIR/build/Flynn-${ver}.hqx"
-
-    if [ ! -f "$dsk" ] && [ ! -f "$hqx" ]; then
-        echo "Warning: No artifacts found for $ver (looked for Flynn-${ver}.dsk/.hqx in build/)"
-        echo "  Run ./scripts/build.sh first, or artifacts will be skipped"
+    # Build all presets if artifacts don't exist yet
+    if [ ! -f "$SCRIPT_DIR/build/Flynn-${ver}.dsk" ]; then
+        build_all_presets "$ver"
     fi
 
+    # Collect all artifacts
+    collect_artifacts "$ver"
+
+    if [ ${#RELEASE_FILES[@]} -eq 0 ]; then
+        echo "Warning: No artifacts found for $ver"
+        echo "  Expected: Flynn-${ver}.dsk/.hqx, Flynn-Lite-${ver}.dsk/.hqx, Flynn-Minimal-${ver}.dsk/.hqx"
+    else
+        echo "  Artifacts: ${#RELEASE_FILES[@]} files"
+        for f in "${RELEASE_FILES[@]}"; do echo "    $(basename "$f")"; done
+    fi
+
+    # Append preset descriptions to release body
+    body="${body}
+
+---
+
+### Downloads
+
+| Edition | Description | Memory |
+|---------|-------------|--------|
+| **Flynn** | Full build — 4 sessions, 192-line scrollback, all features including 256-color | ~768KB |
+| **Flynn Lite** | Recommended — 1 session, 96-line scrollback, most features | ~384KB |
+| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped features | ~256KB |
+
+See [BUILD.md](https://github.com/$GITHUB_REPO/blob/main/docs/BUILD.md) for custom build options."
+
     local name="Flynn $tag"
-    release_forgejo "$tag" "$name" "$body" "$dsk" "$hqx"
-    release_github "$tag" "$name" "$body" "$dsk" "$hqx"
+    release_forgejo "$tag" "$name" "$body"
+    release_github "$tag" "$name" "$body"
     echo ""
 }
 

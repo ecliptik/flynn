@@ -47,8 +47,10 @@ static void term_set_attr(Terminal *term, short param);
 static void term_put_cp437(Terminal *term, unsigned char byte);
 static void term_process_osc(Terminal *term, unsigned char ch);
 static void term_finish_osc(Terminal *term);
+#ifdef FLYNN_ALT_SCREEN
 static void term_switch_to_alt(Terminal *term);
 static void term_switch_to_main(Terminal *term);
+#endif
 static void term_dirty_row(Terminal *term, short row);
 static void term_dirty_range(Terminal *term, short r1, short r2);
 static short term_clamp(short val, short lo, short hi);
@@ -135,9 +137,11 @@ terminal_init(Terminal *term)
 
 	/* Alternate screen */
 	term->alt_active = 0;
+#ifdef FLYNN_ALT_SCREEN
 	term->alt_cur_row = 0;
 	term->alt_cur_col = 0;
 	term->alt_cur_attr = ATTR_NORMAL;
+#endif
 
 	/* Saved cursor */
 	term->saved_row = 0;
@@ -155,8 +159,10 @@ terminal_init(Terminal *term)
 	term->cur_fg = COLOR_DEFAULT;
 	term->cur_bg = COLOR_DEFAULT;
 	term->pre_dim_fg = COLOR_DEFAULT;
+#ifdef FLYNN_ALT_SCREEN
 	term->alt_cur_fg = COLOR_DEFAULT;
 	term->alt_cur_bg = COLOR_DEFAULT;
+#endif
 
 	/* Allocate screen color array on System 7 (first init only).
 	 * alt_color and sb_color are lazy-allocated on first use
@@ -181,8 +187,11 @@ terminal_init(Terminal *term)
 		    (long)TERM_ROWS * TERM_COLS * sizeof(CellColor));
 	}
 
+#ifdef FLYNN_CURSOR_STYLES
 	term->cursor_style = 0;
+#endif
 
+#ifdef FLYNN_TAB_STOPS
 	/* Tab stops: default every 8 columns */
 	memset(term->tab_stops, 0, sizeof(term->tab_stops));
 	{
@@ -190,9 +199,12 @@ terminal_init(Terminal *term)
 		for (c = 0; c < TERM_COLS; c += 8)
 			term->tab_stops[c] = 1;
 	}
+#endif
 
+#ifdef FLYNN_DBLWIDTH
 	/* Line attributes */
 	memset(term->line_attr, 0, sizeof(term->line_attr));
+#endif
 
 	/* Clear dirty flags then mark active rows dirty */
 	memset(term->dirty, 0, sizeof(term->dirty));
@@ -230,6 +242,7 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 
 		switch (term->parse_state) {
 		case PARSE_NORMAL:
+#ifdef FLYNN_CP437
 			/* CP437/ANSI-BBS mode: raw byte interpretation */
 			if (term->cp437_mode) {
 				if (ch == 0x1B) {
@@ -248,9 +261,15 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					{
 						short c;
 						c = term->cur_col + 1;
+#ifdef FLYNN_TAB_STOPS
 						while (c < term->active_cols &&
 						    !term->tab_stops[c])
 							c++;
+#else
+						while (c < term->active_cols &&
+						    (c & 7) != 0)
+							c++;
+#endif
 						if (c >= term->active_cols)
 							c = term->active_cols - 1;
 						term->cur_col = c;
@@ -258,10 +277,15 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				} else if (ch == 0x07) {
 					SysBeep(5);
 				} else {
+#ifdef FLYNN_CP437
 					term_put_cp437(term, ch);
+#else
+					term_put_char(term, ch);
+#endif
 				}
 				break;
 			}
+#endif /* FLYNN_CP437 */
 
 			/*
 			 * Fast path first: printable ASCII (0x20-0x7E)
@@ -358,9 +382,15 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					{
 						short c;
 						c = term->cur_col + 1;
+#ifdef FLYNN_TAB_STOPS
 						while (c < term->active_cols &&
 						    !term->tab_stops[c])
 							c++;
+#else
+						while (c < term->active_cols &&
+						    (c & 7) != 0)
+							c++;
+#endif
 						if (c >= term->active_cols)
 							c = term->active_cols - 1;
 						term->cur_col = c;
@@ -533,6 +563,7 @@ terminal_get_display_cell(Terminal *term, short row, short col)
 	if (row < 0 || row >= TERM_ROWS)
 		return &term->screen[0][0];
 
+#if FLYNN_SCROLLBACK_LINES > 0
 	if (term->scroll_offset == 0)
 		return &term->screen[row][col];
 
@@ -558,6 +589,9 @@ terminal_get_display_cell(Terminal *term, short row, short col)
 
 	/* This row comes from the live screen */
 	return &term->screen[sb_row][col];
+#else
+	return &term->screen[row][col];
+#endif
 }
 
 /*
@@ -575,6 +609,7 @@ terminal_get_display_color(Terminal *term, short row, short col)
 	if (col < 0 || col >= TERM_COLS || row < 0 || row >= TERM_ROWS)
 		return 0L;
 
+#if FLYNN_SCROLLBACK_LINES > 0
 	if (term->scroll_offset == 0)
 		return &term->screen_color[row * TERM_COLS + col];
 
@@ -594,8 +629,12 @@ terminal_get_display_color(Terminal *term, short row, short col)
 	}
 
 	return &term->screen_color[sb_row * TERM_COLS + col];
+#else
+	return &term->screen_color[row * TERM_COLS + col];
+#endif
 }
 
+#if FLYNN_SCROLLBACK_LINES > 0
 /*
  * terminal_scroll_back - scroll back N lines into scrollback history
  */
@@ -621,6 +660,7 @@ terminal_scroll_forward(Terminal *term, short lines)
 		term->scroll_offset = 0;
 	term_dirty_all(term);
 }
+#endif /* FLYNN_SCROLLBACK_LINES > 0 */
 
 /*
  * terminal_is_row_dirty - check if row needs redraw
@@ -650,6 +690,30 @@ terminal_get_cursor(Terminal *term, short *row, short *col)
 {
 	*row = term->cur_row;
 	*col = term->cur_col;
+}
+
+/*
+ * cell_to_char - Convert a TermCell to a plain text character
+ *
+ * Shared by clipboard and savefile for text export.
+ */
+char
+cell_to_char(TermCell *cell)
+{
+	if (cell->ch == 0)
+		return ' ';
+	if (CELL_IS_GLYPH(cell->attr) &&
+	    cell->ch == GLYPH_WIDE_SPACER)
+		return ' ';
+#ifdef FLYNN_GLYPHS
+	if (CELL_IS_GLYPH(cell->attr)) {
+		const GlyphInfo *gi = glyph_get_info(cell->ch);
+		return gi ? gi->copy_char : '?';
+	}
+#endif
+	if (CELL_IS_BRAILLE(cell->attr))
+		return '.';
+	return cell->ch;
 }
 
 /* ----------------------------------------------------------------
@@ -760,6 +824,7 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 	}
 }
 
+#if FLYNN_SCROLLBACK_LINES > 0
 /*
  * term_save_scrollback - save one line into the scrollback ring buffer
  */
@@ -795,6 +860,7 @@ term_save_scrollback(Terminal *term, short row)
 	if (term->sb_count < TERM_SCROLLBACK_LINES)
 		term->sb_count++;
 }
+#endif /* FLYNN_SCROLLBACK_LINES > 0 */
 
 /*
  * term_scroll_up - scroll lines [top..bottom] up by count lines.
@@ -811,11 +877,13 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 	if (count > (bottom - top + 1))
 		count = bottom - top + 1;
 
+#if FLYNN_SCROLLBACK_LINES > 0
 	/* Save lines scrolled off top into scrollback (not on alt screen) */
 	if (top == 0 && !term->alt_active) {
 		for (r = 0; r < count; r++)
 			term_save_scrollback(term, r);
 	}
+#endif
 
 	/* Move lines up: per-row memmove using active_cols to
 	 * avoid moving unused columns (saves ~39% when 80 of 132) */
@@ -827,9 +895,11 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 				    &term->screen[top + count + r][0],
 				    term->active_cols *
 				    sizeof(TermCell));
+#ifdef FLYNN_DBLWIDTH
 			memmove(&term->line_attr[top],
 			    &term->line_attr[top + count],
 			    rows_to_move);
+#endif
 		}
 
 		/* Scroll color arrays in parallel */
@@ -856,7 +926,9 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 			    (unsigned short *)&term->screen[r][0];
 			for (c = 0; c < term->active_cols; c++)
 				*p++ = fill;
+#ifdef FLYNN_DBLWIDTH
 			term->line_attr[r] = LINE_ATTR_NORMAL;
+#endif
 		}
 
 		/* Clear color for exposed lines */
@@ -946,9 +1018,11 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 				    &term->screen[top + r][0],
 				    term->active_cols *
 				    sizeof(TermCell));
+#ifdef FLYNN_DBLWIDTH
 			memmove(&term->line_attr[top + count],
 			    &term->line_attr[top],
 			    rows_to_move);
+#endif
 		}
 
 		/* Scroll color arrays in parallel */
@@ -975,7 +1049,9 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 			    (unsigned short *)&term->screen[r][0];
 			for (c = 0; c < term->active_cols; c++)
 				*p++ = fill;
+#ifdef FLYNN_DBLWIDTH
 			term->line_attr[r] = LINE_ATTR_NORMAL;
+#endif
 		}
 
 		/* Clear color for exposed lines */
@@ -1226,10 +1302,14 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
  * Looks up the byte in the CP437 table and stores the appropriate
  * ch + attr.  For ASCII/MACROMAN, stores as normal text.  For GLYPH,
  * stores with CELL_TYPE_GLYPH.  For SPACE, stores space.
+ *
+ * When FLYNN_CP437 is disabled, falls back to term_put_char for
+ * printable ASCII or '?' for control/high bytes.
  */
 static void
 term_put_cp437(Terminal *term, unsigned char byte)
 {
+#ifdef FLYNN_CP437
 	const CP437Entry *e;
 	unsigned char ch, attr;
 
@@ -1283,6 +1363,13 @@ term_put_cp437(Terminal *term, unsigned char byte)
 		term->cur_col++;
 	else
 		term->wrap_pending = 1;
+#else /* !FLYNN_CP437 */
+	/* Fallback: treat printable ASCII as-is, else '?' */
+	if (byte >= 0x20 && byte < 0x7F)
+		term_put_char(term, byte);
+	else
+		term_put_char(term, '?');
+#endif /* FLYNN_CP437 */
 }
 
 /*
@@ -1380,7 +1467,9 @@ term_process_esc(Terminal *term, unsigned char ch)
 
 	case 'H':
 		/* HTS - Horizontal Tab Set */
+#ifdef FLYNN_TAB_STOPS
 		term->tab_stops[term->cur_col] = 1;
+#endif
 		return;
 
 	case '=':
@@ -1433,6 +1522,7 @@ term_process_esc(Terminal *term, unsigned char ch)
 			    ch == 'U' || ch == '1' || ch == '2')
 				term->g1_charset = ch;
 		} else if (term->intermediate == '#') {
+#ifdef FLYNN_DBLWIDTH
 			/* DEC line attributes */
 			switch (ch) {
 			case '3':	/* DECDHL top half */
@@ -1456,6 +1546,7 @@ term_process_esc(Terminal *term, unsigned char ch)
 				term->dirty[term->cur_row] = 1;
 				break;
 			}
+#endif
 		}
 		term->intermediate = 0;
 		break;
@@ -1574,10 +1665,12 @@ term_dec_set_mode(Terminal *term)
 		case 25:
 			term->cursor_visible = 1;
 			break;
+#ifdef FLYNN_ALT_SCREEN
 		case 47:
 		case 1047:
 			term_switch_to_alt(term);
 			break;
+#endif
 		case 1048:
 			/* Save cursor */
 			term->saved_row = term->cur_row;
@@ -1586,6 +1679,7 @@ term_dec_set_mode(Terminal *term)
 			term->saved_fg = term->cur_fg;
 			term->saved_bg = term->cur_bg;
 			break;
+#ifdef FLYNN_ALT_SCREEN
 		case 1049:
 			/* Save cursor + switch to alt */
 			term->saved_row = term->cur_row;
@@ -1595,6 +1689,7 @@ term_dec_set_mode(Terminal *term)
 			term->saved_bg = term->cur_bg;
 			term_switch_to_alt(term);
 			break;
+#endif
 		case 2004:
 			term->bracketed_paste = 1;
 			break;
@@ -1634,10 +1729,12 @@ term_dec_reset_mode(Terminal *term)
 		case 25:
 			term->cursor_visible = 0;
 			break;
+#ifdef FLYNN_ALT_SCREEN
 		case 47:
 		case 1047:
 			term_switch_to_main(term);
 			break;
+#endif
 		case 1048:
 			/* Restore cursor */
 			term->cur_row = term_clamp(
@@ -1651,6 +1748,7 @@ term_dec_reset_mode(Terminal *term)
 			term->cur_bg = term->saved_bg;
 			term->wrap_pending = 0;
 			break;
+#ifdef FLYNN_ALT_SCREEN
 		case 1049:
 			/* Switch to main + restore cursor */
 			term_switch_to_main(term);
@@ -1665,6 +1763,7 @@ term_dec_reset_mode(Terminal *term)
 			term->cur_bg = term->saved_bg;
 			term->wrap_pending = 0;
 			break;
+#endif
 		case 2004:
 			term->bracketed_paste = 0;
 			break;
@@ -1929,6 +2028,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 					} else if (i + 1 < term->num_params &&
 					    term->params[i + 1] == 2) {
 						/* Truecolor: 38;2;R;G;B */
+#ifdef FLYNN_COLOR
 						if (i + 4 < term->num_params) {
 							unsigned char ci =
 							    color_nearest_256(
@@ -1943,6 +2043,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 							else
 								term->cur_bg = ci;
 						}
+#endif
 						i += 4;
 					}
 					continue;
@@ -2074,6 +2175,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 
 	case 'g':
 		/* TBC - Tabulation Clear */
+#ifdef FLYNN_TAB_STOPS
 		if (term->intermediate == 0) {
 			p1 = (term->num_params >= 1) ?
 			    term->params[0] : 0;
@@ -2083,10 +2185,12 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 				memset(term->tab_stops, 0,
 				    sizeof(term->tab_stops));
 		}
+#endif
 		break;
 
 	case 'q':
 		/* DECSCUSR - Set Cursor Style (CSI Ps SP q) */
+#ifdef FLYNN_CURSOR_STYLES
 		if (term->intermediate == ' ') {
 			p1 = (term->num_params >= 1) ?
 			    term->params[0] : 0;
@@ -2094,6 +2198,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 				term->cursor_style =
 				    (unsigned char)p1;
 		}
+#endif
 		break;
 
 	case 'p':
@@ -2119,7 +2224,10 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->saved_fg = COLOR_DEFAULT;
 			term->saved_bg = COLOR_DEFAULT;
 			term->wrap_pending = 0;
+#ifdef FLYNN_CURSOR_STYLES
 			term->cursor_style = 0;
+#endif
+#ifdef FLYNN_TAB_STOPS
 			/* Reset tab stops to defaults */
 			memset(term->tab_stops, 0,
 			    sizeof(term->tab_stops));
@@ -2128,8 +2236,11 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 				for (c = 0; c < TERM_COLS; c += 8)
 					term->tab_stops[c] = 1;
 			}
+#endif
+#ifdef FLYNN_DBLWIDTH
 			memset(term->line_attr, 0,
 			    sizeof(term->line_attr));
+#endif
 		}
 		break;
 
@@ -2185,6 +2296,7 @@ term_set_attr(Terminal *term, short param)
 	case 2:
 		/* Dim/faint */
 		term->cur_attr &= ~ATTR_BOLD;
+#ifdef FLYNN_COLOR
 		if (g_has_color_qd) {
 			unsigned char dimmed;
 			term->pre_dim_fg = term->cur_fg;
@@ -2195,6 +2307,7 @@ term_set_attr(Terminal *term, short param)
 			term->cur_fg = dimmed;
 			term->cur_attr |= ATTR_HAS_COLOR;
 		}
+#endif
 		break;
 	case 3:
 		/* Italic */
@@ -2397,6 +2510,7 @@ term_finish_osc(Terminal *term)
 				i++;
 			}
 			/* Check for ";?" suffix = query */
+#ifdef FLYNN_COLOR
 			if (i < term->osc_len &&
 			    term->osc_buf[i] == ';' &&
 			    i + 1 < term->osc_len &&
@@ -2419,6 +2533,7 @@ term_finish_osc(Terminal *term)
 					term->response_len = sizeof(term->response) - 1;
 				term_flush_response(term);
 			}
+#endif
 			/* Set (non-"?" payload): silently ignore */
 		}
 		break;
@@ -2489,6 +2604,7 @@ term_finish_osc(Terminal *term)
 	term_flush_response(term);
 }
 
+#ifdef FLYNN_ALT_SCREEN
 /*
  * term_switch_to_alt - switch to alternate screen buffer
  */
@@ -2500,8 +2616,10 @@ term_switch_to_alt(Terminal *term)
 
 	/* Save main screen contents */
 	memcpy(term->alt_screen, term->screen, sizeof(term->screen));
+#ifdef FLYNN_DBLWIDTH
 	memcpy(term->alt_line_attr, term->line_attr,
 	    sizeof(term->line_attr));
+#endif
 	term->alt_cur_row = term->cur_row;
 	term->alt_cur_col = term->cur_col;
 	term->alt_cur_attr = term->cur_attr;
@@ -2523,9 +2641,11 @@ term_switch_to_alt(Terminal *term)
 		}
 	}
 
-	/* Clear the screen and line attributes for alt buffer use */
+	/* Clear the screen for alt buffer use */
 	term_clear_region(term, 0, 0, term->active_rows - 1, term->active_cols - 1);
+#ifdef FLYNN_DBLWIDTH
 	memset(term->line_attr, 0, sizeof(term->line_attr));
+#endif
 	term->cur_row = 0;
 	term->cur_col = 0;
 	term->wrap_pending = 0;
@@ -2543,8 +2663,10 @@ term_switch_to_main(Terminal *term)
 
 	/* Restore main screen contents */
 	memcpy(term->screen, term->alt_screen, sizeof(term->screen));
+#ifdef FLYNN_DBLWIDTH
 	memcpy(term->line_attr, term->alt_line_attr,
 	    sizeof(term->line_attr));
+#endif
 	term->cur_row = term->alt_cur_row;
 	term->cur_col = term->alt_cur_col;
 	term->cur_attr = term->alt_cur_attr;
@@ -2561,6 +2683,7 @@ term_switch_to_main(Terminal *term)
 
 	term_dirty_all(term);
 }
+#endif /* FLYNN_ALT_SCREEN */
 
 /* ----------------------------------------------------------------
  * UTF-8 decode and Unicode translation

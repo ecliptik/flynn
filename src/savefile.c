@@ -22,26 +22,7 @@
 /* External references to main.c globals */
 extern Session *active_session;
 
-/*
- * cell_to_char - Convert a TermCell to a plain text character
- * Same conversion logic as clipboard.c do_copy()
- */
-char
-cell_to_char(TermCell *cell)
-{
-	if (cell->ch == 0)
-		return ' ';
-	if (CELL_IS_GLYPH(cell->attr) &&
-	    cell->ch == GLYPH_WIDE_SPACER)
-		return ' ';
-	if (CELL_IS_GLYPH(cell->attr)) {
-		const GlyphInfo *gi = glyph_get_info(cell->ch);
-		return gi ? gi->copy_char : '?';
-	}
-	if (CELL_IS_BRAILLE(cell->attr))
-		return '.';
-	return cell->ch;
-}
+/* cell_to_char() is now in terminal.c (shared with clipboard.c) */
 
 /*
  * write_row - Extract one row of TermCells as text and write to file.

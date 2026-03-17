@@ -24,8 +24,10 @@
 extern FlynnPrefs prefs;
 extern Session *active_session;
 
+#ifdef FLYNN_CLIPBOARD
 /* Forward declaration for local helper */
 static void track_selection_drag(Session *s);
+#endif
 
 /* ---- Data-driven key mapping tables ---- */
 
@@ -336,7 +338,8 @@ handle_key_down(Session *s, EventRecord *event)
 	local_echo(s, (unsigned char *)&key, 1);
 }
 
-short
+#ifdef FLYNN_CLIPBOARD
+static short
 pixel_to_row(Session *s, short v)
 {
 	short r;
@@ -348,7 +351,7 @@ pixel_to_row(Session *s, short v)
 	return r;
 }
 
-short
+static short
 pixel_to_col(Session *s, short h)
 {
 	short c;
@@ -359,7 +362,9 @@ pixel_to_col(Session *s, short h)
 		c = s->terminal.active_cols - 1;
 	return c;
 }
+#endif /* FLYNN_CLIPBOARD */
 
+#ifdef FLYNN_CLIPBOARD
 void
 handle_content_click(Session *s, EventRecord *event)
 {
@@ -436,3 +441,4 @@ track_selection_drag(Session *s)
 
 	term_ui_sel_finalize();
 }
+#endif /* FLYNN_CLIPBOARD */

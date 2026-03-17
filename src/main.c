@@ -48,9 +48,11 @@ static short saved_key_rep_thresh;
 static NMRec nm_rec;
 static Boolean notification_posted = false;
 
+#if FLYNN_SCROLLBACK_LINES > 0
 /* Pre-allocated scroll bar action UPP (avoid leak on every click) */
 static pascal void scrollbar_action(ControlHandle control, short part);
 static ControlActionUPP g_scroll_action_upp = 0L;
+#endif
 
 /* Shared buffers for telnet/terminal processing (static to avoid stack) */
 static unsigned char out_buf[TCP_READ_BUFSIZ];
@@ -133,7 +135,9 @@ main(void)
 	init_apple_events();
 	color_detect();
 	init_menus();
+#if FLYNN_SCROLLBACK_LINES > 0
 	g_scroll_action_upp = NewControlActionUPP(scrollbar_action);
+#endif
 
 	/* Load prefs and fast init before showing window */
 	prefs_load(&prefs);
@@ -185,11 +189,13 @@ session_handle_disconnect(Session *sess)
 	GrafPtr save;
 	short was_ttype;
 
+#ifdef FLYNN_FINGER
 	/* Finger: server closure is expected.  Skip telnet reset,
 	 * snapshot restore, and full redraw — the screen content
 	 * was already drawn by session_draw() in the drain loop.
 	 * Just update scrollbar, status bar, and menus. */
 	if (sess->conn.protocol == PROTO_FINGER) {
+#if FLYNN_SCROLLBACK_LINES > 0
 		/* Update scrollbar for scrollback access */
 		if (sess->scrollbar) {
 			short max_val =
@@ -201,6 +207,7 @@ session_handle_disconnect(Session *sess)
 			HiliteControl(sess->scrollbar,
 			    max_val > 0 ? 0 : 255);
 		}
+#endif
 		if (prefs.show_status_bar) {
 			GrafPtr save;
 
@@ -214,6 +221,7 @@ session_handle_disconnect(Session *sess)
 		term_ui_save_state(&sess->ui);
 		return;
 	}
+#endif /* FLYNN_FINGER */
 
 	/* Save session's terminal type before telnet_init() zeroes it.
 	 * Needed to decide whether to restore snapshot (xterm/VT types
@@ -317,12 +325,14 @@ session_process_data(Session *sess)
 	short out_len = 0;
 	short send_len = 0;
 
+#ifdef FLYNN_FINGER
 	/* Finger: data is handled synchronously in finger_connect(),
 	 * so no data should arrive here.  Safety drain only. */
 	if (sess->conn.protocol == PROTO_FINGER) {
 		sess->conn.read_len = 0;
 		return;
 	}
+#endif
 
 	telnet_process(&sess->telnet,
 	    (unsigned char *)sess->conn.read_buf,
@@ -723,6 +733,7 @@ main_event_loop(void)
 	ExitToShell();
 }
 
+#if FLYNN_SCROLLBACK_LINES > 0
 /*
  * scrollbar_action - TrackControl action proc for scroll bar arrows
  * and page areas.  Called repeatedly while mouse is held down.
@@ -813,6 +824,7 @@ scrollbar_action(ControlHandle control, short part)
 		}
 	}
 }
+#endif /* FLYNN_SCROLLBACK_LINES > 0 */
 
 static void
 handle_mouse_down(EventRecord *event)
@@ -913,6 +925,7 @@ handle_mouse_down(EventRecord *event)
 			    &hit_ctl);
 			SetPort(save);
 
+#if FLYNN_SCROLLBACK_LINES > 0
 			if (ctl_part && hit_ctl == sess->scrollbar) {
 				SetPort(win);
 				if (ctl_part == inThumb) {
@@ -932,7 +945,9 @@ handle_mouse_down(EventRecord *event)
 					    g_scroll_action_upp);
 				}
 				SetPort(save);
-			} else {
+			} else
+#endif
+			{
 				handle_content_click(sess, event);
 			}
 		}
@@ -1052,15 +1067,19 @@ handle_activate(EventRecord *event)
 			term_ui_load_state(&sess->ui);
 			session_load_font(sess);
 			update_menus();
+#if FLYNN_SCROLLBACK_LINES > 0
 			/* Activate scroll bar */
 			if (sess->scrollbar)
 				HiliteControl(sess->scrollbar,
 				    sess->terminal.sb_count > 0 ?
 				    0 : 255);
+#endif
 		}
 	} else {
+#if FLYNN_SCROLLBACK_LINES > 0
 		/* Deactivate scroll bar */
 		if (sess && sess->scrollbar)
 			HiliteControl(sess->scrollbar, 255);
+#endif
 	}
 }

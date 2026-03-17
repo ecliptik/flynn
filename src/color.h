@@ -17,6 +17,8 @@
 /* Color index sentinel: "use terminal default fg/bg" */
 #define COLOR_DEFAULT	0xFF
 
+#ifdef FLYNN_COLOR
+
 /* Per-cell color (2 bytes, allocated separately from TermCell) */
 typedef struct {
 	unsigned char	fg;	/* 0-254: xterm palette, 0xFF = default */
@@ -38,5 +40,15 @@ unsigned char color_nearest_256(unsigned char r, unsigned char g,
 
 /* Return dimmed version of a palette color (halve RGB components) */
 unsigned char color_dim(unsigned char idx);
+
+#else
+/* Without FLYNN_COLOR: no color support, mono only */
+typedef struct { unsigned char fg, bg; } CellColor;
+#define g_has_color_qd       0
+#define color_detect()       ((void)0)
+#define color_get_rgb(i, r)  ((void)0)
+#define color_nearest_256(r, g, b)  0
+#define color_dim(i)         0
+#endif
 
 #endif /* COLOR_H */

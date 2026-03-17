@@ -13,12 +13,16 @@
 #include "connection.h"
 #include "telnet.h"
 
-#define MAX_SESSIONS	4
+#ifndef MAX_SESSIONS
+#define MAX_SESSIONS	1
+#endif
 
 typedef struct Session {
 	/* Window */
 	WindowPtr	window;
+#if FLYNN_SCROLLBACK_LINES > 0
 	ControlHandle	scrollbar;
+#endif
 
 	/* Core protocol state */
 	Connection	conn;
@@ -85,8 +89,12 @@ void do_window_resize(Session *s, short width, short height);
 /* Destroy all sessions (reverse order) */
 void session_destroy_all(void);
 
+#if FLYNN_SCROLLBACK_LINES > 0
 /* Sync scroll bar with terminal scrollback state */
 void session_update_scrollbar(Session *s);
+#else
+#define session_update_scrollbar(s) ((void)0)
+#endif
 
 /* Destroy session and fix up active_session pointer */
 void session_destroy_and_fixup(Session *s);

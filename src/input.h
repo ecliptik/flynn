@@ -18,13 +18,11 @@ void flush_key_send(Session *s);
 /* Handle a keyDown/autoKey event */
 void handle_key_down(Session *s, EventRecord *event);
 
+#ifdef FLYNN_CLIPBOARD
 /* Handle mouse click in terminal content area */
 void handle_content_click(Session *s, EventRecord *event);
-
-/* Convert pixel coordinate to terminal row */
-short pixel_to_row(Session *s, short v);
-
-/* Convert pixel coordinate to terminal column */
-short pixel_to_col(Session *s, short h);
+#else
+#define handle_content_click(s, ev) ((void)0)
+#endif
 
 #endif /* INPUT_H */

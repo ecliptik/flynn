@@ -22,6 +22,8 @@
 #ifndef CP437_H
 #define CP437_H
 
+#ifdef FLYNN_CP437
+
 /* CP437 cell rendering method */
 #define CP437_ASCII	0	/* render as ch directly (0x20-0x7E) */
 #define CP437_MACROMAN	1	/* render as Mac Roman byte in value field */
@@ -34,5 +36,7 @@ typedef struct {
 } CP437Entry;
 
 extern const CP437Entry cp437_table[256];
+
+#endif /* FLYNN_CP437 */
 
 #endif /* CP437_H */

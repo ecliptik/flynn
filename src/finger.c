@@ -286,6 +286,7 @@ finger_connect(const char *host, const char *username,
 	term_ui_draw(s->window, &s->terminal);
 	if (prefs.show_status_bar)
 		draw_status_bar(s->window, s);
+#if FLYNN_SCROLLBACK_LINES > 0
 	if (s->scrollbar) {
 		short max_val = s->terminal.sb_count;
 
@@ -294,6 +295,7 @@ finger_connect(const char *host, const char *username,
 		HiliteControl(s->scrollbar,
 		    max_val > 0 ? 0 : 255);
 	}
+#endif
 	SetPort(save);
 
 	term_ui_save_state(&s->ui);

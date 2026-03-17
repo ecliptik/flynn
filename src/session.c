@@ -98,6 +98,7 @@ session_new(void)
 	/* Create vertical scroll bar in right border area.
 	 * Standard Mac positioning: overlap window frame by 1px
 	 * on top/right, stop above grow box at bottom. */
+#if FLYNN_SCROLLBACK_LINES > 0
 	{
 		Rect sb_bounds;
 
@@ -109,6 +110,7 @@ session_new(void)
 		s->scrollbar = NewControl(s->window, &sb_bounds,
 		    "\p", true, 0, 0, 0, scrollBarProc, 0L);
 	}
+#endif
 
 	sessions[slot] = s;
 	num_sessions++;
@@ -136,8 +138,10 @@ session_destroy(Session *s)
 	if (s->terminal.sb_color)
 		DisposePtr((Ptr)s->terminal.sb_color);
 
+#if FLYNN_SCROLLBACK_LINES > 0
 	if (s->scrollbar)
 		DisposeControl(s->scrollbar);
+#endif
 	if (s->window)
 		DisposeWindow(s->window);
 
@@ -212,6 +216,7 @@ session_destroy_all(void)
 	}
 }
 
+#if FLYNN_SCROLLBACK_LINES > 0
 /*
  * session_update_scrollbar - sync scroll bar with terminal scrollback state.
  */
@@ -230,6 +235,7 @@ session_update_scrollbar(Session *sess)
 	SetControlValue(sess->scrollbar, cur_val);
 	HiliteControl(sess->scrollbar, max_val > 0 ? 0 : 255);
 }
+#endif
 
 void
 session_destroy_and_fixup(Session *s)
@@ -378,6 +384,7 @@ do_font_change(short font_id, short font_size)
 
 	do_window_resize(active_session, win_w, win_h);
 
+#ifdef FLYNN_BOOKMARKS
 	/* Auto-save to originating bookmark */
 	if (active_session->bookmark_index >= 0 &&
 	    active_session->bookmark_index < prefs.bookmark_count) {
@@ -386,6 +393,7 @@ do_font_change(short font_id, short font_size)
 		prefs.bookmarks[active_session->bookmark_index].font_size =
 		    font_size;
 	}
+#endif
 
 	/* Also update global default for new sessions */
 	prefs.font_id = font_id;
@@ -440,6 +448,7 @@ do_window_resize(Session *s, short width, short height)
 		    new_rows * g_cell_height;
 		SizeWindow(s->window, snap_w, snap_h, true);
 
+#if FLYNN_SCROLLBACK_LINES > 0
 		/* Reposition scroll bar to new right edge */
 		if (s->scrollbar) {
 			MoveControl(s->scrollbar,
@@ -448,6 +457,7 @@ do_window_resize(Session *s, short width, short height)
 			    SCROLLBAR_WIDTH,
 			    snap_h - SCROLLBAR_WIDTH + 2);
 		}
+#endif
 	}
 
 	/* Invalidate offscreen — dimensions changed */

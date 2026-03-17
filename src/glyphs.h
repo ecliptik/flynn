@@ -279,6 +279,8 @@
 #define GLYPH_EMOJI_STOPWATCH	0xFE	/* U+23F1 */
 #define GLYPH_EMOJI_COUNT	18
 
+#ifdef FLYNN_GLYPHS
+
 /* Glyph info: describes how to render a glyph */
 typedef struct {
 	unsigned char	category;	/* GLYPH_CAT_PRIMITIVE or _EMOJI */
@@ -319,5 +321,15 @@ short glyph_is_wide(unsigned char glyph_id);
  * Returns NULL if glyph_id is not a bitmap emoji.
  */
 const GlyphBitmap *glyph_get_bitmap(unsigned char glyph_id);
+
+#else /* !FLYNN_GLYPHS */
+
+/* Stubs: glyph_lookup always "not found", others return safe defaults */
+#define glyph_lookup(cp)         (-1)
+#define glyph_get_info(idx)      ((void *)0L)
+#define glyph_is_wide(idx)       (0)
+#define glyph_get_bitmap(idx)    ((void *)0L)
+
+#endif /* FLYNN_GLYPHS */
 
 #endif /* GLYPHS_H */

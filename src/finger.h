@@ -16,10 +16,15 @@
 #define FINGER_VERBOSE_CHK  7
 #define FINGER_DEFAULT_BTN  8
 
+#ifdef FLYNN_FINGER
 /* Show the Finger dialog and connect */
 void do_finger(void);
 
 /* Finger via bookmark (pre-filled host/user) */
 void do_finger_bookmark(short bm_idx);
+#else
+#define do_finger()              ((void)0)
+#define do_finger_bookmark(idx)  ((void)0)
+#endif
 
 #endif /* FINGER_H */

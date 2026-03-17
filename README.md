@@ -31,10 +31,13 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 
 Pre-built binaries are available on the [Releases](https://github.com/ecliptik/flynn/releases) page, [Macintosh Garden](https://macintoshgarden.org/apps/flynn), and [Macintosh Repository](https://www.macintoshrepository.org/87841-flynn):
 
-- **Flynn-x.y.z.dsk** — 800K floppy disk image
-- **Flynn-x.y.z.hqx** — BinHex archive
+| Edition | Description | Memory |
+|---------|-------------|--------|
+| **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB |
+| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~384KB |
+| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB |
 
-No build toolchain required — just download and run.
+Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). No build toolchain required — just download and run. See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
 ## Requirements
 
@@ -120,6 +123,32 @@ Then build Flynn:
 ```bash
 ./scripts/build.sh
 ```
+
+### Build Presets
+
+Flynn supports fully customizable builds. Three presets cover common configurations:
+
+| Preset | Sessions | Scrollback | Features | Memory |
+|--------|----------|------------|----------|----------------|
+| `minimal` | 1 | none | clipboard, alt screen only | ~256KB |
+| `macplus` | 1 | 96 lines | everything except color and double-width | ~384KB |
+| `full` | 4 | 192 lines | everything | ~768KB |
+
+The default build uses the **macplus** preset. Select a preset with `--preset`:
+
+```bash
+./scripts/build.sh --preset minimal    # stripped, for 1MB Macs
+./scripts/build.sh --preset full       # everything, 4 sessions
+```
+
+Individual features can be toggled with `--feature` / `--no-feature` flags. Presets are applied first, then individual flags override:
+
+```bash
+./scripts/build.sh --preset minimal --finger --bookmarks
+./scripts/build.sh --sessions 2 --color --no-darkmode
+```
+
+See [docs/BUILD.md](docs/BUILD.md) for the complete list of build flags, feature details, memory costs, and examples.
 
 ## Testing
 

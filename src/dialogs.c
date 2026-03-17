@@ -37,10 +37,12 @@ extern Session *active_session;
 #define STATUS_WIN_W   320
 #define STATUS_WIN_H    40
 
+static short g_connect_ttype;     /* terminal type selected in connect dialog */
+
+#ifdef FLYNN_BOOKMARKS
 /* Bookmark popup menu, shared with dialog filter */
 static MenuHandle g_bm_popup;
 static short g_bm_selected = -1;  /* bookmark index selected from popup */
-static short g_connect_ttype;     /* terminal type selected in connect dialog */
 
 /* Bookmark edit dialog state shared with filter proc */
 static short g_bme_ttype;
@@ -53,6 +55,7 @@ static short g_bme_verbose;
 static short bm_selection = -1;
 static FlynnPrefs *bm_prefs_ptr;
 static Rect bm_list_rect;
+#endif /* FLYNN_BOOKMARKS */
 
 /* ---- Status window UI (moved from connection.c) ---- */
 
@@ -249,7 +252,9 @@ session_post_connect(Session *s, short ttype, short bm_index,
 	s->telnet.cols = s->terminal.active_cols;
 	s->telnet.rows = s->terminal.active_rows;
 	terminal_reset(&s->terminal);
+#ifdef FLYNN_CP437
 	s->terminal.cp437_mode = (ttype == 4) ? 1 : 0;
+#endif
 
 	/* Save last-used host/port/terminal type to prefs */
 	strncpy(prefs.host, s->conn.host,
@@ -277,6 +282,7 @@ session_post_connect(Session *s, short ttype, short bm_index,
 	set_wtitlef(s->window, "Flynn - %s", s->conn.host);
 }
 
+#ifdef FLYNN_BOOKMARKS
 /*
  * apply_bookmark_font - apply bookmark-specific font and resize window.
  * Shared between do_connect (after connect) and do_connect_bookmark
@@ -302,6 +308,7 @@ apply_bookmark_font(Session *s, Bookmark *bm)
 	if (win_h > MAX_WIN_HEIGHT) win_h = MAX_WIN_HEIGHT;
 	do_window_resize(s, win_w, win_h);
 }
+#endif /* FLYNN_BOOKMARKS */
 
 /* ---- Terminal type popup helper ---- */
 
@@ -433,6 +440,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			return true;
 		}
 
+#ifdef FLYNN_BOOKMARKS
 		/* Bookmark popup menu */
 		if (g_bm_popup) {
 			GetDialogItem(dlg, DLOG_FAVORITES,
@@ -531,6 +539,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 				return true;
 			}
 		}
+#endif /* FLYNN_BOOKMARKS */
 	}
 	return false;  /* let ModalDialog handle it */
 }
@@ -634,6 +643,7 @@ do_connect(void)
 			dlg_set_text(dlg, DLOG_USER_FIELD,
 			    prefill_user);
 
+#ifdef FLYNN_BOOKMARKS
 		/* Hide Favorites button if no favorites saved */
 		if (prefs.bookmark_count <= 0) {
 			GetDialogItem(dlg, DLOG_FAVORITES,
@@ -668,6 +678,9 @@ do_connect(void)
 			}
 			InsertMenu(g_bm_popup, -1);
 		}
+#else
+		HideDialogItem(dlg, DLOG_FAVORITES);
+#endif
 
 		/* Set terminal type button text */
 		{
@@ -695,11 +708,13 @@ do_connect(void)
 			/* Terminal type handled by filter proc popup */
 		}
 
+#ifdef FLYNN_BOOKMARKS
 		if (g_bm_popup) {
 			DeleteMenu(200);
 			DisposeMenu(g_bm_popup);
 			g_bm_popup = 0L;
 		}
+#endif
 
 		if (item_hit == DLOG_OK) {
 			/* Extract host into local buffer */
@@ -788,6 +803,7 @@ do_connect(void)
 		}
 
 		if (connected) {
+#ifdef FLYNN_BOOKMARKS
 			Bookmark *sel_bm = 0L;
 
 			if (g_bm_selected >= 0 &&
@@ -796,6 +812,7 @@ do_connect(void)
 				    g_bm_selected];
 
 			apply_bookmark_font(s, sel_bm);
+#endif
 
 			/* Save username to prefs (bookmark
 			 * path doesn't do this) */
@@ -807,7 +824,11 @@ do_connect(void)
 
 			session_post_connect(s,
 			    g_connect_ttype,
+#ifdef FLYNN_BOOKMARKS
 			    g_bm_selected,
+#else
+			    -1,
+#endif
 			    s->conn.username);
 		} else if (need_new_session && s &&
 		    s->conn.state == CONN_STATE_IDLE) {
@@ -819,6 +840,7 @@ do_connect(void)
 	update_menus();
 }
 
+#ifdef FLYNN_BOOKMARKS
 void
 do_connect_bookmark(short index)
 {
@@ -1548,6 +1570,7 @@ do_save_as_bookmark(void)
 		rebuild_file_menu();
 	}
 }
+#endif /* FLYNN_BOOKMARKS */
 
 /* ---- DNS server dialog ---- */
 

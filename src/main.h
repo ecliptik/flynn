@@ -64,12 +64,14 @@
 #define TTYPE_VT220_ID       4
 #define TTYPE_ANSI_ID        5
 
+#ifdef FLYNN_BOOKMARKS
 /* Favorites submenu (MENU 136) items */
 #define FAVORITES_MENU_ID   136
 #define FAV_MANAGE_ID        1   /* Manage Favorites... */
 #define FAV_ADD_ID           2   /* Add Favorite... */
 /* separator = 3 (added dynamically when bookmarks exist) */
 #define FAV_FIRST_BM         4   /* first bookmark entry */
+#endif
 
 /* Window menu */
 #define WINDOW_MENU_ID      133

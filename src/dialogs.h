@@ -23,9 +23,11 @@
 
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130
+#define DLOG_DNS_ID         133
+
+#ifdef FLYNN_BOOKMARKS
 #define DLOG_FAVORITES_ID   131
 #define DLOG_FAV_EDIT_ID    132
-#define DLOG_DNS_ID         133
 
 /* Bookmark manager dialog items */
 #define BM_DONE             1
@@ -56,6 +58,7 @@
 #define BME_PROTO_LABEL     16
 #define BME_PROTO_BTN       17
 #define BME_VERBOSE_CHK     18
+#endif /* FLYNN_BOOKMARKS */
 
 /* Draw a 3-pixel rounded rect outline around the default button */
 pascal void draw_default_button(WindowPtr dlg, short item);
@@ -70,6 +73,7 @@ pascal Boolean std_dlg_filter(DialogPtr dlg, EventRecord *evt,
 /* Show the Connect dialog */
 void do_connect(void);
 
+#ifdef FLYNN_BOOKMARKS
 /* Connect directly via bookmark index */
 void do_connect_bookmark(short index);
 
@@ -78,6 +82,11 @@ void do_bookmarks(void);
 
 /* Save current session as a new bookmark */
 void do_save_as_bookmark(void);
+#else
+#define do_connect_bookmark(i)    ((void)0)
+#define do_bookmarks()            ((void)0)
+#define do_save_as_bookmark()     ((void)0)
+#endif
 
 /* Show the About dialog */
 void do_about(void);

@@ -29,13 +29,15 @@
 #include "menus.h"
 #include "finger.h"
 
-/* Number of static items in Favorites submenu (Manage + Add) */
-#define FAV_STATIC_ITEMS  2
-
 /* Menu handles (private to this module) */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
 static MenuHandle window_menu;
-static MenuHandle font_submenu, ttype_submenu, favorites_submenu;
+static MenuHandle font_submenu, ttype_submenu;
+#ifdef FLYNN_BOOKMARKS
+/* Number of static items in Favorites submenu (Manage + Add) */
+#define FAV_STATIC_ITEMS  2
+static MenuHandle favorites_submenu;
+#endif
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -78,9 +80,11 @@ init_menus(void)
 	ttype_submenu = GetMenu(TTYPE_MENU_ID);
 	if (ttype_submenu)
 		InsertMenu(ttype_submenu, -1);
+#ifdef FLYNN_BOOKMARKS
 	favorites_submenu = GetMenu(FAVORITES_MENU_ID);
 	if (favorites_submenu)
 		InsertMenu(favorites_submenu, -1);
+#endif
 
 	/* Set hierarchical menu markers (0x1B = hMenuCmd) */
 	if (prefs_menu) {
@@ -91,12 +95,17 @@ init_menus(void)
 		SetItemMark(prefs_menu, PREFS_TTYPE_HIER,
 		    TTYPE_MENU_ID);
 	}
+#ifdef FLYNN_BOOKMARKS
 	if (file_menu) {
 		SetItemCmd(file_menu, FILE_MENU_FAVORITES_ID,
 		    0x1B);
 		SetItemMark(file_menu, FILE_MENU_FAVORITES_ID,
 		    FAVORITES_MENU_ID);
 	}
+#else
+	if (file_menu)
+		DisableItem(file_menu, FILE_MENU_FAVORITES_ID);
+#endif
 
 	DrawMenuBar();
 }
@@ -109,21 +118,30 @@ update_menus(void)
 	connected = (active_session &&
 	    active_session->conn.state == CONN_STATE_CONNECTED);
 
-	/* File menu: New Session and Finger always enabled,
-	 * Close when session exists */
+	/* File menu: New Session always enabled,
+	 * Finger and Close when session exists */
 	EnableItem(file_menu, FILE_MENU_CONNECT_ID);
+#ifdef FLYNN_FINGER
 	EnableItem(file_menu, FILE_MENU_FINGER_ID);
+#else
+	DisableItem(file_menu, FILE_MENU_FINGER_ID);
+#endif
 	if (active_session)
 		EnableItem(file_menu, FILE_MENU_DISCONNECT_ID);
 	else
 		DisableItem(file_menu, FILE_MENU_DISCONNECT_ID);
 
+#ifdef FLYNN_SAVEFILE
 	/* Save Session: enable when session exists */
 	if (active_session)
 		EnableItem(file_menu, FILE_MENU_SAVE_ID);
 	else
 		DisableItem(file_menu, FILE_MENU_SAVE_ID);
+#else
+	DisableItem(file_menu, FILE_MENU_SAVE_ID);
+#endif
 
+#ifdef FLYNN_BOOKMARKS
 	/* Favorites submenu: Add Favorite enable/disable.
 	 * Allow saving when host is set (not just connected) —
 	 * finger sessions disconnect after response but should
@@ -137,7 +155,9 @@ update_menus(void)
 		else
 			DisableItem(favorites_submenu, FAV_ADD_ID);
 	}
+#endif
 
+#ifdef FLYNN_CLIPBOARD
 	/* Edit menu: Copy when selection active, Paste when connected */
 	if (active_session)
 		term_ui_load_state(&active_session->ui);
@@ -153,6 +173,11 @@ update_menus(void)
 		EnableItem(edit_menu, EDIT_MENU_SELALL_ID);
 	else
 		DisableItem(edit_menu, EDIT_MENU_SELALL_ID);
+#else
+	DisableItem(edit_menu, EDIT_MENU_COPY_ID);
+	DisableItem(edit_menu, EDIT_MENU_PASTE_ID);
+	DisableItem(edit_menu, EDIT_MENU_SELALL_ID);
+#endif
 
 	/* Control menu: enable only when connected to telnet
 	 * (not applicable to finger sessions) */
@@ -160,8 +185,12 @@ update_menus(void)
 		short ci;
 		Boolean ctrl_enabled;
 
+#ifdef FLYNN_FINGER
 		ctrl_enabled = connected &&
 		    active_session->conn.protocol != PROTO_FINGER;
+#else
+		ctrl_enabled = connected;
+#endif
 		for (ci = CTRL_MENU_CTRLC; ci <= CTRL_MENU_ESC;
 		    ci++) {
 			if (ctrl_enabled)
@@ -271,16 +300,25 @@ update_prefs_menu(void)
 	}
 
 	/* Options menu checkmarks */
+#ifdef FLYNN_DARK_MODE
 	CheckItem(prefs_menu, PREFS_DARK_ID,
 	    prefs.dark_mode != 0);
+#else
+	DisableItem(prefs_menu, PREFS_DARK_ID);
+#endif
 	CheckItem(prefs_menu, PREFS_BKSP_DEL_ID,
 	    prefs.backspace_bs != 0);
 	CheckItem(prefs_menu, PREFS_LOCAL_ECHO_ID,
 	    prefs.local_echo != 0);
+#ifdef FLYNN_STATUS_BAR
 	CheckItem(prefs_menu, PREFS_STATUS_BAR_ID,
 	    prefs.show_status_bar != 0);
+#else
+	DisableItem(prefs_menu, PREFS_STATUS_BAR_ID);
+#endif
 }
 
+#ifdef FLYNN_BOOKMARKS
 void
 rebuild_file_menu(void)
 {
@@ -358,6 +396,7 @@ add_recent_bookmark(short index)
 	prefs_save(&prefs);
 	rebuild_file_menu();
 }
+#endif /* FLYNN_BOOKMARKS */
 
 static void
 handle_apple_menu(short item)
@@ -426,6 +465,7 @@ handle_file_menu(short item)
 	}
 }
 
+#ifdef FLYNN_BOOKMARKS
 static void
 handle_favorites_submenu(short item)
 {
@@ -443,16 +483,19 @@ handle_favorites_submenu(short item)
 		if (bm_idx >= 0 &&
 		    bm_idx < prefs.bookmark_count) {
 			add_recent_bookmark(bm_idx);
+#ifdef FLYNN_FINGER
 			if (prefs.bookmark_protocol[bm_idx]
 			    == PROTO_FINGER)
 				do_finger_bookmark(bm_idx);
 			else
+#endif
 				do_connect_bookmark(bm_idx);
 		}
 		break;
 	}
 	}
 }
+#endif /* FLYNN_BOOKMARKS */
 
 static void
 handle_edit_menu(short item)
@@ -546,6 +589,7 @@ handle_ttype_submenu(short item)
 
 	if (active_session)
 		active_session->telnet.preferred_ttype = ttype;
+#ifdef FLYNN_BOOKMARKS
 	/* Auto-save to originating bookmark */
 	if (active_session &&
 	    active_session->bookmark_index >= 0 &&
@@ -555,6 +599,7 @@ handle_ttype_submenu(short item)
 		    active_session->bookmark_index
 		    ].terminal_type = ttype;
 	}
+#endif
 	/* Also update global default */
 	prefs.terminal_type = ttype;
 	/* Sync backspace and local echo to match terminal type */
@@ -577,6 +622,7 @@ static void
 handle_prefs_menu(short item)
 {
 	switch (item) {
+#ifdef FLYNN_DARK_MODE
 	case PREFS_DARK_ID:
 		prefs.dark_mode = !prefs.dark_mode;
 		term_ui_set_dark_mode(prefs.dark_mode);
@@ -609,6 +655,7 @@ handle_prefs_menu(short item)
 			SetPort(save);
 		}
 		break;
+#endif
 	case PREFS_BKSP_DEL_ID:
 		prefs.backspace_bs = !prefs.backspace_bs;
 		prefs_save(&prefs);
@@ -619,6 +666,7 @@ handle_prefs_menu(short item)
 		prefs_save(&prefs);
 		update_prefs_menu();
 		break;
+#ifdef FLYNN_STATUS_BAR
 	case PREFS_STATUS_BAR_ID: {
 		short si;
 
@@ -643,6 +691,7 @@ handle_prefs_menu(short item)
 		}
 		break;
 	}
+#endif
 	}
 }
 
@@ -702,9 +751,11 @@ handle_menu(long menu_id)
 	case TTYPE_MENU_ID:
 		handle_ttype_submenu(item);
 		break;
+#ifdef FLYNN_BOOKMARKS
 	case FAVORITES_MENU_ID:
 		handle_favorites_submenu(item);
 		break;
+#endif
 	case WINDOW_MENU_ID:
 		handle_window_menu(item);
 		break;

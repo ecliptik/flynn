@@ -45,6 +45,7 @@ extern short g_font_size;
 /* Cursor blink interval in ticks (30 ticks ~ 0.5s) */
 #define CURSOR_BLINK_TICKS	30
 
+#ifdef FLYNN_CLIPBOARD
 /* Text selection state */
 typedef struct {
 	short		active;
@@ -61,6 +62,7 @@ typedef struct {
 	short		last_click_row;
 	short		last_click_col;
 } Selection;
+#endif
 
 /* Initialize terminal UI (set font, store references) */
 void term_ui_init(WindowPtr win, Terminal *term);
@@ -77,6 +79,7 @@ void term_ui_draw(WindowPtr win, Terminal *term);
 /* Update cursor blink state; call from event loop idle */
 void term_ui_cursor_blink(WindowPtr win, Terminal *term);
 
+#ifdef FLYNN_CLIPBOARD
 /* Text selection API */
 void  term_ui_sel_start(short row, short col, short scroll_offset);
 void  term_ui_sel_start_word(short row, short col, short scroll_offset,
@@ -91,14 +94,28 @@ short term_ui_sel_check_double_click(unsigned long when, short row, short col);
 void  term_ui_sel_dirty_rows(Terminal *term, short old_extent_row,
 	    short new_extent_row);
 void  term_ui_sel_dirty_all(Terminal *term);
+#else
+#define term_ui_sel_active()      0
+#define term_ui_sel_clear()       ((void)0)
+#define term_ui_sel_dirty_all(t)  ((void)0)
+#endif
 
 /* Status bar */
+#ifdef FLYNN_STATUS_BAR
 void draw_status_bar(WindowPtr win, struct Session *s);
+#else
+#define draw_status_bar(w, s) ((void)0)
+#endif
 short status_bar_height(void);  /* STATUSBAR_MARGIN + SCROLLBAR_WIDTH when on, 0 when off */
 
 /* Dark mode */
+#ifdef FLYNN_DARK_MODE
 void term_ui_set_dark_mode(short enabled);
+#else
+#define term_ui_set_dark_mode(e) ((void)0)
+#endif
 
+#ifdef FLYNN_OFFSCREEN
 /* Offscreen double buffer accessors */
 short term_ui_has_offscreen(WindowPtr win, short cols, short rows);
 void  term_ui_blit_offscreen(WindowPtr win);
@@ -106,6 +123,13 @@ void  term_ui_invalidate_offscreen(void);
 short term_ui_scroll_offscreen(WindowPtr win, short direction,
 	    short active_rows);
 void  term_ui_cleanup(void);
+#else
+#define term_ui_has_offscreen(w, c, r)       0
+#define term_ui_blit_offscreen(w)            ((void)0)
+#define term_ui_invalidate_offscreen()       ((void)0)
+#define term_ui_scroll_offscreen(w, d, r)    (-1)
+#define term_ui_cleanup()                    ((void)0)
+#endif
 
 /* Per-session UI state for save/restore */
 typedef struct {
@@ -114,7 +138,9 @@ typedef struct {
 	short		cursor_prev_row;
 	short		cursor_prev_col;
 	short		cursor_initialized;
+#ifdef FLYNN_CLIPBOARD
 	Selection	sel;
+#endif
 } UIState;
 
 /* Save/load per-session UI state (cursor blink, selection) */
