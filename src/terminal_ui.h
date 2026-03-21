@@ -40,7 +40,7 @@ extern short g_font_size;
 #define LEFT_MARGIN		0
 #define TOP_MARGIN		0
 #define STATUSBAR_MARGIN	0
-#define SCROLLBAR_WIDTH		16
+#define SCROLLBAR_WIDTH		15
 
 /* Cursor blink interval in ticks (30 ticks ~ 0.5s) */
 #define CURSOR_BLINK_TICKS	30

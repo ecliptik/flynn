@@ -103,7 +103,7 @@ session_new(void)
 		Rect sb_bounds;
 
 		SetRect(&sb_bounds,
-		    s->window->portRect.right - SCROLLBAR_WIDTH + 1,
+		    s->window->portRect.right - SCROLLBAR_WIDTH,
 		    -1,
 		    s->window->portRect.right + 1,
 		    s->window->portRect.bottom - SCROLLBAR_WIDTH + 1);
@@ -452,9 +452,9 @@ do_window_resize(Session *s, short width, short height)
 		/* Reposition scroll bar to new right edge */
 		if (s->scrollbar) {
 			MoveControl(s->scrollbar,
-			    snap_w - SCROLLBAR_WIDTH + 1, -1);
+			    snap_w - SCROLLBAR_WIDTH, -1);
 			SizeControl(s->scrollbar,
-			    SCROLLBAR_WIDTH,
+			    SCROLLBAR_WIDTH + 1,
 			    snap_h - SCROLLBAR_WIDTH + 2);
 		}
 #endif

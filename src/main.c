@@ -1032,8 +1032,8 @@ handle_update(EventRecord *event)
 		GetClip(save_clip);
 		SetRect(&clip_r,
 		    win->portRect.right - SCROLLBAR_WIDTH,
-		    win->portRect.bottom - SCROLLBAR_WIDTH + 2,
-		    win->portRect.right,
+		    win->portRect.bottom - SCROLLBAR_WIDTH,
+		    win->portRect.right + 1,
 		    win->portRect.bottom + 1);
 		ClipRect(&clip_r);
 		DrawGrowIcon(win);
