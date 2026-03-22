@@ -70,12 +70,13 @@ session_new(void)
 	    2 + offset + win_w, 40 + offset + win_h);
 
 	/* Use NewCWindow on System 7 for color, NewWindow on System 6 */
+	/* zoomDocProc (8) = document window with zoom box + grow box */
 	if (g_has_color_qd) {
 		s->window = NewCWindow(0L, &bounds, "\pFlynn", true,
-		    documentProc, (WindowPtr)-1L, true, (long)s);
+		    8, (WindowPtr)-1L, true, (long)s);
 	} else {
 		s->window = NewWindow(0L, &bounds, "\pFlynn", true,
-		    documentProc, (WindowPtr)-1L, true, (long)s);
+		    8, (WindowPtr)-1L, true, (long)s);
 	}
 	if (s->window == 0L) {
 		if (s->terminal.screen_color)

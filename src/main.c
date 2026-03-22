@@ -873,6 +873,45 @@ handle_mouse_down(EventRecord *event)
 			}
 		}
 		break;
+	case inZoomIn:
+	case inZoomOut:
+		sess = session_from_window(win);
+		if (sess && TrackBox(win, event->where, part)) {
+			GrafPtr save;
+			short std_w, std_h;
+
+			session_load_font(sess);
+
+			/* Set standard state to default 80x24 grid */
+			std_w = LEFT_MARGIN * 2 +
+			    TERM_DEFAULT_COLS * g_cell_width +
+			    SCROLLBAR_WIDTH;
+			std_h = status_bar_height() +
+			    TERM_DEFAULT_ROWS * g_cell_height;
+			{
+				WStateData **wstate;
+				wstate = (WStateData **)
+				    ((WindowPeek)win)->dataHandle;
+				if (wstate) {
+					(**wstate).stdState.left = 2;
+					(**wstate).stdState.top = 40;
+					(**wstate).stdState.right =
+					    2 + std_w;
+					(**wstate).stdState.bottom =
+					    40 + std_h;
+				}
+			}
+
+			GetPort(&save);
+			SetPort(win);
+			EraseRect(&win->portRect);
+			ZoomWindow(win, part, false);
+			do_window_resize(sess,
+			    win->portRect.right - win->portRect.left,
+			    win->portRect.bottom - win->portRect.top);
+			SetPort(save);
+		}
+		break;
 	case inGrow: {
 		long new_size;
 		Rect limit_rect;
