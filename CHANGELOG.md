@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.9.7] - 2026-03-21
+
+### Added
+- Zoom box in window title bar per Apple HIG (zoomDocProc)
+  - Click to toggle between user-sized window and standard 80x24 grid
+  - Sets standard state to default terminal dimensions
+  - Sends NAWS update to server on zoom while connected
+
+### Changed
+- Scrollbar width from 16 to 15 pixels, matching Geomys UI dimensions
+- Build system: renamed macplus preset to lite, full is now default
+- README: added direct download links, auto-updated in release.sh
+
+### Fixed
+- BUILD.md examples updated to reflect full as default preset
+- BUILD.md: added apt-get install line for Debian/Ubuntu prerequisites
+
 ## [1.9.6] - 2026-03-16
 
 ### Added
