@@ -33,9 +33,9 @@ Pre-built binaries are available on the [Releases](https://github.com/ecliptik/f
 
 | Edition | Description | Memory | Download |
 |---------|-------------|--------|----------|
-| **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-1.9.6.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-1.9.6.hqx) |
-| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~384KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-Lite-1.9.6.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-Lite-1.9.6.hqx) |
-| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-Minimal-1.9.6.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.6/Flynn-Minimal-1.9.6.hqx) |
+| **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-1.9.7.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-1.9.7.hqx) |
+| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~384KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-Lite-1.9.7.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-Lite-1.9.7.hqx) |
+| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-Minimal-1.9.7.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-Minimal-1.9.7.hqx) |
 
 Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). No build toolchain required — just download and run. See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
