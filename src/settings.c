@@ -95,7 +95,12 @@ prefs_load(FlynnPrefs *prefs)
 	prefs->username[sizeof(prefs->username) - 1] = '\0';
 	{
 		short i;
-		for (i = 0; i < MAX_BOOKMARKS; i++) {
+		short bc = prefs->bookmark_count;
+		/* Clamp to actual array size — critical for old-format
+		 * files where bookmarks[8+] overlaps other fields */
+		if (bc < 0) bc = 0;
+		if (bc > MAX_BOOKMARKS) bc = MAX_BOOKMARKS;
+		for (i = 0; i < bc; i++) {
 			prefs->bookmarks[i].name[sizeof(prefs->bookmarks[i].name) - 1] = '\0';
 			prefs->bookmarks[i].host[sizeof(prefs->bookmarks[i].host) - 1] = '\0';
 			prefs->bookmarks[i].username[sizeof(prefs->bookmarks[i].username) - 1] = '\0';
@@ -165,10 +170,11 @@ prefs_load(FlynnPrefs *prefs)
 	}
 
 	if (prefs->version == 6) {
-		/* v6→v7 migration: add per-bookmark settings */
+		/* v6→v7 migration: add per-bookmark settings.
+		 * Use literal 8 — old layout had 8-slot arrays. */
 		{
 			short i;
-			for (i = 0; i < MAX_BOOKMARKS; i++) {
+			for (i = 0; i < 8; i++) {
 				prefs->bookmarks[i].username[0] = '\0';
 				prefs->bookmarks[i].terminal_type = -1;
 				prefs->bookmarks[i].font_id = 0;
@@ -217,10 +223,10 @@ prefs_load(FlynnPrefs *prefs)
 
 	if (prefs->version == 10) {
 		/* v10→v11 migration: add bookmark_protocol array.
-		 * Appended at end of struct — no layout shift. */
+		 * Use literal 8 — old layout had 8-slot arrays. */
 		{
 			short i;
-			for (i = 0; i < MAX_BOOKMARKS; i++)
+			for (i = 0; i < 8; i++)
 				prefs->bookmark_protocol[i] = 0;
 		}
 		/* fall through to v11→v12 migration */
@@ -236,15 +242,105 @@ prefs_load(FlynnPrefs *prefs)
 	}
 
 	if (prefs->version == 12) {
-		/* v12→v13 migration: add bookmark_verbose */
+		/* v12→v13 migration: add bookmark_verbose.
+		 * bookmark_verbose was appended at end — no layout shift
+		 * for 8-bookmark struct. Fall through to v13→v14. */
 		{
 			short i;
-			for (i = 0; i < MAX_BOOKMARKS; i++)
+			for (i = 0; i < 8; i++)
 				prefs->bookmark_verbose[i] = 0;
 		}
-		prefs->version = PREFS_VERSION;
-		prefs_save(prefs);
-		return;
+		prefs->version = 13;
+	}
+
+	if (prefs->version == 13) {
+		/* v13→v14 migration: MAX_BOOKMARKS 8→20.
+		 * bookmarks[], bookmark_protocol[], bookmark_verbose[]
+		 * all grew, shifting every field after bookmarks[8] in
+		 * the binary layout.  Read old data via a struct that
+		 * matches the v13 on-disk format, then copy into the
+		 * new (larger) layout field by field. */
+		struct V13Prefs {
+			short		version;
+			char		host[256];
+			short		port;
+			short		bookmark_count;
+			Bookmark	bookmarks[8];
+			short		font_id;
+			short		font_size;
+			short		terminal_type;
+			unsigned char	dark_mode;
+			unsigned char	backspace_bs;
+			char		dns_server[16];
+			char		username[64];
+			short		recent[MAX_RECENT];
+			short		recent_count;
+			unsigned char	local_echo;
+			unsigned char	show_status_bar;
+			short		bookmark_protocol[8];
+			char		finger_host[128];
+			char		finger_user[64];
+			unsigned char	bookmark_verbose[8];
+		};
+		{
+			struct V13Prefs old;
+			short i, bc;
+
+			/* Raw bytes in prefs match v13 layout */
+			memcpy(&old, prefs,
+			    sizeof(struct V13Prefs));
+
+			/* Reset to defaults with new layout */
+			prefs_defaults(prefs);
+
+			/* Copy scalar fields */
+			memcpy(prefs->host, old.host,
+			    sizeof(old.host));
+			prefs->port = old.port;
+			bc = old.bookmark_count;
+			if (bc < 0) bc = 0;
+			if (bc > 8) bc = 8;
+			prefs->bookmark_count = bc;
+
+			/* Copy old bookmarks into first 8 slots */
+			for (i = 0; i < bc; i++)
+				prefs->bookmarks[i] =
+				    old.bookmarks[i];
+
+			prefs->font_id = old.font_id;
+			prefs->font_size = old.font_size;
+			prefs->terminal_type = old.terminal_type;
+			prefs->dark_mode = old.dark_mode;
+			prefs->backspace_bs = old.backspace_bs;
+			memcpy(prefs->dns_server, old.dns_server,
+			    sizeof(old.dns_server));
+			memcpy(prefs->username, old.username,
+			    sizeof(old.username));
+			memcpy(prefs->recent, old.recent,
+			    sizeof(old.recent));
+			prefs->recent_count = old.recent_count;
+			prefs->local_echo = old.local_echo;
+			prefs->show_status_bar = old.show_status_bar;
+
+			/* Copy per-bookmark arrays (first 8) */
+			for (i = 0; i < 8; i++) {
+				prefs->bookmark_protocol[i] =
+				    old.bookmark_protocol[i];
+				prefs->bookmark_verbose[i] =
+				    old.bookmark_verbose[i];
+			}
+
+			memcpy(prefs->finger_host,
+			    old.finger_host,
+			    sizeof(old.finger_host));
+			memcpy(prefs->finger_user,
+			    old.finger_user,
+			    sizeof(old.finger_user));
+
+			prefs->version = PREFS_VERSION;
+			prefs_save(prefs);
+			return;
+		}
 	}
 
 	if (prefs->version != PREFS_VERSION)

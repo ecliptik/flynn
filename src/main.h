@@ -27,9 +27,7 @@
 #define FILE_MENU_SAVE_ID       5
 #define FILE_MENU_DNS_ID        6
 /* separator = 7 */
-#define FILE_MENU_FAVORITES_ID  8   /* Favorites hierarchical submenu */
-/* separator = 9 */
-#define FILE_MENU_QUIT_ID       10
+#define FILE_MENU_QUIT_ID       8
 
 /* Edit menu items */
 #define EDIT_MENU_COPY_ID   4
@@ -64,9 +62,11 @@
 #define TTYPE_VT220_ID       4
 #define TTYPE_ANSI_ID        5
 
-#ifdef FLYNN_BOOKMARKS
-/* Favorites submenu (MENU 136) items */
+/* Favorites menu resource ID (always defined for DeleteMenu when disabled) */
 #define FAVORITES_MENU_ID   136
+
+#ifdef FLYNN_FAVORITES
+/* Favorites menu (MENU 136) items */
 #define FAV_MANAGE_ID        1   /* Manage Favorites... */
 #define FAV_ADD_ID           2   /* Add Favorite... */
 /* separator = 3 (added dynamically when bookmarks exist) */

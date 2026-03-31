@@ -20,17 +20,6 @@ void update_window_menu(void);
 /* Update Preferences menu checkmarks */
 void update_prefs_menu(void);
 
-#ifdef FLYNN_BOOKMARKS
-/* Rebuild File menu dynamic items (recent bookmarks + Quit) */
-void rebuild_file_menu(void);
-
-/* Add bookmark index to MRU recent list */
-void add_recent_bookmark(short index);
-#else
-#define rebuild_file_menu()       ((void)0)
-#define add_recent_bookmark(i)    ((void)0)
-#endif
-
 /* Handle a menu selection. Returns true if handled. */
 Boolean handle_menu(long menu_id);
 

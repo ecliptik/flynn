@@ -27,17 +27,13 @@
 #include "savefile.h"
 #include "macutil.h"
 #include "menus.h"
+#include "favorites.h"
 #include "finger.h"
 
 /* Menu handles (private to this module) */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
 static MenuHandle window_menu;
 static MenuHandle font_submenu, ttype_submenu;
-#ifdef FLYNN_BOOKMARKS
-/* Number of static items in Favorites submenu (Manage + Add) */
-#define FAV_STATIC_ITEMS  2
-static MenuHandle favorites_submenu;
-#endif
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -80,12 +76,6 @@ init_menus(void)
 	ttype_submenu = GetMenu(TTYPE_MENU_ID);
 	if (ttype_submenu)
 		InsertMenu(ttype_submenu, -1);
-#ifdef FLYNN_BOOKMARKS
-	favorites_submenu = GetMenu(FAVORITES_MENU_ID);
-	if (favorites_submenu)
-		InsertMenu(favorites_submenu, -1);
-#endif
-
 	/* Set hierarchical menu markers (0x1B = hMenuCmd) */
 	if (prefs_menu) {
 		SetItemCmd(prefs_menu, PREFS_FONT_HIER, 0x1B);
@@ -95,16 +85,9 @@ init_menus(void)
 		SetItemMark(prefs_menu, PREFS_TTYPE_HIER,
 		    TTYPE_MENU_ID);
 	}
-#ifdef FLYNN_BOOKMARKS
-	if (file_menu) {
-		SetItemCmd(file_menu, FILE_MENU_FAVORITES_ID,
-		    0x1B);
-		SetItemMark(file_menu, FILE_MENU_FAVORITES_ID,
-		    FAVORITES_MENU_ID);
-	}
-#else
-	if (file_menu)
-		DisableItem(file_menu, FILE_MENU_FAVORITES_ID);
+#ifndef FLYNN_FAVORITES
+	/* Hide Favorites menu when feature is disabled */
+	DeleteMenu(FAVORITES_MENU_ID);
 #endif
 
 	DrawMenuBar();
@@ -141,19 +124,23 @@ update_menus(void)
 	DisableItem(file_menu, FILE_MENU_SAVE_ID);
 #endif
 
-#ifdef FLYNN_BOOKMARKS
-	/* Favorites submenu: Add Favorite enable/disable.
-	 * Allow saving when host is set (not just connected) —
+#ifdef FLYNN_FAVORITES
+	/* Favorites menu: Add Favorite enable/disable.
+	 * Allow saving when host is set (not just connected) --
 	 * finger sessions disconnect after response but should
 	 * still be saveable as favorites. */
-	if (favorites_submenu) {
-		if (active_session &&
-		    active_session->conn.host[0] &&
-		    active_session->bookmark_index < 0 &&
-		    prefs.bookmark_count < MAX_BOOKMARKS)
-			EnableItem(favorites_submenu, FAV_ADD_ID);
-		else
-			DisableItem(favorites_submenu, FAV_ADD_ID);
+	{
+		MenuHandle fav_menu;
+		fav_menu = GetMenuHandle(FAVORITES_MENU_ID);
+		if (fav_menu) {
+			if (active_session &&
+			    active_session->conn.host[0] &&
+			    active_session->bookmark_index < 0 &&
+			    prefs.bookmark_count < MAX_BOOKMARKS)
+				EnableItem(fav_menu, FAV_ADD_ID);
+			else
+				DisableItem(fav_menu, FAV_ADD_ID);
+		}
 	}
 #endif
 
@@ -318,85 +305,6 @@ update_prefs_menu(void)
 #endif
 }
 
-#ifdef FLYNN_BOOKMARKS
-void
-rebuild_file_menu(void)
-{
-	short count, i;
-	Str255 item_str;
-	short nlen, ni;
-	const char *name;
-
-	if (!favorites_submenu)
-		return;
-
-	/* Remove all dynamic items (after Manage + Add) */
-	count = CountMItems(favorites_submenu);
-	while (count > FAV_STATIC_ITEMS) {
-		DeleteMenuItem(favorites_submenu, count);
-		count--;
-	}
-
-	/* Add separator + all bookmarks */
-	if (prefs.bookmark_count > 0) {
-		AppendMenu(favorites_submenu, "\p(-");
-
-		for (i = 0; i < prefs.bookmark_count; i++) {
-			name = prefs.bookmarks[i].name;
-			nlen = strlen(name);
-			if (nlen > 254) nlen = 254;
-			item_str[0] = nlen;
-			for (ni = 0; ni < nlen; ni++)
-				item_str[ni + 1] = name[ni];
-			AppendMenu(favorites_submenu, "\p ");
-			SetMenuItemText(favorites_submenu,
-			    CountMItems(favorites_submenu),
-			    item_str);
-		}
-	}
-}
-
-void
-add_recent_bookmark(short index)
-{
-	short i, pos;
-
-	if (index < 0 || index >= prefs.bookmark_count)
-		return;
-
-	/* Check if already in recent list */
-	pos = -1;
-	for (i = 0; i < prefs.recent_count; i++) {
-		if (prefs.recent[i] == index) {
-			pos = i;
-			break;
-		}
-	}
-
-	if (pos == 0)
-		return;	/* Already at front */
-
-	/* Remove from current position if found */
-	if (pos > 0) {
-		for (i = pos; i > 0; i--)
-			prefs.recent[i] = prefs.recent[i - 1];
-	} else {
-		/* Not found — shift everything right */
-		short limit = prefs.recent_count;
-
-		if (limit >= MAX_RECENT)
-			limit = MAX_RECENT - 1;
-		for (i = limit; i > 0; i--)
-			prefs.recent[i] = prefs.recent[i - 1];
-		if (prefs.recent_count < MAX_RECENT)
-			prefs.recent_count++;
-	}
-
-	prefs.recent[0] = index;
-	prefs_save(&prefs);
-	rebuild_file_menu();
-}
-#endif /* FLYNN_BOOKMARKS */
 
 static void
 handle_apple_menu(short item)
@@ -465,37 +373,6 @@ handle_file_menu(short item)
 	}
 }
 
-#ifdef FLYNN_BOOKMARKS
-static void
-handle_favorites_submenu(short item)
-{
-	switch (item) {
-	case FAV_MANAGE_ID:
-		do_bookmarks();
-		break;
-	case FAV_ADD_ID:
-		do_save_as_bookmark();
-		break;
-	default: {
-		/* Bookmark entry: item 4+ maps to bookmark index */
-		short bm_idx = item - FAV_FIRST_BM;
-
-		if (bm_idx >= 0 &&
-		    bm_idx < prefs.bookmark_count) {
-			add_recent_bookmark(bm_idx);
-#ifdef FLYNN_FINGER
-			if (prefs.bookmark_protocol[bm_idx]
-			    == PROTO_FINGER)
-				do_finger_bookmark(bm_idx);
-			else
-#endif
-				do_connect_bookmark(bm_idx);
-		}
-		break;
-	}
-	}
-}
-#endif /* FLYNN_BOOKMARKS */
 
 static void
 handle_edit_menu(short item)
@@ -589,7 +466,7 @@ handle_ttype_submenu(short item)
 
 	if (active_session)
 		active_session->telnet.preferred_ttype = ttype;
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 	/* Auto-save to originating bookmark */
 	if (active_session &&
 	    active_session->bookmark_index >= 0 &&
@@ -751,9 +628,9 @@ handle_menu(long menu_id)
 	case TTYPE_MENU_ID:
 		handle_ttype_submenu(item);
 		break;
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 	case FAVORITES_MENU_ID:
-		handle_favorites_submenu(item);
+		favorites_menu_click(item);
 		break;
 #endif
 	case WINDOW_MENU_ID:

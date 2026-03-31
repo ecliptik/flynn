@@ -8,7 +8,7 @@ option(FLYNN_GLYPHS        "Enable Unicode glyph rendering"    ON)
 option(FLYNN_CP437         "Enable CP437 character set"         ON)
 option(FLYNN_CLIPBOARD     "Enable clipboard copy/paste"        ON)
 option(FLYNN_SAVEFILE      "Enable save session to file"        ON)
-option(FLYNN_BOOKMARKS     "Enable favorites/bookmarks"         ON)
+option(FLYNN_FAVORITES     "Enable favorites/bookmarks"         ON)
 option(FLYNN_DARK_MODE     "Enable dark mode toggle"            ON)
 option(FLYNN_DBLWIDTH      "Enable double-width/height lines"   OFF)
 option(FLYNN_ALT_SCREEN    "Enable alternate screen buffer"     ON)
@@ -57,6 +57,9 @@ endif()
 if(FLYNN_SAVEFILE)
     list(APPEND FLYNN_SOURCES src/savefile.c)
 endif()
+if(FLYNN_FAVORITES)
+    list(APPEND FLYNN_SOURCES src/favorites.c)
+endif()
 if(FLYNN_COLOR)
     list(APPEND FLYNN_SOURCES src/color.c)
 endif()
@@ -79,7 +82,7 @@ target_compile_definitions(Flynn PRIVATE
     $<$<BOOL:${FLYNN_CP437}>:FLYNN_CP437>
     $<$<BOOL:${FLYNN_CLIPBOARD}>:FLYNN_CLIPBOARD>
     $<$<BOOL:${FLYNN_SAVEFILE}>:FLYNN_SAVEFILE>
-    $<$<BOOL:${FLYNN_BOOKMARKS}>:FLYNN_BOOKMARKS>
+    $<$<BOOL:${FLYNN_FAVORITES}>:FLYNN_FAVORITES>
     $<$<BOOL:${FLYNN_DARK_MODE}>:FLYNN_DARK_MODE>
     $<$<BOOL:${FLYNN_DBLWIDTH}>:FLYNN_DBLWIDTH>
     $<$<BOOL:${FLYNN_ALT_SCREEN}>:FLYNN_ALT_SCREEN>

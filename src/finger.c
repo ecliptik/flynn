@@ -34,6 +34,7 @@
 #include "terminal_ui.h"
 #include "settings.h"
 #include "dialogs.h"
+#include "favorites.h"
 #include "macutil.h"
 #include "menus.h"
 

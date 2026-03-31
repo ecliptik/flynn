@@ -25,21 +25,23 @@
 #define DLOG_ABOUT_ID       130
 #define DLOG_DNS_ID         133
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 #define DLOG_FAVORITES_ID   131
 #define DLOG_FAV_EDIT_ID    132
 
-/* Bookmark manager dialog items */
+/* Favorites manager dialog items (must match DITL 131) */
 #define BM_DONE             1
 #define BM_ADD              2
 #define BM_EDIT             3
-#define BM_DELETE           4
-#define BM_CONNECT          5
-#define BM_LABEL            6
-#define BM_LIST             7	/* UserItem for list area */
-#define BM_DEFAULT_BTN      8	/* UserItem for default button outline */
+#define BM_LABEL            4
+#define BM_LIST             5	/* UserItem for List Manager */
+#define BM_DEFAULT_BTN      6	/* UserItem for default button outline */
+#define BM_REMOVE           7
+#define BM_MOVE_UP          8
+#define BM_MOVE_DOWN        9
+#define BM_CONNECT          10
 
-/* Bookmark add/edit dialog items */
+/* Favorite add/edit dialog items (DITL 132 — unchanged) */
 #define BME_OK              1
 #define BME_CANCEL          2
 #define BME_NAME_LABEL      3
@@ -58,7 +60,10 @@
 #define BME_PROTO_LABEL     16
 #define BME_PROTO_BTN       17
 #define BME_VERBOSE_CHK     18
-#endif /* FLYNN_BOOKMARKS */
+#endif /* FLYNN_FAVORITES */
+
+/* Set a button's title text (used by favorites edit dialog too) */
+void bme_set_btn_title(DialogPtr dlg, short item, const char *text);
 
 /* Draw a 3-pixel rounded rect outline around the default button */
 pascal void draw_default_button(WindowPtr dlg, short item);
@@ -73,19 +78,11 @@ pascal Boolean std_dlg_filter(DialogPtr dlg, EventRecord *evt,
 /* Show the Connect dialog */
 void do_connect(void);
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 /* Connect directly via bookmark index */
 void do_connect_bookmark(short index);
-
-/* Show the Bookmarks manager dialog */
-void do_bookmarks(void);
-
-/* Save current session as a new bookmark */
-void do_save_as_bookmark(void);
 #else
 #define do_connect_bookmark(i)    ((void)0)
-#define do_bookmarks()            ((void)0)
-#define do_save_as_bookmark()     ((void)0)
 #endif
 
 /* Show the About dialog */

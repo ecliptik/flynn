@@ -23,6 +23,7 @@
 #include "settings.h"
 #include "glyphs.h"
 #include "dialogs.h"
+#include "favorites.h"
 #include "color.h"
 #include "macutil.h"
 #include "sysutil.h"
@@ -39,23 +40,11 @@ extern Session *active_session;
 
 static short g_connect_ttype;     /* terminal type selected in connect dialog */
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 /* Bookmark popup menu, shared with dialog filter */
 static MenuHandle g_bm_popup;
 static short g_bm_selected = -1;  /* bookmark index selected from popup */
-
-/* Bookmark edit dialog state shared with filter proc */
-static short g_bme_ttype;
-static short g_bme_font_id;
-static short g_bme_font_size;
-static short g_bme_protocol;
-static short g_bme_verbose;
-
-/* Bookmark manager state */
-static short bm_selection = -1;
-static FlynnPrefs *bm_prefs_ptr;
-static Rect bm_list_rect;
-#endif /* FLYNN_BOOKMARKS */
+#endif /* FLYNN_FAVORITES */
 
 /* ---- Status window UI (moved from connection.c) ---- */
 
@@ -182,7 +171,7 @@ std_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 
 /* ---- Button title helper ---- */
 
-static void
+void
 bme_set_btn_title(DialogPtr dlg, short item, const char *text)
 {
 	short item_type;
@@ -282,7 +271,7 @@ session_post_connect(Session *s, short ttype, short bm_index,
 	set_wtitlef(s->window, "Flynn - %s", s->conn.host);
 }
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 /*
  * apply_bookmark_font - apply bookmark-specific font and resize window.
  * Shared between do_connect (after connect) and do_connect_bookmark
@@ -308,7 +297,7 @@ apply_bookmark_font(Session *s, Bookmark *bm)
 	if (win_h > MAX_WIN_HEIGHT) win_h = MAX_WIN_HEIGHT;
 	do_window_resize(s, win_w, win_h);
 }
-#endif /* FLYNN_BOOKMARKS */
+#endif /* FLYNN_FAVORITES */
 
 /* ---- Terminal type popup helper ---- */
 
@@ -440,7 +429,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			return true;
 		}
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 		/* Bookmark popup menu */
 		if (g_bm_popup) {
 			GetDialogItem(dlg, DLOG_FAVORITES,
@@ -539,7 +528,7 @@ connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 				return true;
 			}
 		}
-#endif /* FLYNN_BOOKMARKS */
+#endif /* FLYNN_FAVORITES */
 	}
 	return false;  /* let ModalDialog handle it */
 }
@@ -643,7 +632,7 @@ do_connect(void)
 			dlg_set_text(dlg, DLOG_USER_FIELD,
 			    prefill_user);
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 		/* Hide Favorites button if no favorites saved */
 		if (prefs.bookmark_count <= 0) {
 			GetDialogItem(dlg, DLOG_FAVORITES,
@@ -708,7 +697,7 @@ do_connect(void)
 			/* Terminal type handled by filter proc popup */
 		}
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 		if (g_bm_popup) {
 			DeleteMenu(200);
 			DisposeMenu(g_bm_popup);
@@ -803,7 +792,7 @@ do_connect(void)
 		}
 
 		if (connected) {
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 			Bookmark *sel_bm = 0L;
 
 			if (g_bm_selected >= 0 &&
@@ -824,7 +813,7 @@ do_connect(void)
 
 			session_post_connect(s,
 			    g_connect_ttype,
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 			    g_bm_selected,
 #else
 			    -1,
@@ -840,7 +829,7 @@ do_connect(void)
 	update_menus();
 }
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 void
 do_connect_bookmark(short index)
 {
@@ -916,661 +905,7 @@ do_connect_bookmark(short index)
 	}
 	update_menus();
 }
-
-/* ---- Bookmark manager ---- */
-
-static pascal void
-bm_list_draw(WindowPtr win, short item)
-{
-	short i, y;
-	Rect r;
-	short len, tmpType;
-	Handle tmpH;
-	FlynnPrefs *p = bm_prefs_ptr;
-	RgnHandle save_clip;
-
-	GetDialogItem((DialogPtr)win, item, &tmpType, &tmpH, &r);
-	bm_list_rect = r;
-
-	EraseRect(&r);
-	FrameRect(&r);
-	InsetRect(&r, 1, 1);
-
-	/* Clip text drawing to list rect so long names don't overflow */
-	save_clip = NewRgn();
-	GetClip(save_clip);
-	ClipRect(&r);
-
-	for (i = 0; i < p->bookmark_count; i++) {
-		y = r.top + 2 + i * 16;
-		if (y + 14 > r.bottom)
-			break;
-
-		MoveTo(r.left + 4, y + 12);
-		len = strlen(p->bookmarks[i].name);
-		DrawText(p->bookmarks[i].name, 0, len);
-
-		if (i == bm_selection) {
-			Rect sel_r;
-			SetRect(&sel_r, r.left, y - 1,
-			    r.right, y + 15);
-			InvertRect(&sel_r);
-		}
-	}
-
-	SetClip(save_clip);
-	DisposeRgn(save_clip);
-}
-
-static pascal Boolean
-bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
-{
-	if (evt->what == keyDown) {
-		char key = evt->message & charCodeMask;
-		/* Return/Enter = OK */
-		if (key == '\r' || key == '\n' || key == 0x03) {
-			*item = 1;  /* OK button */
-			return true;
-		}
-		/* Cmd+. = Cancel */
-		if ((evt->modifiers & cmdKey) && key == '.') {
-			*item = 2;  /* Cancel button */
-			return true;
-		}
-		/* Tab cycles: Name(4)->Host(6)->Port(8)->User(10) */
-		if (key == '\t') {
-			DialogPeek dp = (DialogPeek)dlg;
-			short cur = dp->editField + 1;
-			short next;
-
-			if (cur == BME_NAME_FIELD)
-				next = BME_HOST_FIELD;
-			else if (cur == BME_HOST_FIELD)
-				next = BME_PORT_FIELD;
-			else if (cur == BME_PORT_FIELD)
-				next = BME_USER_FIELD;
-			else
-				next = BME_NAME_FIELD;
-			SelectDialogItemText(dlg, next, 0, 32767);
-			*item = next;
-			return true;
-		}
-	}
-
-	if (evt->what == mouseDown) {
-		Point pt;
-		short item_type;
-		Handle item_h;
-		Rect item_rect;
-
-		pt = evt->where;
-		SetPort(dlg);
-		GlobalToLocal(&pt);
-
-		/* Terminal type popup menu */
-		GetDialogItem(dlg, BME_TTYPE_BTN,
-		    &item_type, &item_h, &item_rect);
-		if (PtInRect(pt, &item_rect)) {
-			g_bme_ttype = show_ttype_popup(dlg,
-			    BME_TTYPE_BTN, g_bme_ttype,
-			    true);
-			*item = BME_TTYPE_BTN;
-			return true;
-		}
-
-		/* Font popup menu */
-		GetDialogItem(dlg, BME_FONT_BTN,
-		    &item_type, &item_h, &item_rect);
-		if (PtInRect(pt, &item_rect)) {
-			MenuHandle popup;
-			Point popup_pt;
-			long result;
-			short choice, fi;
-			short cur_item = 1;  /* Default */
-
-			popup = NewMenu(203, "\p");
-			AppendMenu(popup, "\pDefault");
-			for (fi = 0; fi < NUM_FONT_PRESETS; fi++) {
-				Str255 ps;
-				short len;
-
-				len = strlen(font_presets[fi].name);
-				ps[0] = len;
-				memcpy(ps + 1,
-				    font_presets[fi].name, len);
-				AppendMenu(popup, "\p ");
-				SetMenuItemText(popup,
-				    fi + 2, ps);
-			}
-			InsertMenu(popup, -1);
-
-			/* Find current selection for checkmark */
-			if (g_bme_font_id == 0 &&
-			    g_bme_font_size == 0) {
-				cur_item = 1;  /* Default */
-			} else {
-				for (fi = 0;
-				    fi < NUM_FONT_PRESETS;
-				    fi++) {
-					if (font_presets[fi].font_id
-					    == g_bme_font_id &&
-					    font_presets[fi].font_size
-					    == g_bme_font_size) {
-						cur_item = fi + 2;
-						break;
-					}
-				}
-			}
-			CheckItem(popup, cur_item, true);
-
-			popup_pt.h = item_rect.left;
-			popup_pt.v = item_rect.top;
-			LocalToGlobal(&popup_pt);
-
-			result = PopUpMenuSelect(popup,
-			    popup_pt.v, popup_pt.h, cur_item);
-			choice = LoWord(result);
-
-			if (choice > 0) {
-				char btn_text[32];
-
-				if (choice == 1) {
-					g_bme_font_id = 0;
-					g_bme_font_size = 0;
-				} else {
-					g_bme_font_id =
-					    font_presets
-					    [choice - 2].font_id;
-					g_bme_font_size =
-					    font_presets
-					    [choice - 2].font_size;
-				}
-				font_to_str(g_bme_font_id,
-				    g_bme_font_size, btn_text,
-				    sizeof(btn_text));
-				bme_set_btn_title(dlg,
-				    BME_FONT_BTN, btn_text);
-			}
-
-			DeleteMenu(203);
-			DisposeMenu(popup);
-
-			*item = BME_FONT_BTN;
-			return true;
-		}
-
-		/* Protocol popup menu */
-		GetDialogItem(dlg, BME_PROTO_BTN,
-		    &item_type, &item_h, &item_rect);
-		if (PtInRect(pt, &item_rect)) {
-			MenuHandle popup;
-			Point popup_pt;
-			long result;
-			short choice;
-			short cur_item;
-
-			popup = NewMenu(204, "\p");
-			AppendMenu(popup, "\pTelnet");
-			AppendMenu(popup, "\pFinger");
-			InsertMenu(popup, -1);
-
-			cur_item = (g_bme_protocol ==
-			    PROTO_FINGER) ? 2 : 1;
-			CheckItem(popup, cur_item, true);
-
-			popup_pt.h = item_rect.left;
-			popup_pt.v = item_rect.top;
-			LocalToGlobal(&popup_pt);
-
-			result = PopUpMenuSelect(popup,
-			    popup_pt.v, popup_pt.h,
-			    cur_item);
-			choice = LoWord(result);
-
-			if (choice > 0) {
-				short it;
-				Handle ih;
-				Rect ir;
-
-				g_bme_protocol =
-				    (choice == 2) ?
-				    PROTO_FINGER :
-				    PROTO_TELNET;
-				bme_set_btn_title(dlg,
-				    BME_PROTO_BTN,
-				    (g_bme_protocol ==
-				    PROTO_FINGER) ?
-				    "Finger" : "Telnet");
-				/* Show/hide verbose checkbox */
-				GetDialogItem(dlg,
-				    BME_VERBOSE_CHK,
-				    &it, &ih, &ir);
-				HiliteControl(
-				    (ControlHandle)ih,
-				    (g_bme_protocol ==
-				    PROTO_FINGER) ?
-				    0 : 255);
-			}
-
-			DeleteMenu(204);
-			DisposeMenu(popup);
-
-			*item = BME_PROTO_BTN;
-			return true;
-		}
-	}
-	return false;
-}
-
-static Boolean
-bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
-{
-	DialogPtr dlg;
-	short item_hit;
-	long num;
-	char btn_text[32];
-
-	dlg = GetNewDialog(DLOG_FAV_EDIT_ID, 0L, (WindowPtr)-1L);
-	if (!dlg)
-		return false;
-
-	/* Initialize shared state for filter proc from bookmark */
-	g_bme_ttype = bm->terminal_type;
-	g_bme_font_id = bm->font_id;
-	g_bme_font_size = bm->font_size;
-	g_bme_protocol = (bm_idx >= 0 &&
-	    bm_idx < MAX_BOOKMARKS) ?
-	    prefs.bookmark_protocol[bm_idx] : 0;
-
-	/* Pre-fill fields from bookmark struct */
-	if (bm->name[0])
-		dlg_set_text(dlg, BME_NAME_FIELD, bm->name);
-	if (bm->host[0])
-		dlg_set_text(dlg, BME_HOST_FIELD, bm->host);
-	if (bm->port > 0) {
-		char port_buf[8];
-		snprintf(port_buf, sizeof(port_buf), "%u", bm->port);
-		dlg_set_text(dlg, BME_PORT_FIELD, port_buf);
-	}
-	if (bm->username[0])
-		dlg_set_text(dlg, BME_USER_FIELD, bm->username);
-
-	/* Set terminal type button text */
-	ttype_to_str(g_bme_ttype, btn_text, sizeof(btn_text));
-	bme_set_btn_title(dlg, BME_TTYPE_BTN, btn_text);
-
-	/* Set font button text */
-	font_to_str(g_bme_font_id, g_bme_font_size, btn_text,
-	    sizeof(btn_text));
-	bme_set_btn_title(dlg, BME_FONT_BTN, btn_text);
-
-	/* Set protocol button text */
-	bme_set_btn_title(dlg, BME_PROTO_BTN,
-	    (g_bme_protocol == PROTO_FINGER) ?
-	    "Finger" : "Telnet");
-
-	/* Verbose checkbox: init from prefs, disable if not finger */
-	g_bme_verbose = (bm_idx >= 0 &&
-	    bm_idx < MAX_BOOKMARKS) ?
-	    prefs.bookmark_verbose[bm_idx] : 0;
-	{
-		short it;
-		Handle ih;
-		Rect ir;
-
-		GetDialogItem(dlg, BME_VERBOSE_CHK,
-		    &it, &ih, &ir);
-		SetControlValue((ControlHandle)ih,
-		    g_bme_verbose);
-		HiliteControl((ControlHandle)ih,
-		    (g_bme_protocol == PROTO_FINGER) ?
-		    0 : 255);
-	}
-
-	/* Register default button outline */
-	setup_default_button_outline(dlg, BME_DEFAULT_BTN);
-
-	ShowWindow(dlg);
-
-	for (;;) {
-		ModalDialog(
-		    (ModalFilterUPP)bme_dlg_filter,
-		    &item_hit);
-		if (item_hit == BME_CANCEL) {
-			DisposeDialog(dlg);
-			return false;
-		}
-		if (item_hit == BME_OK)
-			break;
-
-		if (item_hit == BME_VERBOSE_CHK) {
-			short it;
-			Handle ih;
-			Rect ir;
-			short val;
-
-			GetDialogItem(dlg, BME_VERBOSE_CHK,
-			    &it, &ih, &ir);
-			val = GetControlValue(
-			    (ControlHandle)ih);
-			SetControlValue(
-			    (ControlHandle)ih, !val);
-			g_bme_verbose = !val;
-		}
-
-		/* Terminal type and font handled by filter
-		 * proc popup menus */
-	}
-
-	/* Extract name */
-	dlg_get_text(dlg, BME_NAME_FIELD, bm->name, 32);
-	if (bm->name[0] == '\0') {
-		DisposeDialog(dlg);
-		return false;
-	}
-
-	/* Extract host */
-	dlg_get_text(dlg, BME_HOST_FIELD, bm->host, 128);
-	if (bm->host[0] == '\0') {
-		DisposeDialog(dlg);
-		return false;
-	}
-
-	/* Extract port */
-	{
-		char port_buf[8];
-		dlg_get_text(dlg, BME_PORT_FIELD, port_buf, sizeof(port_buf));
-		if (port_buf[0]) {
-			Str255 pstr;
-			c2pstr(pstr, port_buf);
-			StringToNum(pstr, &num);
-			bm->port = (unsigned short)num;
-		} else {
-			bm->port = 23;
-		}
-	}
-
-	/* Extract username */
-	dlg_get_text(dlg, BME_USER_FIELD, bm->username,
-	    sizeof(bm->username));
-
-	/* Store terminal type, font from filter proc state */
-	bm->terminal_type = g_bme_ttype;
-	bm->font_id = g_bme_font_id;
-	bm->font_size = g_bme_font_size;
-	/* Store protocol and verbose in prefs arrays */
-	if (bm_idx >= 0 && bm_idx < MAX_BOOKMARKS) {
-		prefs.bookmark_protocol[bm_idx] = g_bme_protocol;
-		prefs.bookmark_verbose[bm_idx] =
-		    g_bme_verbose ? 1 : 0;
-	}
-
-	DisposeDialog(dlg);
-	return true;
-}
-
-static pascal Boolean
-bm_filter(DialogPtr dlg, EventRecord *event, short *item)
-{
-	Point pt;
-	short i;
-
-	/* Cmd+. maps to Done button */
-	if (event->what == keyDown) {
-		char key = event->message & charCodeMask;
-		if ((event->modifiers & cmdKey) && key == '.') {
-			*item = BM_DONE;
-			return true;
-		}
-	}
-
-	if (event->what == mouseDown) {
-		SetPort(dlg);
-		pt = event->where;
-		GlobalToLocal(&pt);
-		if (PtInRect(pt, &bm_list_rect)) {
-			InsetRect(&bm_list_rect, 1, 1);
-			i = (pt.v - bm_list_rect.top - 2) / 16;
-			InsetRect(&bm_list_rect, -1, -1);
-			if (i >= 0 && i < bm_prefs_ptr->bookmark_count)
-				bm_selection = i;
-			else
-				bm_selection = -1;
-			/* Redraw list in dialog port */
-			bm_list_draw((WindowPtr)dlg, BM_LIST);
-			*item = BM_LIST;
-			return true;
-		}
-	}
-	return false;
-}
-
-void
-do_bookmarks(void)
-{
-	DialogPtr dlg;
-	short item_hit;
-	Handle item_h;
-	short item_type;
-	Rect item_rect;
-	Boolean changed = false;
-
-	dlg = GetNewDialog(DLOG_FAVORITES_ID, 0L, (WindowPtr)-1L);
-	if (!dlg)
-		return;
-
-	bm_prefs_ptr = &prefs;
-	bm_selection = -1;
-
-	/* Set up UserItem draw proc for list */
-	GetDialogItem(dlg, BM_LIST, &item_type, &item_h, &item_rect);
-	bm_list_rect = item_rect;
-	SetDialogItem(dlg, BM_LIST, item_type,
-	    (Handle)bm_list_draw, &item_rect);
-
-	/* Register default button outline */
-	setup_default_button_outline(dlg, BM_DEFAULT_BTN);
-
-	ShowWindow(dlg);
-
-	for (;;) {
-		ModalDialog((ModalFilterProcPtr)bm_filter,
-		    &item_hit);
-
-		if (item_hit == BM_DONE)
-			break;
-
-		/* List click handled by filter — just redraw */
-		if (item_hit == BM_LIST)
-			continue;
-
-		if (item_hit == BM_ADD) {
-			if (prefs.bookmark_count >= MAX_BOOKMARKS) {
-				SysBeep(10);
-				continue;
-			}
-			memset(&prefs.bookmarks[prefs.bookmark_count],
-			    0, sizeof(Bookmark));
-			prefs.bookmarks[prefs.bookmark_count].port = 23;
-			prefs.bookmarks[prefs.bookmark_count].terminal_type = -1;
-			prefs.bookmark_protocol[prefs.bookmark_count] = 0;
-			if (bm_edit_dialog(
-			    &prefs.bookmarks[prefs.bookmark_count],
-			    true, prefs.bookmark_count)) {
-				prefs.bookmark_count++;
-				bm_selection = prefs.bookmark_count - 1;
-				changed = true;
-			}
-			/* Redraw list */
-			SetPort(dlg);
-			bm_list_draw((WindowPtr)dlg, BM_LIST);
-		}
-
-		if (item_hit == BM_EDIT) {
-			if (bm_selection < 0 ||
-			    bm_selection >= prefs.bookmark_count) {
-				SysBeep(10);
-				continue;
-			}
-			if (bm_edit_dialog(
-			    &prefs.bookmarks[bm_selection], false,
-			    bm_selection))
-				changed = true;
-			SetPort(dlg);
-			bm_list_draw((WindowPtr)dlg, BM_LIST);
-		}
-
-		if (item_hit == BM_DELETE) {
-			short j, ri, wi, del_idx;
-
-			if (bm_selection < 0 ||
-			    bm_selection >= prefs.bookmark_count) {
-				SysBeep(10);
-				continue;
-			}
-			del_idx = bm_selection;
-			for (j = del_idx;
-			    j < prefs.bookmark_count - 1; j++) {
-				prefs.bookmarks[j] =
-				    prefs.bookmarks[j + 1];
-				prefs.bookmark_protocol[j] =
-				    prefs.bookmark_protocol[j + 1];
-				prefs.bookmark_verbose[j] =
-				    prefs.bookmark_verbose[j + 1];
-			}
-			prefs.bookmark_count--;
-			if (bm_selection >= prefs.bookmark_count)
-				bm_selection = prefs.bookmark_count - 1;
-
-			/* Fix recent indices after delete */
-			wi = 0;
-			for (ri = 0; ri < prefs.recent_count;
-			    ri++) {
-				if (prefs.recent[ri] == del_idx)
-					continue; /* removed */
-				if (prefs.recent[ri] > del_idx)
-					prefs.recent[ri]--;
-				prefs.recent[wi++] =
-				    prefs.recent[ri];
-			}
-			prefs.recent_count = wi;
-
-			/* Fix bookmark_index in live sessions */
-			{
-				short si;
-				Session *sess;
-				for (si = 0; si < MAX_SESSIONS; si++) {
-					sess = session_get(si);
-					if (!sess)
-						continue;
-					if (sess->bookmark_index == del_idx)
-						sess->bookmark_index = -1;
-					else if (sess->bookmark_index >
-					    del_idx)
-						sess->bookmark_index--;
-				}
-			}
-
-			changed = true;
-			SetPort(dlg);
-			bm_list_draw((WindowPtr)dlg, BM_LIST);
-		}
-
-		if (item_hit == BM_CONNECT) {
-			if (bm_selection < 0 ||
-			    bm_selection >= prefs.bookmark_count) {
-				SysBeep(10);
-				continue;
-			}
-			DisposeDialog(dlg);
-			if (changed)
-				prefs_save(&prefs);
-			if (prefs.bookmark_protocol[bm_selection]
-			    == PROTO_FINGER)
-				do_finger_bookmark(bm_selection);
-			else
-				do_connect_bookmark(bm_selection);
-			return;
-		}
-	}
-
-	DisposeDialog(dlg);
-	if (changed) {
-		prefs_save(&prefs);
-		rebuild_file_menu();
-	}
-}
-
-/* ---- Save as bookmark ---- */
-
-void
-do_save_as_bookmark(void)
-{
-	Session *s = active_session;
-	Bookmark bm;
-
-	if (!s || prefs.bookmark_count >= MAX_BOOKMARKS)
-		return;
-
-	memset(&bm, 0, sizeof(Bookmark));
-	strncpy(bm.host, s->conn.host, sizeof(bm.host) - 1);
-	bm.port = s->conn.port;
-	if (s->conn.username[0])
-		strncpy(bm.username, s->conn.username,
-		    sizeof(bm.username) - 1);
-	bm.font_id = s->font_id;
-	bm.font_size = s->font_size;
-	if (s->telnet.preferred_ttype >= 0)
-		bm.terminal_type = s->telnet.preferred_ttype;
-	else
-		bm.terminal_type = -1;
-
-	/* Auto-generate name from window title (user@hostname:path).
-	 * Extract just user@hostname, stripping :path and beyond.
-	 * If title is empty or has no '@', build from connection. */
-	bm.name[0] = '\0';
-	if (s->terminal.window_title[0]) {
-		char *src = s->terminal.window_title;
-		short ni = 0;
-		Boolean have_at = false;
-
-		while (src[ni] && src[ni] != ':' && src[ni] != ' ' &&
-		    ni < (short)(sizeof(bm.name) - 1)) {
-			if (src[ni] == '@')
-				have_at = true;
-			bm.name[ni] = src[ni];
-			ni++;
-		}
-		bm.name[ni] = '\0';
-
-		if (!have_at)
-			bm.name[0] = '\0';  /* not user@host, discard */
-	}
-	if (!bm.name[0]) {
-		if (s->conn.username[0])
-			snprintf(bm.name, sizeof(bm.name),
-			    "%.15s@%.15s",
-			    s->conn.username, s->conn.host);
-		else
-			strncpy(bm.name, s->conn.host,
-			    sizeof(bm.name) - 1);
-	}
-
-	/* Pre-set protocol and verbose so edit dialog picks them up */
-	prefs.bookmark_protocol[prefs.bookmark_count] =
-	    s->conn.protocol;
-	prefs.bookmark_verbose[prefs.bookmark_count] = 0;
-
-	if (bm_edit_dialog(&bm, true, prefs.bookmark_count)) {
-		prefs.bookmarks[prefs.bookmark_count] = bm;
-		prefs.bookmark_count++;
-		s->bookmark_index = prefs.bookmark_count - 1;
-		add_recent_bookmark(s->bookmark_index);
-		prefs_save(&prefs);
-		rebuild_file_menu();
-	}
-}
-#endif /* FLYNN_BOOKMARKS */
+#endif /* FLYNN_FAVORITES */
 
 /* ---- DNS server dialog ---- */
 

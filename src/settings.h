@@ -5,8 +5,8 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	13
-#define MAX_BOOKMARKS	8
+#define PREFS_VERSION	14
+#define MAX_BOOKMARKS	20
 #define MAX_RECENT	5
 
 typedef struct {

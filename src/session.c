@@ -385,7 +385,7 @@ do_font_change(short font_id, short font_size)
 
 	do_window_resize(active_session, win_w, win_h);
 
-#ifdef FLYNN_BOOKMARKS
+#ifdef FLYNN_FAVORITES
 	/* Auto-save to originating bookmark */
 	if (active_session->bookmark_index >= 0 &&
 	    active_session->bookmark_index < prefs.bookmark_count) {

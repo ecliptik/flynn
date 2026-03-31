@@ -28,6 +28,7 @@
 #include "settings.h"
 #include "dialogs.h"
 #include "menus.h"
+#include "favorites.h"
 #include "input.h"
 #include "clipboard.h"
 #include "macutil.h"
@@ -148,7 +149,7 @@ main(void)
 	 * clicks OK. MacTCP init is lazy (first conn_connect call). */
 	do_connect();
 
-	rebuild_file_menu();
+	favorites_rebuild_menu();
 	update_menus();
 	update_prefs_menu();
 

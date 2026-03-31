@@ -7,7 +7,7 @@
 #include "Processes.r"
 
 resource 'MBAR' (128) {
-	{ 128, 129, 130, 131, 132, 133 }
+	{ 128, 129, 130, 132, 136, 131, 133 }
 };
 
 resource 'MENU' (128, "Apple") {
@@ -26,8 +26,6 @@ resource 'MENU' (129, "File") {
 		"-", noIcon, noKey, noMark, plain;
 		"Save Contents\311", noIcon, "S", noMark, plain;
 		"DNS Server\311", noIcon, noKey, noMark, plain;
-		"-", noIcon, noKey, noMark, plain;
-		"Favorites", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Quit", noIcon, "Q", noMark, plain
 	}
@@ -88,7 +86,7 @@ resource 'MENU' (136, "Favorites") {
 	136, textMenuProc, allEnabled, enabled, "Favorites",
 	{
 		"Manage Favorites\311", noIcon, "B", noMark, plain;
-		"Add Favorite\311", noIcon, noKey, noMark, plain
+		"Add Favorite\311", noIcon, "D", noMark, plain
 		/* Separator + bookmark entries added dynamically */
 	}
 };
@@ -261,7 +259,7 @@ resource 'DITL' (128, "Alert") {
 
 /* Favorites manager dialog */
 resource 'DLOG' (131, "Favorites") {
-	{40, 60, 290, 430},
+	{40, 60, 300, 430},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -273,37 +271,45 @@ resource 'DLOG' (131, "Favorites") {
 
 resource 'DITL' (131, "Favorites") {
 	{
-		/* Done button */
-		{220, 280, 240, 350},
+		/* 1: Done button */
+		{228, 280, 248, 350},
 		Button { enabled, "Done" };
 
-		/* Add button */
+		/* 2: Add button */
 		{15, 280, 35, 350},
 		Button { enabled, "Add" };
 
-		/* Edit button */
+		/* 3: Edit button */
 		{45, 280, 65, 350},
 		Button { enabled, "Edit" };
 
-		/* Delete button */
-		{75, 280, 95, 350},
-		Button { enabled, "Delete" };
-
-		/* Connect button */
-		{115, 280, 135, 350},
-		Button { enabled, "Connect" };
-
-		/* Label */
+		/* 4: Label */
 		{5, 15, 21, 120},
 		StaticText { disabled, "Favorites:" };
 
-		/* List area (UserItem) */
-		{25, 15, 210, 265},
+		/* 5: List area (UserItem, enabled for List Manager clicks) */
+		{25, 15, 218, 265},
+		UserItem { enabled };
+
+		/* 6: Default button outline (UserItem) */
+		{224, 276, 252, 354},
 		UserItem { disabled };
 
-		/* 8: Default button outline (UserItem) */
-		{216, 276, 244, 354},
-		UserItem { disabled };
+		/* 7: Remove button (was Delete) */
+		{75, 280, 95, 350},
+		Button { enabled, "Remove" };
+
+		/* 8: Move Up button */
+		{115, 280, 135, 350},
+		Button { enabled, "Move Up" };
+
+		/* 9: Move Down button */
+		{145, 280, 165, 350},
+		Button { enabled, "Move Dn" };
+
+		/* 10: Connect button */
+		{195, 280, 215, 350},
+		Button { enabled, "Connect" };
 	}
 };
 
