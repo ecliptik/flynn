@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.9.8] - 2026-03-31
+
+### Added
+- iBeam cursor when mouse is over terminal text area (arrow elsewhere)
+
+### Fixed
+- Click-and-drag text selection not highlighting or selecting wrong text
+  (shadow buffer optimization was skipping rows where only selection changed)
+
 ## [1.9.7] - 2026-03-21
 
 ### Added
