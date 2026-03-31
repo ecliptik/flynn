@@ -1,10 +1,11 @@
 #!/bin/bash
-# Create releases on Forgejo and GitHub with changelog and artifacts
+# Create releases on Forgejo, Codeberg, and GitHub with changelog and artifacts
 #
 # Prerequisites:
 #   - jq: sudo apt install jq
 #   - gh: sudo apt install gh (for GitHub releases)
 #   - FORGEJO_TOKEN env var (create at Forgejo Settings > Applications)
+#   - CODEBERG_TOKEN env var (create at Codeberg Settings > Applications)
 #   - gh auth login (for GitHub)
 #
 # Usage:
@@ -17,6 +18,8 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 FORGEJO_URL="${FORGEJO_URL:-https://forgejo.ecliptik.com}"
 FORGEJO_REPO="${FORGEJO_REPO:-ecliptik/flynn}"
+CODEBERG_URL="${CODEBERG_URL:-https://codeberg.org}"
+CODEBERG_REPO="${CODEBERG_REPO:-ecliptik/flynn}"
 GITHUB_REPO="${GITHUB_REPO:-ecliptik/flynn}"
 
 # Extract changelog section for a given version (without the v prefix)
@@ -93,6 +96,62 @@ release_forgejo() {
             --data-binary @"$file" > /dev/null
     done
     echo "  Forgejo release complete: $FORGEJO_URL/$FORGEJO_REPO/releases/tag/$tag"
+}
+
+# Create a release on Codeberg (Forgejo-compatible API)
+release_codeberg() {
+    local tag="$1"
+    local name="$2"
+    local body="$3"
+
+    if [ -z "$CODEBERG_TOKEN" ]; then
+        echo "Warning: CODEBERG_TOKEN not set, skipping Codeberg release"
+        return 0
+    fi
+
+    # Check if release already exists
+    local existing
+    existing=$(curl -s -o /dev/null -w "%{http_code}" \
+        "$CODEBERG_URL/api/v1/repos/$CODEBERG_REPO/releases/tags/$tag" \
+        -H "Authorization: token $CODEBERG_TOKEN")
+    if [ "$existing" = "200" ]; then
+        echo "  Codeberg release for $tag already exists, skipping"
+        return 0
+    fi
+
+    echo "Creating Codeberg release for $tag..."
+    local response
+    response=$(curl -s -X POST "$CODEBERG_URL/api/v1/repos/$CODEBERG_REPO/releases" \
+        -H "Authorization: token $CODEBERG_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -n --arg tag "$tag" --arg name "$name" --arg body "$body" '{
+            tag_name: $tag,
+            name: $name,
+            body: $body,
+            draft: false,
+            prerelease: false
+        }')")
+
+    local release_id
+    release_id=$(echo "$response" | jq -r '.id // empty')
+    if [ -z "$release_id" ]; then
+        echo "Error creating Codeberg release: $response"
+        return 1
+    fi
+    echo "  Created release ID: $release_id"
+
+    # Upload artifacts
+    for file in "${RELEASE_FILES[@]}"; do
+        local filename
+        filename=$(basename "$file")
+        echo "  Uploading $filename..."
+        curl -s -X POST \
+            "$CODEBERG_URL/api/v1/repos/$CODEBERG_REPO/releases/$release_id/assets?name=$filename" \
+            -H "Authorization: token $CODEBERG_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$file" > /dev/null
+    done
+    echo "  Codeberg release complete: $CODEBERG_URL/$CODEBERG_REPO/releases/tag/$tag"
 }
 
 # Create a release on GitHub
@@ -231,6 +290,7 @@ See [BUILD.md](https://github.com/$GITHUB_REPO/blob/main/docs/BUILD.md) for cust
 
     local name="Flynn $tag"
     release_forgejo "$tag" "$name" "$body"
+    release_codeberg "$tag" "$name" "$body"
     release_github "$tag" "$name" "$body"
     update_readme_downloads "$tag"
     echo ""
@@ -249,6 +309,19 @@ forgejo_release_exists() {
     [ "$status" = "200" ]
 }
 
+# Check for existing releases on Codeberg
+codeberg_release_exists() {
+    local tag="$1"
+    if [ -z "$CODEBERG_TOKEN" ]; then
+        return 1
+    fi
+    local status
+    status=$(curl -s -o /dev/null -w "%{http_code}" \
+        "$CODEBERG_URL/api/v1/repos/$CODEBERG_REPO/releases/tags/$tag" \
+        -H "Authorization: token $CODEBERG_TOKEN")
+    [ "$status" = "200" ]
+}
+
 # Check for existing releases on GitHub
 github_release_exists() {
     local tag="$1"
@@ -264,12 +337,14 @@ if [ "$1" = "--hierarchical" ]; then
     echo "Checking for unreleased tags..."
     for tag in $(git tag -l 'v*' --sort=version:refname); do
         local_forgejo=$(forgejo_release_exists "$tag" && echo "yes" || echo "no")
+        local_codeberg=$(codeberg_release_exists "$tag" && echo "yes" || echo "no")
         local_github=$(github_release_exists "$tag" && echo "yes" || echo "no")
-        if [ "$local_forgejo" = "yes" ] && [ "$local_github" = "yes" ]; then
-            echo "  $tag: already released on both platforms, skipping"
+        if [ "$local_forgejo" = "yes" ] && [ "$local_codeberg" = "yes" ] && [ "$local_github" = "yes" ]; then
+            echo "  $tag: already released on all platforms, skipping"
         else
-            [ "$local_forgejo" = "yes" ] && echo "  $tag: already on Forgejo, checking GitHub..."
-            [ "$local_github" = "yes" ] && echo "  $tag: already on GitHub, checking Forgejo..."
+            [ "$local_forgejo" = "yes" ] && echo "  $tag: already on Forgejo"
+            [ "$local_codeberg" = "yes" ] && echo "  $tag: already on Codeberg"
+            [ "$local_github" = "yes" ] && echo "  $tag: already on GitHub"
             do_release "$tag"
         fi
     done
