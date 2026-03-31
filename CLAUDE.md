@@ -73,7 +73,9 @@ Basilisk II was tested extensively but has critical incompatibilities with Syste
 
 ## Repository Conventions
 
-- Git remote: `https://github.com/ecliptik/flynn.git`
+- Git remote (primary): `ssh://git@forgejo.ecliptik.com/ecliptik/flynn.git`
+- Codeberg mirror: `https://codeberg.org/ecliptik/flynn` (auto-mirrored from Forgejo)
+- GitHub mirror: `https://github.com/ecliptik/flynn` (read-only, never push directly)
 - Use feature branches, commits, and worktrees for development
 - Do NOT commit: disk images, FLYNN.md, or other non-source artifacts
 - Maintain: README.md, CHANGELOG.md, TODO.md

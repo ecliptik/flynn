@@ -226,7 +226,7 @@ update_readme_downloads() {
         return 0
     fi
 
-    # Replace version in GitHub release download URLs
+    # Replace version in Codeberg release download URLs
     # Matches: /releases/download/vX.Y.Z/Flynn...-X.Y.Z.ext
     if grep -q "releases/download/v" "$readme"; then
         sed -i -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/([A-Za-z-]*)-[0-9]+\.[0-9]+\.[0-9]+\.|releases/download/${tag}/\1-${ver}.|g" "$readme"
@@ -286,7 +286,7 @@ do_release() {
 | **Flynn Lite** | Recommended — 1 session, 96-line scrollback, most features | ~384KB |
 | **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped features | ~256KB |
 
-See [BUILD.md](https://github.com/$GITHUB_REPO/blob/main/docs/BUILD.md) for custom build options."
+See [BUILD.md](https://codeberg.org/$CODEBERG_REPO/src/branch/main/docs/BUILD.md) for custom build options."
 
     local name="Flynn $tag"
     release_forgejo "$tag" "$name" "$body"

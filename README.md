@@ -29,13 +29,13 @@ This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/
 
 ## Download
 
-Pre-built binaries are available on the [Releases](https://github.com/ecliptik/flynn/releases) page, [Macintosh Garden](https://macintoshgarden.org/apps/flynn), and [Macintosh Repository](https://www.macintoshrepository.org/87841-flynn):
+Pre-built binaries are available on the [Releases](https://codeberg.org/ecliptik/flynn/releases) page, [Macintosh Garden](https://macintoshgarden.org/apps/flynn), and [Macintosh Repository](https://www.macintoshrepository.org/87841-flynn):
 
 | Edition | Description | Memory | Download |
 |---------|-------------|--------|----------|
-| **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-1.9.7.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-1.9.7.hqx) |
-| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~384KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-Lite-1.9.7.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-Lite-1.9.7.hqx) |
-| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-Minimal-1.9.7.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.9.7/Flynn-Minimal-1.9.7.hqx) |
+| **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.7/Flynn-1.9.7.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.7/Flynn-1.9.7.hqx) |
+| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~384KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.7/Flynn-Lite-1.9.7.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.7/Flynn-Lite-1.9.7.hqx) |
+| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.7/Flynn-Minimal-1.9.7.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.7/Flynn-Minimal-1.9.7.hqx) |
 
 Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). No build toolchain required — just download and run. See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
@@ -165,3 +165,7 @@ Uses [Snow](https://snowemu.com/) emulator (v1.3.1) with a Mac Plus ROM and Syst
 ## License
 
 ISC License. See [LICENSE](LICENSE) for full details.
+
+---
+
+> **Note:** The [GitHub repository](https://github.com/ecliptik/flynn) is a read-only mirror. Please open issues and pull requests on [Codeberg](https://codeberg.org/ecliptik/flynn).
