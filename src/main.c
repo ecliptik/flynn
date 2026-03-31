@@ -73,6 +73,7 @@ static void session_poll_data(Session *sess);
 static void session_process_data(Session *sess);
 static void session_draw(Session *sess);
 static void session_update_title(Session *sess);
+static void adjust_cursor(Point mouse_pt);
 
 /*
  * Apple Events handlers for System 7 compatibility.
@@ -418,6 +419,56 @@ session_poll_data(Session *sess)
 	session_draw(sess);
 }
 
+/*
+ * adjust_cursor - set cursor to iBeam over terminal content, arrow elsewhere
+ */
+static void
+adjust_cursor(Point mouse_pt)
+{
+	WindowPtr win;
+	short part;
+
+	if (g_suspended) {
+		InitCursor();
+		return;
+	}
+
+	win = FrontWindow();
+	if (!win) {
+		InitCursor();
+		return;
+	}
+
+	part = FindWindow(mouse_pt, &win);
+	if (part == inContent && win == FrontWindow()) {
+		Session *sess;
+
+		sess = session_from_window(win);
+		if (sess) {
+			Point local_pt;
+			GrafPtr save;
+			Rect content_r;
+
+			GetPort(&save);
+			SetPort(win);
+			local_pt = mouse_pt;
+			GlobalToLocal(&local_pt);
+			SetPort(save);
+
+			/* Text area excludes scroll bar */
+			content_r = win->portRect;
+			content_r.right -= SCROLLBAR_WIDTH;
+
+			if (PtInRect(local_pt, &content_r)) {
+				SetCursor(*GetCursor(iBeamCursor));
+				return;
+			}
+		}
+	}
+
+	InitCursor();
+}
+
 static void
 main_event_loop(void)
 {
@@ -525,6 +576,7 @@ main_event_loop(void)
 					    &active_session->terminal);
 					SetPort(save);
 				}
+				adjust_cursor(event.where);
 				break;
 			}
 
@@ -641,6 +693,7 @@ main_event_loop(void)
 				session_load_font(active_session);
 			}
 
+			adjust_cursor(event.where);
 			break;
 		}
 		case keyDown:

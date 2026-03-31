@@ -4823,6 +4823,9 @@ term_ui_sel_start_word(short row, short col, short scroll_offset,
 	sel.word_mode = 1;
 	sel.word_anchor_start = ws;
 	sel.word_anchor_end = we;
+#ifdef FLYNN_OFFSCREEN
+	g_shadow_valid = 0;
+#endif
 }
 
 /*
@@ -4856,6 +4859,9 @@ term_ui_sel_extend(short row, short col, Terminal *term)
 		sel.extent_row = row;
 		sel.extent_col = col;
 	}
+#ifdef FLYNN_OFFSCREEN
+	g_shadow_valid = 0;
+#endif
 }
 
 /*
