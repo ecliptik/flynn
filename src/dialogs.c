@@ -216,7 +216,7 @@ do_about(void)
 	SetDialogItemText(item_h, pstr);
 
 	/* Register default button outline */
-	setup_default_button_outline(dlg, 7);
+	setup_default_button_outline(dlg, 8);
 
 	ModalDialog((ModalFilterUPP)std_dlg_filter, &item);
 	DisposeDialog(dlg);

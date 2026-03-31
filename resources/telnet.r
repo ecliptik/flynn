@@ -182,7 +182,7 @@ resource 'DITL' (129, "Connect") {
 
 /* About dialog */
 resource 'DLOG' (130, "About Flynn") {
-	{80, 100, 230, 400},
+	{70, 100, 240, 400},
 	dBoxProc,
 	visible,
 	noGoAway,
@@ -195,7 +195,7 @@ resource 'DLOG' (130, "About Flynn") {
 resource 'DITL' (130, "About Flynn") {
 	{
 		/* 1: OK button */
-		{118, 115, 138, 185},
+		{138, 115, 158, 185},
 		Button { enabled, "OK" };
 
 		/* 2: Icon */
@@ -210,16 +210,20 @@ resource 'DITL' (130, "About Flynn") {
 		{33, 55, 49, 280},
 		StaticText { disabled, "" };
 
-		/* 5: Copyright */
-		{62, 30, 78, 270},
+		/* 5: Description */
+		{62, 15, 78, 290},
+		StaticText { disabled, "A Telnet client for classic Macintosh" };
+
+		/* 6: Copyright */
+		{84, 15, 100, 290},
 		StaticText { disabled, "\0xA9 2026 Micheal Waltz" };
 
-		/* 6: Codeberg */
-		{84, 30, 100, 270},
+		/* 7: Codeberg */
+		{102, 15, 118, 290},
 		StaticText { disabled, "https://codeberg.org/ecliptik/flynn" };
 
-		/* 7: Default button outline (UserItem) */
-		{118, 111, 146, 189},
+		/* 8: Default button outline (UserItem) */
+		{134, 111, 162, 189},
 		UserItem { disabled };
 	}
 };
