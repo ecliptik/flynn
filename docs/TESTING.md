@@ -318,15 +318,7 @@ The keyboard input mapping (handle_key_down in main.c) was confirmed working:
 
 ### Screenshots
 
-Test screenshots are saved in `screenshots/` (gitignored):
-
-- `70-flynn-window.png` — Flynn launched, empty terminal window
-- `42-connect-dialog_000.png` — Connect dialog with Host/Port fields
-- `43-host-entered.png` — IP address entered in Host field
-- `44-connected.png` — Connected, login banner rendered
-- `73-logged-in.png` — Neofetch ASCII art fully rendered
-- `74-echo.png` through `87-quit.png` — Screen frozen on neofetch (bug)
-- `88-current.png` — Finder after clean quit
+Test screenshots are saved in `docs/screenshots/`.
 
 ### Coordinate Reference for GUI Automation
 
