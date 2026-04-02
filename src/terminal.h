@@ -310,4 +310,6 @@ short terminal_find(Terminal *term, const char *text, short text_len,
     short start_row, short start_col, short direction,
     short *found_row, short *found_col);
 
+void terminal_normalize_rows(Terminal *term);
+
 #endif /* TERMINAL_H */

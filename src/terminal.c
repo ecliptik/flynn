@@ -80,6 +80,25 @@ term_flush_response(Terminal *term)
 }
 
 /*
+ * terminal_normalize_rows - reset screen_rows[] (and screen_color_rows[])
+ * to point sequentially into their backing arrays.  Called after any
+ * bulk restore that writes directly to screen[][] (alt screen restore,
+ * snap_screen restore) so the pointer table matches the data layout.
+ */
+void
+terminal_normalize_rows(Terminal *term)
+{
+	short r;
+	for (r = 0; r < TERM_ROWS; r++)
+		term->screen_rows[r] = term->screen[r];
+	if (term->has_color && term->screen_color) {
+		for (r = 0; r < TERM_ROWS; r++)
+			term->screen_color_rows[r] =
+			    &term->screen_color[r * TERM_COLS];
+	}
+}
+
+/*
  * terminal_init - set up terminal to power-on defaults
  */
 void
@@ -803,8 +822,13 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 	    r2 >= term->active_rows - 1 &&
 	    c2 >= term->active_cols - 1 &&
 	    !term->alt_active) {
-		memcpy(term->snap_screen, term->screen,
-		    sizeof(term->screen));
+		/* Copy row-by-row via screen_rows[] since pointer
+		 * rotation may have reordered them */
+		short sr;
+		for (sr = 0; sr < TERM_ROWS; sr++)
+			memcpy(term->snap_screen[sr],
+			    term->screen_rows[sr],
+			    TERM_COLS * sizeof(TermCell));
 		term->snap_valid = 1;
 	}
 
@@ -896,33 +920,56 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 	}
 #endif
 
-	/* Move lines up: per-row memmove using active_cols to
-	 * avoid moving unused columns (saves ~39% when 80 of 132) */
+	/* Pointer rotation: rotate screen_rows[] pointers instead of
+	 * memmove-ing TermCell data.  Eliminates count*active_cols*2
+	 * bytes of copying per scroll — just moves pointer values. */
 	{
 		short rows_to_move = bottom - top - count + 1;
-		if (rows_to_move > 0) {
-			for (r = 0; r < rows_to_move; r++)
-				memmove(term->screen_rows[top + r],
-				    term->screen_rows[top + count + r],
-				    term->active_cols *
-				    sizeof(TermCell));
-#ifdef FLYNN_DBLWIDTH
-			memmove(&term->line_attr[top],
-			    &term->line_attr[top + count],
-			    rows_to_move);
-#endif
-		}
 
-		/* Scroll color arrays in parallel */
-		if (term->has_color && term->screen_color &&
-		    rows_to_move > 0) {
+		/* 1. Save pointers being scrolled off the top */
+		TermCell *saved_rows[TERM_ROWS];
+		for (r = 0; r < count; r++)
+			saved_rows[r] = term->screen_rows[top + r];
+
+		/* 2. Shift remaining pointers up */
+		for (r = 0; r < rows_to_move; r++)
+			term->screen_rows[top + r] =
+			    term->screen_rows[top + count + r];
+
+		/* 3. Place saved pointers at bottom (become cleared rows) */
+		for (r = 0; r < count; r++)
+			term->screen_rows[bottom - count + 1 + r] =
+			    saved_rows[r];
+
+#ifdef FLYNN_DBLWIDTH
+		/* Rotate line_attr[] values (plain array, not pointers) */
+		{
+			unsigned char saved_la[TERM_ROWS];
+			for (r = 0; r < count; r++)
+				saved_la[r] = term->line_attr[top + r];
 			for (r = 0; r < rows_to_move; r++)
-				memmove(
-				    term->screen_color_rows[top + r],
+				term->line_attr[top + r] =
+				    term->line_attr[top + count + r];
+			for (r = 0; r < count; r++)
+				term->line_attr[bottom - count + 1 + r] =
+				    saved_la[r];
+		}
+#endif
+
+		/* Rotate color row pointers in parallel */
+		if (term->has_color && term->screen_color) {
+			CellColor *saved_cr[TERM_ROWS];
+			for (r = 0; r < count; r++)
+				saved_cr[r] =
+				    term->screen_color_rows[top + r];
+			for (r = 0; r < rows_to_move; r++)
+				term->screen_color_rows[top + r] =
 				    term->screen_color_rows[
-				    top + count + r],
-				    term->active_cols *
-				    sizeof(CellColor));
+				    top + count + r];
+			for (r = 0; r < count; r++)
+				term->screen_color_rows[
+				    bottom - count + 1 + r] =
+				    saved_cr[r];
 		}
 	}
 
@@ -1015,35 +1062,55 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 	if (count > (bottom - top + 1))
 		count = bottom - top + 1;
 
-	/* Move lines down: per-row memmove using active_cols,
-	 * iterate in reverse (dest > src) to avoid overwriting */
+	/* Pointer rotation: rotate screen_rows[] pointers instead of
+	 * memmove-ing TermCell data.  Same as scroll_up but reversed —
+	 * save bottom pointers, shift down, place saved at top. */
 	{
 		short rows_to_move = bottom - top - count + 1;
-		if (rows_to_move > 0) {
-			for (r = rows_to_move - 1; r >= 0; r--)
-				memmove(term->screen_rows[top + count +
-				    r],
-				    term->screen_rows[top + r],
-				    term->active_cols *
-				    sizeof(TermCell));
-#ifdef FLYNN_DBLWIDTH
-			memmove(&term->line_attr[top + count],
-			    &term->line_attr[top],
-			    rows_to_move);
-#endif
-		}
 
-		/* Scroll color arrays in parallel */
-		if (term->has_color && term->screen_color &&
-		    rows_to_move > 0) {
+		/* 1. Save pointers being scrolled off the bottom */
+		TermCell *saved_rows[TERM_ROWS];
+		for (r = 0; r < count; r++)
+			saved_rows[r] =
+			    term->screen_rows[bottom - count + 1 + r];
+
+		/* 2. Shift remaining pointers down (reverse order) */
+		for (r = rows_to_move - 1; r >= 0; r--)
+			term->screen_rows[top + count + r] =
+			    term->screen_rows[top + r];
+
+		/* 3. Place saved pointers at top (become cleared rows) */
+		for (r = 0; r < count; r++)
+			term->screen_rows[top + r] = saved_rows[r];
+
+#ifdef FLYNN_DBLWIDTH
+		/* Rotate line_attr[] values (plain array, not pointers) */
+		{
+			unsigned char saved_la[TERM_ROWS];
+			for (r = 0; r < count; r++)
+				saved_la[r] =
+				    term->line_attr[bottom - count + 1 + r];
 			for (r = rows_to_move - 1; r >= 0; r--)
-				memmove(
+				term->line_attr[top + count + r] =
+				    term->line_attr[top + r];
+			for (r = 0; r < count; r++)
+				term->line_attr[top + r] = saved_la[r];
+		}
+#endif
+
+		/* Rotate color row pointers in parallel */
+		if (term->has_color && term->screen_color) {
+			CellColor *saved_cr[TERM_ROWS];
+			for (r = 0; r < count; r++)
+				saved_cr[r] =
 				    term->screen_color_rows[
-				    top + count + r],
-				    term->screen_color_rows[
-				    top + r],
-				    term->active_cols *
-				    sizeof(CellColor));
+				    bottom - count + 1 + r];
+			for (r = rows_to_move - 1; r >= 0; r--)
+				term->screen_color_rows[top + count + r] =
+				    term->screen_color_rows[top + r];
+			for (r = 0; r < count; r++)
+				term->screen_color_rows[top + r] =
+				    saved_cr[r];
 		}
 	}
 
@@ -2624,8 +2691,14 @@ term_switch_to_alt(Terminal *term)
 	if (term->alt_active)
 		return;
 
-	/* Save main screen contents */
-	memcpy(term->alt_screen, term->screen, sizeof(term->screen));
+	/* Save main screen contents row-by-row via screen_rows[]
+	 * (pointer rotation may have reordered them) */
+	{
+		short r;
+		for (r = 0; r < TERM_ROWS; r++)
+			memcpy(term->alt_screen[r], term->screen_rows[r],
+			    TERM_COLS * sizeof(TermCell));
+	}
 #ifdef FLYNN_DBLWIDTH
 	memcpy(term->alt_line_attr, term->line_attr,
 	    sizeof(term->line_attr));
@@ -2645,11 +2718,16 @@ term_switch_to_alt(Terminal *term)
 			term->alt_color = (CellColor *)NewPtr(sc_size);
 		}
 		if (term->alt_color) {
-			memcpy(term->alt_color, term->screen_color,
-			    (long)TERM_ROWS * TERM_COLS *
-			    sizeof(CellColor));
+			short r;
+			for (r = 0; r < TERM_ROWS; r++)
+				memcpy(&term->alt_color[r * TERM_COLS],
+				    term->screen_color_rows[r],
+				    TERM_COLS * sizeof(CellColor));
 		}
 	}
+
+	/* Normalize row pointers before clearing for alt screen use */
+	terminal_normalize_rows(term);
 
 	/* Clear the screen for alt buffer use */
 	term_clear_region(term, 0, 0, term->active_rows - 1, term->active_cols - 1);
@@ -2671,8 +2749,9 @@ term_switch_to_main(Terminal *term)
 	if (!term->alt_active)
 		return;
 
-	/* Restore main screen contents */
+	/* Restore main screen contents (alt_screen is always sequential) */
 	memcpy(term->screen, term->alt_screen, sizeof(term->screen));
+	terminal_normalize_rows(term);
 #ifdef FLYNN_DBLWIDTH
 	memcpy(term->line_attr, term->alt_line_attr,
 	    sizeof(term->line_attr));

@@ -369,6 +369,7 @@ session_handle_disconnect(Session *sess)
 	if (sess->terminal.snap_valid && was_ttype != 4) {
 		memcpy(sess->terminal.screen, sess->terminal.snap_screen,
 		    sizeof(sess->terminal.screen));
+		terminal_normalize_rows(&sess->terminal);
 	}
 	sess->terminal.snap_valid = 0;
 
@@ -505,14 +506,16 @@ session_process_data(Session *sess)
 			    out_buf + offset, chunk);
 			offset += chunk;
 
-			/* Draw when scroll accumulates past half
-			 * the screen.  Batches more scroll before
-			 * drawing — ScrollRect handles large
-			 * offsets as efficiently as small ones. */
+			/* Draw when scroll accumulates past quarter
+			 * screen, or when significant data processed.
+			 * Smaller batches = smoother visual output
+			 * with 2x more CopyBits but fewer dirty rows
+			 * per blit (net render time unchanged). */
 			if (offset < out_len &&
 			    sess->terminal.scroll_pending &&
-			    sess->terminal.scroll_count >=
-			    sess->terminal.active_rows / 2) {
+			    (sess->terminal.scroll_count >=
+			    sess->terminal.active_rows / 4 ||
+			    offset >= 2048)) {
 				session_draw(sess);
 			}
 		}
@@ -691,7 +694,7 @@ main_event_loop(void)
 					if (active_session->conn.read_len
 					    == 0)
 						break;
-				} while (drain < 16);
+				} while (drain < 8);
 
 				if (drain > 0) {
 					had_data = 1;
@@ -704,7 +707,7 @@ main_event_loop(void)
 						if (!draw_deadline)
 							draw_deadline =
 							    TickCount()
-							    + 4;
+							    + 2;
 						if (active_session
 						    ->conn
 						    .pending_data > 0
@@ -835,7 +838,7 @@ main_event_loop(void)
 							if (!draw_deadline)
 								draw_deadline =
 								    TickCount()
-								    + 4;
+								    + 2;
 							if (sess->conn
 							    .pending_data
 							    > 0

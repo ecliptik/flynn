@@ -2051,8 +2051,7 @@ draw_row(Terminal *term, short row)
 #endif
 		row_cells = term->screen_rows[row];
 		if (use_color)
-			row_colors = &term->screen_color[
-			    row * TERM_COLS];
+			row_colors = term->screen_color_rows[row];
 		else
 			row_colors = 0L;
 #if FLYNN_SCROLLBACK_LINES > 0
@@ -2082,8 +2081,7 @@ draw_row(Terminal *term, short row)
 			row_cells = term->screen_rows[sb_row];
 			if (use_color)
 				row_colors =
-				    &term->screen_color[
-				    sb_row * TERM_COLS];
+				    term->screen_color_rows[sb_row];
 			else
 				row_colors = 0L;
 		}
@@ -4733,6 +4731,7 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	unsigned char style;
 
 	if (!cursor_initialized || !term->cursor_visible
+	    || term->scroll_offset > 0
 #ifdef FLYNN_CLIPBOARD
 	    || sel.active
 #endif

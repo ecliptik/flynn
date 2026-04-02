@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 - Window position saved to preferences and restored on next launch
 
 ### Fixed
+- Cursor blink no longer fires during scrollback view (caused XOR artifact over scrollback content)
+- Color row pointers now rotate in sync with screen row pointers (fixes scrambled colors after scroll on System 7)
 - DNS response parser signed short overflow on crafted RDLEN values
 - OSC parameter accumulation signed short overflow (guard tightened)
 - Window title from OSC 0/2 now strips control characters (bytes < 0x20)
@@ -29,6 +31,8 @@ All notable changes to this project will be documented in this file.
 - Clicks in disconnected terminal sessions ignored (prevents stale color artifacts)
 
 ### Changed
+- Scroll rendering uses pointer rotation instead of memmove (94% less data moved per scroll)
+- Smoother bulk output: smaller draw batches, shorter jump scroll deadline, reduced drain loop cap
 - Font and Size split into separate submenus (matching Geomys HIG)
 - New fonts: New York (System 6+), Helvetica, Times, Palatino (System 7 only, added at runtime)
 - Size submenu: 9, 10, 12, 14 — any font/size combination now possible
