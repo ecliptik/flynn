@@ -970,26 +970,12 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 		if (g_has_color_qd && g_dark_mode) {
 			/* Color dark mode: erase with black background */
-#ifdef FLYNN_OFFSCREEN
-			if (use_color_offscreen)
-				color_offscreen_fill_rect(&r, 0);
-			else
-#endif
-			{
-				set_bg_color(0);
-				EraseRect(&r);
-			}
+			set_bg_color(0);
+			EraseRect(&r);
 		} else if (g_has_color_qd) {
 			/* Color light mode: erase with white background */
-#ifdef FLYNN_OFFSCREEN
-			if (use_color_offscreen)
-				color_offscreen_fill_rect(&r, 15);
-			else
-#endif
-			{
-				set_bg_color(15);
-				EraseRect(&r);
-			}
+			set_bg_color(15);
+			EraseRect(&r);
 #ifdef FLYNN_OFFSCREEN
 		} else if (use_offscreen) {
 			/* Direct offscreen fill: bypass QD traps */
