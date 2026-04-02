@@ -224,6 +224,10 @@ typedef struct {
 	CellColor	*alt_color;	/* NULL on System 6, lazy alloc */
 	CellColor	*sb_color;	/* NULL on System 6, lazy alloc */
 
+	/* Row pointer table: eliminates row*TERM_COLS multiply on 68000.
+	 * Points into screen[] — valid for struct lifetime (NewPtr). */
+	TermCell	*screen_rows[TERM_ROWS];
+
 	/* --- Large arrays LAST: pushed beyond hot-path offsets --- */
 
 	/* Screen buffer: rows x cols (13,200 bytes) */

@@ -77,7 +77,7 @@ write_session_data(short refNum, Terminal *term)
 	/* Write screen buffer lines */
 	for (row = 0; row < term->active_rows; row++) {
 		err = write_row(refNum,
-		    term->screen[row],
+		    term->screen_rows[row],
 		    term->active_cols);
 		if (err != noErr)
 			return err;

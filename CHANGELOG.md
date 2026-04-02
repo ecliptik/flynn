@@ -9,9 +9,10 @@ All notable changes to this project will be documented in this file.
 - OSC parameter accumulation signed short overflow (guard tightened)
 - Window title from OSC 0/2 now strips control characters (bytes < 0x20)
 - Window resize on font change used wrong status bar height calculation
+- Grow box and scrollbar column not redrawn after window resize snap-to-grid
 
 ### Changed
-- Terminal fast path caches screen row pointer (eliminates per-character multiply on 68000)
+- Screen row pointer table eliminates row×132 multiply on all screen accesses (+200 bytes/session)
 - Glyph cache uses direct lookup table instead of linear search (O(1) vs O(49))
 - adjust_cursor() only called on mouse movement, not every idle tick
 - Color cube RGB decomposition uses subtraction loops instead of division (no hardware divide on 68000)

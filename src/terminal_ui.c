@@ -892,7 +892,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			TermCell *cur_row_cells;
 			short row_changed;
 
-			cur_row_cells = &term->screen[row][0];
+			cur_row_cells = term->screen_rows[row];
 			row_changed = memcmp(&g_shadow[row][0],
 			    cur_row_cells,
 			    term->active_cols * sizeof(TermCell));
@@ -950,7 +950,7 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			TermCell *rc;
 			short blank, ci;
 			if (term->scroll_offset == 0)
-				rc = &term->screen[row][0];
+				rc = term->screen_rows[row];
 			else {
 				/* For scrollback, skip optimization — always draw */
 				goto do_draw;
@@ -972,7 +972,7 @@ do_draw:
 		/* Copy rendered row to shadow buffer */
 		if (term->scroll_offset == 0)
 			memcpy(&g_shadow[row][0],
-			    &term->screen[row][0],
+			    term->screen_rows[row],
 			    term->active_cols * sizeof(TermCell));
 #endif
 
@@ -1997,7 +1997,7 @@ draw_row(Terminal *term, short row)
 #if FLYNN_SCROLLBACK_LINES > 0
 	if (term->scroll_offset == 0) {
 #endif
-		row_cells = &term->screen[row][0];
+		row_cells = term->screen_rows[row];
 		if (use_color)
 			row_colors = &term->screen_color[
 			    row * TERM_COLS];
@@ -2014,7 +2014,7 @@ draw_row(Terminal *term, short row)
 				sb_idx -= TERM_SCROLLBACK_LINES;
 			if (sb_idx < 0 ||
 			    sb_idx >= TERM_SCROLLBACK_LINES) {
-				row_cells = &term->screen[0][0];
+				row_cells = term->screen_rows[0];
 				row_colors = 0L;
 			} else {
 				row_cells =
@@ -2027,7 +2027,7 @@ draw_row(Terminal *term, short row)
 					row_colors = 0L;
 			}
 		} else {
-			row_cells = &term->screen[sb_row][0];
+			row_cells = term->screen_rows[sb_row];
 			if (use_color)
 				row_colors =
 				    &term->screen_color[

@@ -206,6 +206,13 @@ terminal_init(Terminal *term)
 	memset(term->line_attr, 0, sizeof(term->line_attr));
 #endif
 
+	/* Initialize row pointer table (eliminates row*TERM_COLS multiply) */
+	{
+		short r;
+		for (r = 0; r < TERM_ROWS; r++)
+			term->screen_rows[r] = term->screen[r];
+	}
+
 	/* Clear dirty flags then mark active rows dirty */
 	memset(term->dirty, 0, sizeof(term->dirty));
 
@@ -310,8 +317,8 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					if (term->cur_fg != COLOR_DEFAULT ||
 					    term->cur_bg != COLOR_DEFAULT)
 						a |= ATTR_HAS_COLOR;
-					term->screen[term->cur_row][term->cur_col].ch = ch;
-					term->screen[term->cur_row][term->cur_col].attr = a;
+					term->screen_rows[term->cur_row][term->cur_col].ch = ch;
+					term->screen_rows[term->cur_row][term->cur_col].attr = a;
 					if (term->has_color &&
 					    term->screen_color) {
 						if (term->cur_row !=
@@ -559,13 +566,13 @@ terminal_get_display_cell(Terminal *term, short row, short col)
 	short sb_idx;
 
 	if (col < 0 || col >= TERM_COLS)
-		return &term->screen[0][0];
+		return term->screen_rows[0];
 	if (row < 0 || row >= TERM_ROWS)
-		return &term->screen[0][0];
+		return term->screen_rows[0];
 
 #if FLYNN_SCROLLBACK_LINES > 0
 	if (term->scroll_offset == 0)
-		return &term->screen[row][col];
+		return &term->screen_rows[row][col];
 
 	/*
 	 * With scroll_offset > 0, display row 0 maps to
@@ -583,14 +590,14 @@ terminal_get_display_cell(Terminal *term, short row, short col)
 			sb_idx -= TERM_SCROLLBACK_LINES;
 		/* Final bounds check */
 		if (sb_idx < 0 || sb_idx >= TERM_SCROLLBACK_LINES)
-			return &term->screen[0][0];
+			return &term->screen_rows[0][0];
 		return &term->scrollback[sb_idx][col];
 	}
 
 	/* This row comes from the live screen */
-	return &term->screen[sb_row][col];
+	return &term->screen_rows[sb_row][col];
 #else
-	return &term->screen[row][col];
+	return &term->screen_rows[row][col];
 #endif
 }
 
@@ -804,7 +811,7 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 	 */
 	for (r = r1; r <= r2; r++) {
 		unsigned short fill = ((unsigned short)' ' << 8) | ATTR_NORMAL;
-		unsigned short *p = (unsigned short *)&term->screen[r][c1];
+		unsigned short *p = (unsigned short *)&term->screen_rows[r][c1];
 		for (c = c1; c <= c2; c++)
 			*p++ = fill;
 		term_dirty_row(term, r);
@@ -834,7 +841,7 @@ term_save_scrollback(Terminal *term, short row)
 	if (row < 0 || row >= TERM_ROWS)
 		return;
 
-	memcpy(term->scrollback[term->sb_head], term->screen[row],
+	memcpy(term->scrollback[term->sb_head], term->screen_rows[row],
 	    term->active_cols * sizeof(TermCell));
 
 	/* Save color for this scrollback line (lazy-allocate on first use) */
@@ -891,8 +898,8 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		short rows_to_move = bottom - top - count + 1;
 		if (rows_to_move > 0) {
 			for (r = 0; r < rows_to_move; r++)
-				memmove(&term->screen[top + r][0],
-				    &term->screen[top + count + r][0],
+				memmove(term->screen_rows[top + r],
+				    term->screen_rows[top + count + r],
 				    term->active_cols *
 				    sizeof(TermCell));
 #ifdef FLYNN_DBLWIDTH
@@ -923,7 +930,7 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		    ATTR_NORMAL;
 		for (r = bottom - count + 1; r <= bottom; r++) {
 			unsigned short *p =
-			    (unsigned short *)&term->screen[r][0];
+			    (unsigned short *)term->screen_rows[r];
 			for (c = 0; c < term->active_cols; c++)
 				*p++ = fill;
 #ifdef FLYNN_DBLWIDTH
@@ -1013,9 +1020,9 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		short rows_to_move = bottom - top - count + 1;
 		if (rows_to_move > 0) {
 			for (r = rows_to_move - 1; r >= 0; r--)
-				memmove(&term->screen[top + count +
-				    r][0],
-				    &term->screen[top + r][0],
+				memmove(term->screen_rows[top + count +
+				    r],
+				    term->screen_rows[top + r],
 				    term->active_cols *
 				    sizeof(TermCell));
 #ifdef FLYNN_DBLWIDTH
@@ -1046,7 +1053,7 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		    ATTR_NORMAL;
 		for (r = top; r < top + count; r++) {
 			unsigned short *p =
-			    (unsigned short *)&term->screen[r][0];
+			    (unsigned short *)term->screen_rows[r];
 			for (c = 0; c < term->active_cols; c++)
 				*p++ = fill;
 #ifdef FLYNN_DBLWIDTH
@@ -1145,8 +1152,8 @@ term_put_char(Terminal *term, unsigned char ch)
 	/* Insert mode: shift line right before placing character */
 	if (term->insert_mode) {
 		for (c = term->active_cols - 1; c > term->cur_col; c--) {
-			term->screen[term->cur_row][c] =
-			    term->screen[term->cur_row][c - 1];
+			term->screen_rows[term->cur_row][c] =
+			    term->screen_rows[term->cur_row][c - 1];
 		}
 		/* Shift color array too */
 		if (term->has_color && term->screen_color) {
@@ -1164,8 +1171,8 @@ term_put_char(Terminal *term, unsigned char ch)
 	if (term->cur_fg != COLOR_DEFAULT || term->cur_bg != COLOR_DEFAULT)
 		attr |= ATTR_HAS_COLOR;
 
-	term->screen[term->cur_row][term->cur_col].ch = ch;
-	term->screen[term->cur_row][term->cur_col].attr = attr;
+	term->screen_rows[term->cur_row][term->cur_col].ch = ch;
+	term->screen_rows[term->cur_row][term->cur_col].attr = attr;
 
 	/* Write color to separate color array (System 7 only) */
 	if (term->has_color && term->screen_color) {
@@ -1205,8 +1212,8 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 	/* Wide glyph at last column: place space and wrap first */
 	if (wide && term->cur_col >= term->active_cols - 1) {
 		/* Fill current cell with space */
-		term->screen[term->cur_row][term->cur_col].ch = ' ';
-		term->screen[term->cur_row][term->cur_col].attr = ATTR_NORMAL;
+		term->screen_rows[term->cur_row][term->cur_col].ch = ' ';
+		term->screen_rows[term->cur_row][term->cur_col].attr = ATTR_NORMAL;
 		term_dirty_row(term, term->cur_row);
 
 		if (term->autowrap) {
@@ -1245,8 +1252,8 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 
 		for (c = term->active_cols - 1;
 		    c > term->cur_col + shift - 1; c--) {
-			term->screen[term->cur_row][c] =
-			    term->screen[term->cur_row][c - shift];
+			term->screen_rows[term->cur_row][c] =
+			    term->screen_rows[term->cur_row][c - shift];
 		}
 		/* Shift color array too */
 		if (term->has_color && term->screen_color) {
@@ -1261,8 +1268,8 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 	}
 
 	/* Place primary glyph cell */
-	term->screen[term->cur_row][term->cur_col].ch = glyph_id;
-	term->screen[term->cur_row][term->cur_col].attr = attr;
+	term->screen_rows[term->cur_row][term->cur_col].ch = glyph_id;
+	term->screen_rows[term->cur_row][term->cur_col].attr = attr;
 
 	/* Write color for primary cell */
 	if (term->has_color && term->screen_color) {
@@ -1277,9 +1284,9 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 	if (wide) {
 		/* Place wide spacer in second cell */
 		term->cur_col++;
-		term->screen[term->cur_row][term->cur_col].ch =
+		term->screen_rows[term->cur_row][term->cur_col].ch =
 		    GLYPH_WIDE_SPACER;
-		term->screen[term->cur_row][term->cur_col].attr = attr;
+		term->screen_rows[term->cur_row][term->cur_col].attr = attr;
 		/* Write color for spacer cell too */
 		if (term->has_color && term->screen_color) {
 			CellColor *cc = &term->screen_color[
@@ -1347,8 +1354,8 @@ term_put_cp437(Terminal *term, unsigned char byte)
 	if (term->cur_fg != COLOR_DEFAULT || term->cur_bg != COLOR_DEFAULT)
 		attr |= ATTR_HAS_COLOR;
 
-	term->screen[term->cur_row][term->cur_col].ch = ch;
-	term->screen[term->cur_row][term->cur_col].attr = attr;
+	term->screen_rows[term->cur_row][term->cur_col].ch = ch;
+	term->screen_rows[term->cur_row][term->cur_col].attr = attr;
 
 	if (term->has_color && term->screen_color) {
 		CellColor *cc = &term->screen_color[
@@ -1911,12 +1918,12 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		/* ICH - insert characters at cursor, shifting right */
 		p1 = term_clamp(p1, 1, term->active_cols - term->cur_col);
 		for (c = term->active_cols - 1; c >= term->cur_col + p1; c--) {
-			term->screen[term->cur_row][c] =
-			    term->screen[term->cur_row][c - p1];
+			term->screen_rows[term->cur_row][c] =
+			    term->screen_rows[term->cur_row][c - p1];
 		}
 		for (c = term->cur_col; c < term->cur_col + p1; c++) {
-			term->screen[term->cur_row][c].ch = ' ';
-			term->screen[term->cur_row][c].attr = ATTR_NORMAL;
+			term->screen_rows[term->cur_row][c].ch = ' ';
+			term->screen_rows[term->cur_row][c].attr = ATTR_NORMAL;
 		}
 		if (term->has_color && term->screen_color) {
 			short row_off = term->cur_row * TERM_COLS;
@@ -1938,12 +1945,12 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		/* DCH - delete characters at cursor, shifting left */
 		p1 = term_clamp(p1, 1, term->active_cols - term->cur_col);
 		for (c = term->cur_col; c < term->active_cols - p1; c++) {
-			term->screen[term->cur_row][c] =
-			    term->screen[term->cur_row][c + p1];
+			term->screen_rows[term->cur_row][c] =
+			    term->screen_rows[term->cur_row][c + p1];
 		}
 		for (c = term->active_cols - p1; c < term->active_cols; c++) {
-			term->screen[term->cur_row][c].ch = ' ';
-			term->screen[term->cur_row][c].attr = ATTR_NORMAL;
+			term->screen_rows[term->cur_row][c].ch = ' ';
+			term->screen_rows[term->cur_row][c].attr = ATTR_NORMAL;
 		}
 		if (term->has_color && term->screen_color) {
 			short row_off = term->cur_row * TERM_COLS;
@@ -1966,8 +1973,8 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		/* ECH - erase characters at cursor (don't move cursor) */
 		p1 = term_clamp(p1, 1, term->active_cols - term->cur_col);
 		for (c = term->cur_col; c < term->cur_col + p1; c++) {
-			term->screen[term->cur_row][c].ch = ' ';
-			term->screen[term->cur_row][c].attr = ATTR_NORMAL;
+			term->screen_rows[term->cur_row][c].ch = ' ';
+			term->screen_rows[term->cur_row][c].attr = ATTR_NORMAL;
 		}
 		if (term->has_color && term->screen_color) {
 			short row_off = term->cur_row * TERM_COLS;
