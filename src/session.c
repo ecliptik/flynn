@@ -489,6 +489,39 @@ do_window_resize(Session *s, short width, short height)
 	term_ui_draw(s->window, &s->terminal);
 	if (prefs.show_status_bar)
 		draw_status_bar(s->window, s);
+
+	/* Redraw scrollbar column and grow box directly.
+	 * SizeWindow snap-to-grid may shrink the window, which
+	 * doesn't generate an update event for the lost area.
+	 * Without this, the grow box and right column are left
+	 * un-drawn until the next full update. */
+	{
+		Rect col_r;
+		RgnHandle save_clip;
+
+		SetRect(&col_r,
+		    s->window->portRect.right - SCROLLBAR_WIDTH, 0,
+		    s->window->portRect.right,
+		    s->window->portRect.bottom);
+		if (prefs.dark_mode)
+			PaintRect(&col_r);
+		else
+			EraseRect(&col_r);
+
+		save_clip = NewRgn();
+		GetClip(save_clip);
+		SetRect(&col_r,
+		    s->window->portRect.right - SCROLLBAR_WIDTH,
+		    s->window->portRect.bottom - SCROLLBAR_WIDTH,
+		    s->window->portRect.right + 1,
+		    s->window->portRect.bottom + 1);
+		ClipRect(&col_r);
+		DrawGrowIcon(s->window);
+		SetClip(save_clip);
+		DisposeRgn(save_clip);
+
+		DrawControls(s->window);
+	}
 	SetPort(save);
 
 	/* Send NAWS only if grid dimensions actually changed */
