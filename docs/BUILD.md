@@ -47,9 +47,9 @@ Bare-bones telnet client. Ideal for 1MB Macs or embedded use. Released as **Flyn
 | Everything else | OFF    |
 
 What you lose: no scroll-back history, no bookmarks, no Finger protocol, no Unicode
-glyphs or box-drawing characters, no file save, no dark mode, no offscreen buffering
-(may see flicker), no status bar, no custom cursor styles or tab stops, no
-double-width/height line rendering.
+glyphs or box-drawing characters, no file save, no session logging, no printing, no
+dark mode, no offscreen buffering (may see flicker), no status bar, no custom cursor
+styles or tab stops, no double-width/height line rendering.
 
 ### lite (~384KB partition, ~115KB binary)
 
@@ -65,6 +65,8 @@ Recommended for Macintosh Plus and other compact Macs running System 6. Released
 | CP437            | ON     |
 | Clipboard       | ON     |
 | Save file       | ON     |
+| Logging         | ON     |
+| Printing        | ON     |
 | Bookmarks       | ON     |
 | Dark mode       | ON     |
 | Alt screen      | ON     |
@@ -282,7 +284,7 @@ After building, a summary shows the configuration:
 ```
 Build complete (v1.9.8, full preset):
   Sessions: 4, Scrollback: 192 lines
-  Features: finger glyphs cp437 clipboard savefile bookmarks
+  Features: finger glyphs cp437 clipboard savefile logging printing favorites
             darkmode altscreen offscreen statusbar cursorstyles tabstops color dblwidth
   SIZE: 768KB preferred / 704KB minimum
 ```
