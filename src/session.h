@@ -48,6 +48,15 @@ typedef struct Session {
 
 	/* Bookmark this session was launched from (-1 = none) */
 	short		bookmark_index;
+
+#ifdef FLYNN_LOGGING
+	/* Session logging file refnum (0 = not logging) */
+	short		log_refnum;
+	/* Escape sequence filter state for log output */
+	short		log_filter_state;
+	/* Last char written to log (for CR dedup) */
+	char		log_last_char;
+#endif
 } Session;
 
 /* Create a new session with window. Returns NULL on failure. */

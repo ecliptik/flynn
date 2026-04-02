@@ -19,6 +19,7 @@
 #include "tcp.h"
 #include "color.h"
 #include "menus.h"
+#include "logging.h"
 
 extern FlynnPrefs prefs;
 
@@ -130,6 +131,9 @@ session_destroy(Session *s)
 {
 	if (s == 0L)
 		return;
+
+	/* Auto-stop logging before cleanup */
+	log_stop_if_active(s);
 
 	/* Invalidate offscreen buffer — prevents stale content
 	 * from a destroyed session being blitted to a new window */

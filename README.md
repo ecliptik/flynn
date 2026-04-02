@@ -79,6 +79,8 @@ Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archi
 **Session Management**
 - **Bookmarks** with per-bookmark protocol, font, and terminal type
 - **Reconnect** (Cmd+R) and keep-alive (NOP every 120s)
+- **Session logging** to text file (Cmd+L) with ANSI escape filtering
+- **Page Setup and Print** (Cmd+P) with Printing Manager support
 - **Find in Scrollback** (Cmd+F / Cmd+G), Show Clipboard, Reset Terminal
 - **Persistent settings**, window position, and telnet:// URL handling
 - **MultiFinder, Apple Events, and Notification Manager support**
@@ -109,6 +111,8 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | Finger | Cmd+I | Finger protocol query |
 | New Session | Cmd+N | New session (new window if connected) |
 | Reconnect | Cmd+R | Reconnect to same host after disconnect |
+| Start/Stop Logging | Cmd+L | Log session output to text file |
+| Print | Cmd+P | Print scrollback and screen content |
 | Save Contents | Cmd+S | Save scrollback and screen to text file |
 | Close Window | Cmd+W | Close active session window |
 | Quit | Cmd+Q | Quit Flynn |

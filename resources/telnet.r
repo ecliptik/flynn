@@ -27,6 +27,10 @@ resource 'MENU' (129, "File") {
 		"Finger\311", noIcon, "I", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Save Contents\311", noIcon, "S", noMark, plain;
+		"Start Logging\311", noIcon, "L", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Page Setup\311", noIcon, noKey, noMark, plain;
+		"Print\311", noIcon, "P", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Quit", noIcon, "Q", noMark, plain
 	}

@@ -15,6 +15,8 @@ FLYNN_GLYPHS=ON
 FLYNN_CP437=ON
 FLYNN_CLIPBOARD=ON
 FLYNN_SAVEFILE=ON
+FLYNN_LOGGING=ON
+FLYNN_PRINTING=ON
 FLYNN_FAVORITES=ON
 FLYNN_DARK_MODE=ON
 FLYNN_DBLWIDTH=ON
@@ -38,6 +40,8 @@ apply_preset() {
             FLYNN_CP437=OFF
             FLYNN_CLIPBOARD=ON
             FLYNN_SAVEFILE=OFF
+            FLYNN_LOGGING=OFF
+            FLYNN_PRINTING=OFF
             FLYNN_FAVORITES=OFF
             FLYNN_DARK_MODE=OFF
             FLYNN_DBLWIDTH=OFF
@@ -57,6 +61,8 @@ apply_preset() {
             FLYNN_CP437=ON
             FLYNN_CLIPBOARD=ON
             FLYNN_SAVEFILE=ON
+            FLYNN_LOGGING=ON
+            FLYNN_PRINTING=ON
             FLYNN_FAVORITES=ON
             FLYNN_DARK_MODE=ON
             FLYNN_DBLWIDTH=ON
@@ -76,6 +82,8 @@ apply_preset() {
             FLYNN_CP437=ON
             FLYNN_CLIPBOARD=ON
             FLYNN_SAVEFILE=ON
+            FLYNN_LOGGING=ON
+            FLYNN_PRINTING=ON
             FLYNN_FAVORITES=ON
             FLYNN_DARK_MODE=ON
             FLYNN_DBLWIDTH=ON
@@ -145,6 +153,10 @@ while [[ $# -gt 0 ]]; do
         --no-clipboard)  FLYNN_CLIPBOARD=OFF;      shift ;;
         --savefile)      FLYNN_SAVEFILE=ON;         shift ;;
         --no-savefile)   FLYNN_SAVEFILE=OFF;        shift ;;
+        --logging)       FLYNN_LOGGING=ON;          shift ;;
+        --no-logging)    FLYNN_LOGGING=OFF;         shift ;;
+        --printing)      FLYNN_PRINTING=ON;         shift ;;
+        --no-printing)   FLYNN_PRINTING=OFF;        shift ;;
         --favorites)     FLYNN_FAVORITES=ON;        shift ;;
         --no-favorites)  FLYNN_FAVORITES=OFF;       shift ;;
         --bookmarks)     FLYNN_FAVORITES=ON;        shift ;;  # legacy alias
@@ -202,6 +214,8 @@ compute_size() {
     [ "$FLYNN_FAVORITES" = "ON" ] && shared=$(( shared + 3 ))
     [ "$FLYNN_CLIPBOARD" = "ON" ] && shared=$(( shared + 1 ))
     [ "$FLYNN_SAVEFILE" = "ON" ] && shared=$(( shared + 1 ))
+    [ "$FLYNN_LOGGING" = "ON" ] && shared=$(( shared + 1 ))
+    [ "$FLYNN_PRINTING" = "ON" ] && shared=$(( shared + 2 ))
     [ "$FLYNN_COLOR" = "ON" ] && shared=$(( shared + 1 ))
     [ "$FLYNN_DBLWIDTH" = "ON" ] && shared=$(( shared + 1 ))
     [ "$FLYNN_STATUS_BAR" = "ON" ] && shared=$(( shared + 1 ))
@@ -273,6 +287,8 @@ cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=MinSi
     -DFLYNN_CP437="$FLYNN_CP437" \
     -DFLYNN_CLIPBOARD="$FLYNN_CLIPBOARD" \
     -DFLYNN_SAVEFILE="$FLYNN_SAVEFILE" \
+    -DFLYNN_LOGGING="$FLYNN_LOGGING" \
+    -DFLYNN_PRINTING="$FLYNN_PRINTING" \
     -DFLYNN_FAVORITES="$FLYNN_FAVORITES" \
     -DFLYNN_DARK_MODE="$FLYNN_DARK_MODE" \
     -DFLYNN_DBLWIDTH="$FLYNN_DBLWIDTH" \
@@ -345,13 +361,15 @@ cp "$BUILD_DIR/Flynn.dsk" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.dsk"
 # --- Build summary ---
 ENABLED=""
 DISABLED=""
-for feat in finger glyphs cp437 clipboard savefile favorites darkmode altscreen offscreen statusbar cursorstyles tabstops color dblwidth; do
+for feat in finger glyphs cp437 clipboard savefile logging printing favorites darkmode altscreen offscreen statusbar cursorstyles tabstops color dblwidth; do
     case $feat in
         finger)       val=$FLYNN_FINGER ;;
         glyphs)       val=$FLYNN_GLYPHS ;;
         cp437)        val=$FLYNN_CP437 ;;
         clipboard)    val=$FLYNN_CLIPBOARD ;;
         savefile)     val=$FLYNN_SAVEFILE ;;
+        logging)      val=$FLYNN_LOGGING ;;
+        printing)     val=$FLYNN_PRINTING ;;
         favorites)    val=$FLYNN_FAVORITES ;;
         darkmode)     val=$FLYNN_DARK_MODE ;;
         altscreen)    val=$FLYNN_ALT_SCREEN ;;

@@ -35,6 +35,8 @@
 #include "macutil.h"
 #include "color.h"
 #include "finger.h"
+#include "logging.h"
+#include "printing.h"
 
 /* Globals */
 Boolean running = true;
@@ -301,6 +303,9 @@ session_handle_disconnect(Session *sess)
 	GrafPtr save;
 	short was_ttype;
 
+	/* Auto-stop logging on disconnect */
+	log_stop_if_active(sess);
+
 #ifdef FLYNN_FINGER
 	/* Finger: server closure is expected.  Skip telnet reset,
 	 * snapshot restore, and full redraw — the screen content
@@ -473,6 +478,9 @@ session_process_data(Session *sess)
 
 	if (out_len > 0) {
 		short offset = 0;
+
+		/* Log raw terminal output before processing */
+		log_write_data(sess, out_buf, out_len);
 
 		if (sess->terminal.scroll_offset > 0) {
 			sess->terminal.scroll_offset = 0;

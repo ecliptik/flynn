@@ -27,8 +27,12 @@
 #define FILE_MENU_FINGER_ID     5   /* Finger... (Cmd+I) */
 /* separator = 6 */
 #define FILE_MENU_SAVE_ID       7
-/* separator = 8 */
-#define FILE_MENU_QUIT_ID       9
+#define FILE_MENU_LOG_ID        8   /* Start/Stop Logging (Cmd+L) */
+/* separator = 9 */
+#define FILE_MENU_PAGESETUP_ID  10  /* Page Setup... */
+#define FILE_MENU_PRINT_ID      11  /* Print... (Cmd+P) */
+/* separator = 12 */
+#define FILE_MENU_QUIT_ID       13
 
 /* Edit menu items */
 #define EDIT_MENU_COPY_ID       4

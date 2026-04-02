@@ -30,6 +30,8 @@
 #include "favorites.h"
 #include "finger.h"
 #include "color.h"
+#include "logging.h"
+#include "printing.h"
 
 /* Menu handles (private to this module) */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
@@ -142,6 +144,35 @@ update_menus(void)
 		DisableItem(file_menu, FILE_MENU_SAVE_ID);
 #else
 	DisableItem(file_menu, FILE_MENU_SAVE_ID);
+#endif
+
+#ifdef FLYNN_LOGGING
+	/* Logging: enable when session exists, toggle text */
+	if (active_session) {
+		EnableItem(file_menu, FILE_MENU_LOG_ID);
+		SetMenuItemText(file_menu, FILE_MENU_LOG_ID,
+		    active_session->log_refnum ?
+		    "\pStop Logging" :
+		    "\pStart Logging\311");
+	} else {
+		DisableItem(file_menu, FILE_MENU_LOG_ID);
+		SetMenuItemText(file_menu, FILE_MENU_LOG_ID,
+		    "\pStart Logging\311");
+	}
+#else
+	DisableItem(file_menu, FILE_MENU_LOG_ID);
+#endif
+
+#ifdef FLYNN_PRINTING
+	/* Page Setup: always enabled. Print: when session exists. */
+	EnableItem(file_menu, FILE_MENU_PAGESETUP_ID);
+	if (active_session)
+		EnableItem(file_menu, FILE_MENU_PRINT_ID);
+	else
+		DisableItem(file_menu, FILE_MENU_PRINT_ID);
+#else
+	DisableItem(file_menu, FILE_MENU_PAGESETUP_ID);
+	DisableItem(file_menu, FILE_MENU_PRINT_ID);
 #endif
 
 #ifdef FLYNN_FAVORITES
@@ -430,6 +461,20 @@ handle_file_menu(short item)
 		break;
 	case FILE_MENU_SAVE_ID:
 		do_save_session();
+		break;
+	case FILE_MENU_LOG_ID:
+#ifdef FLYNN_LOGGING
+		if (active_session && active_session->log_refnum)
+			do_stop_logging();
+		else
+			do_start_logging();
+#endif
+		break;
+	case FILE_MENU_PAGESETUP_ID:
+		do_page_setup();
+		break;
+	case FILE_MENU_PRINT_ID:
+		do_print();
 		break;
 	case FILE_MENU_QUIT_ID:
 		if (session_any_connected()) {

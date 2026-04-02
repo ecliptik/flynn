@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Session logging (Cmd+L): continuous output logging to text file with ANSI escape sequence filtering, CR deduplication, and sensitive data warning in log header
+- Print support (Cmd+P): Page Setup and Print via Printing Manager with paginated output, Geneva 9pt header/footer, Monaco 9pt terminal content, and ImageWriter spool printing
 - Telnet NOP keep-alive: sends IAC NOP after 120 seconds idle to prevent NAT/firewall drops
 - Reconnect (Cmd+R): reconnect to same host after disconnect, also available in File menu
 - Reconnect button on disconnect alert: one-click reconnect when remote host closes connection

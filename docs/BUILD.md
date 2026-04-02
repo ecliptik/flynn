@@ -120,6 +120,8 @@ to disable. Presets are applied first, then individual flags override.
 | `--cp437 / --no-cp437` | ON | Code Page 437 character set (ANSI-BBS) |
 | `--clipboard / --no-clipboard` | ON | Copy/paste and text selection |
 | `--savefile / --no-savefile` | ON | Save session text to file |
+| `--logging / --no-logging` | ON | Session logging to text file |
+| `--printing / --no-printing` | ON | Page Setup and Print support |
 | `--bookmarks / --no-bookmarks` | ON | Favorites/bookmarks system |
 | `--darkmode / --no-darkmode` | ON | Dark mode toggle (white on black) |
 | `--dblwidth / --no-dblwidth` | ON | Double-width/height line rendering (DECDWL/DECDHL) |
@@ -198,6 +200,20 @@ BBS systems that use IBM PC character sets. Requires glyphs (auto-enabled if nee
 
 RFC 1288 Finger protocol client. Query user information on remote hosts via port 79.
 Accessed from the File menu.
+
+### Logging (--logging)
+
+Continuous session logging to a text file (like Unix `script`). Records all terminal
+output with ANSI escape sequences stripped, producing clean readable text. Accessible
+via File > Start Logging (Cmd+L). The log header includes a warning that the file may
+contain sensitive information such as passwords.
+
+### Printing (--printing)
+
+Page Setup and Print (Cmd+P) support via the Macintosh Printing Manager. Prints
+scrollback and screen buffer content with Geneva 9pt header/footer (hostname and page
+numbers) and Monaco 9pt monospace terminal content. Supports ImageWriter spool printing.
+Uses lazy printer record allocation (no overhead if never used).
 
 ### Bookmarks (--bookmarks)
 
