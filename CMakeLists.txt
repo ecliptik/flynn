@@ -99,6 +99,7 @@ target_compile_definitions(Flynn PRIVATE
 target_compile_options(Flynn PRIVATE
     -m68000
     -Os
+    -fomit-frame-pointer
     -ffunction-sections
     -fdata-sections
 )

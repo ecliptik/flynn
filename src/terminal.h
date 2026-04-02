@@ -224,9 +224,17 @@ typedef struct {
 	CellColor	*alt_color;	/* NULL on System 6, lazy alloc */
 	CellColor	*sb_color;	/* NULL on System 6, lazy alloc */
 
+	/* Charset-is-standard flag: 1 when gl_charset==0 && g0_charset=='B'.
+	 * Avoids two-field check per character in ASCII fast path. */
+	unsigned char	charset_std;
+
 	/* Row pointer table: eliminates row*TERM_COLS multiply on 68000.
 	 * Points into screen[] — valid for struct lifetime (NewPtr). */
 	TermCell	*screen_rows[TERM_ROWS];
+
+	/* Color row pointer table: same optimization for CellColor arrays.
+	 * Points into screen_color — valid only when has_color is set. */
+	CellColor	*screen_color_rows[TERM_ROWS];
 
 	/* --- Large arrays LAST: pushed beyond hot-path offsets --- */
 
@@ -273,6 +281,11 @@ void terminal_scroll_forward(Terminal *term, short lines);
 #define terminal_scroll_forward(t, l) ((void)0)
 #endif
 
+/* Inline dirty-row marking: saves JSR/RTS overhead (~40 cycles) */
+#define TERM_DIRTY_ROW(t, r) do { \
+    if ((r) >= 0 && (r) < (t)->active_rows) (t)->dirty[r] = 1; \
+} while(0)
+
 /* Check if a row is dirty (needs redraw) */
 short terminal_is_row_dirty(Terminal *term, short row);
 
@@ -287,5 +300,14 @@ void terminal_get_cursor(Terminal *term, short *row, short *col);
 
 /* Convert a TermCell to a plain text character for clipboard/file export */
 char cell_to_char(TermCell *cell);
+
+/* Search for text in screen and scrollback.
+ * start_row/start_col: position to start searching from
+ * direction: 1=forward, -1=backward
+ * Sets found_row/found_col on match, returns 1. Returns 0 if not found.
+ * found_row is in display coordinates (negative = scrollback). */
+short terminal_find(Terminal *term, const char *text, short text_len,
+    short start_row, short start_col, short direction,
+    short *found_row, short *found_col);
 
 #endif /* TERMINAL_H */

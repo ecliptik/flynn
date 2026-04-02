@@ -54,6 +54,8 @@ prefs_defaults(FlynnPrefs *prefs)
 	prefs->show_status_bar = 1;	/* on by default */
 	strncpy(prefs->dns_server, "1.1.1.1", sizeof(prefs->dns_server) - 1);
 	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
+	prefs->win_x = 2;
+	prefs->win_y = 40;
 }
 
 void
@@ -341,6 +343,15 @@ prefs_load(FlynnPrefs *prefs)
 			prefs_save(prefs);
 			return;
 		}
+	}
+
+	if (prefs->version == 14) {
+		/* v14→v15 migration: add win_x/win_y */
+		prefs->win_x = 2;
+		prefs->win_y = 40;
+		prefs->version = PREFS_VERSION;
+		prefs_save(prefs);
+		return;
 	}
 
 	if (prefs->version != PREFS_VERSION)

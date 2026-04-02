@@ -998,3 +998,241 @@ do_dns_server_dialog(void)
 		}
 	}
 }
+
+/* ---- Reconnect ---- */
+
+void
+do_reconnect(void)
+{
+	Session *s = active_session;
+	WindowPtr sw;
+	char smsg[80];
+
+	if (!s || !s->conn.host[0])
+		return;
+	if (s->conn.state == CONN_STATE_CONNECTED)
+		return;
+
+	/* Reset terminal and telnet state */
+	terminal_reset(&s->terminal);
+	telnet_init(&s->telnet);
+	s->telnet.preferred_ttype = prefs.terminal_type;
+	s->telnet.cols = s->terminal.active_cols;
+	s->telnet.rows = s->terminal.active_rows;
+	s->key_send_len = 0;
+
+	/* Redraw cleared screen */
+	{
+		GrafPtr save;
+
+		GetPort(&save);
+		SetPort(s->window);
+		term_ui_invalidate_offscreen();
+		term_dirty_all(&s->terminal);
+		term_ui_draw(s->window, &s->terminal);
+		SetPort(save);
+	}
+
+	/* Connect */
+	snprintf(smsg, sizeof(smsg), "Reconnecting to %.50s\311",
+	    s->conn.host);
+	sw = conn_status_show(smsg);
+	if (conn_connect(&s->conn, s->conn.host, s->conn.port, sw)) {
+		conn_status_close(sw);
+		set_wtitlef(s->window, "Flynn - %s", s->conn.host);
+	} else {
+		conn_status_close(sw);
+	}
+	update_menus();
+}
+
+/* ---- Find in scrollback ---- */
+
+static char last_find_text[128];
+static short last_find_row = -1;
+static short last_find_col = -1;
+
+Boolean
+find_has_last_search(void)
+{
+	return last_find_text[0] != '\0';
+}
+
+static pascal Boolean
+find_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
+{
+	if (evt->what == keyDown) {
+		char key = evt->message & charCodeMask;
+
+		if (key == '\r' || key == '\n' || key == 0x03) {
+			*item = FIND_OK;
+			return true;
+		}
+		if ((evt->modifiers & cmdKey) && key == '.') {
+			*item = FIND_CANCEL;
+			return true;
+		}
+	}
+	return false;
+}
+
+static void
+find_and_show(Session *s, const char *text,
+    short start_row, short start_col)
+{
+	short found_row, found_col;
+	short text_len = strlen(text);
+
+	if (terminal_find(&s->terminal, text, text_len,
+	    start_row, start_col, -1,
+	    &found_row, &found_col)) {
+		short sb_row;
+		GrafPtr save;
+
+		/* Convert found row to scroll offset.
+		 * terminal_find returns rows in scrollback-
+		 * relative coordinates where negative rows
+		 * are in scrollback. */
+		if (found_row < 0)
+			sb_row = -found_row;
+		else
+			sb_row = 0;
+
+		/* Ensure found row is visible */
+		if (sb_row > s->terminal.sb_count)
+			sb_row = s->terminal.sb_count;
+		s->terminal.scroll_offset = sb_row;
+
+		/* Set selection to highlight match */
+		term_ui_load_state(&s->ui);
+		term_ui_sel_clear();
+		{
+			short vis_row = found_row +
+			    s->terminal.scroll_offset;
+			term_ui_sel_start(vis_row, found_col,
+			    s->terminal.scroll_offset);
+			term_ui_sel_extend(vis_row,
+			    found_col + text_len - 1,
+			    &s->terminal);
+			term_ui_sel_finalize();
+		}
+
+		/* Redraw */
+		GetPort(&save);
+		SetPort(s->window);
+		term_dirty_all(&s->terminal);
+		term_ui_draw(s->window, &s->terminal);
+		session_update_scrollbar(s);
+		SetPort(save);
+		term_ui_save_state(&s->ui);
+
+		/* Save position for Find Again */
+		last_find_row = found_row;
+		last_find_col = found_col;
+	} else {
+		ParamText("\pText not found.", "\p", "\p", "\p");
+		NoteAlert(128, 0L);
+	}
+}
+
+void
+do_find(void)
+{
+	DialogPtr dlg;
+	short item_hit;
+	Session *s = active_session;
+	char text[128];
+
+	if (!s)
+		return;
+
+	dlg = GetNewDialog(DLOG_FIND_ID, 0L, (WindowPtr)-1L);
+	if (!dlg) {
+		SysBeep(10);
+		return;
+	}
+
+	setup_default_button_outline(dlg, FIND_DEFAULT_BTN);
+
+	/* Pre-fill with last search */
+	if (last_find_text[0])
+		dlg_set_text(dlg, FIND_TEXT, last_find_text);
+
+	SelectDialogItemText(dlg, FIND_TEXT, 0, 32767);
+	ShowWindow(dlg);
+
+	for (;;) {
+		ModalDialog(
+		    (ModalFilterUPP)find_dlg_filter,
+		    &item_hit);
+		if (item_hit == FIND_CANCEL ||
+		    item_hit == FIND_OK)
+			break;
+	}
+
+	if (item_hit == FIND_OK) {
+		dlg_get_text(dlg, FIND_TEXT, text, sizeof(text));
+		DisposeDialog(dlg);
+
+		if (!text[0])
+			return;
+
+		strncpy(last_find_text, text,
+		    sizeof(last_find_text) - 1);
+		last_find_text[sizeof(last_find_text) - 1] = '\0';
+
+		/* Start search from bottom of screen going
+		 * backward into scrollback */
+		last_find_row = s->terminal.active_rows - 1;
+		last_find_col = s->terminal.active_cols - 1;
+		find_and_show(s, text,
+		    last_find_row, last_find_col);
+	} else {
+		DisposeDialog(dlg);
+	}
+}
+
+void
+do_find_again(void)
+{
+	Session *s = active_session;
+
+	if (!s || !last_find_text[0])
+		return;
+
+	/* Continue searching backward from before last match */
+	if (last_find_col > 0)
+		find_and_show(s, last_find_text,
+		    last_find_row, last_find_col - 1);
+	else
+		find_and_show(s, last_find_text,
+		    last_find_row - 1,
+		    s->terminal.active_cols - 1);
+}
+
+/* ---- Clear scrollback ---- */
+
+void
+do_clear_scrollback(void)
+{
+	Session *s = active_session;
+	GrafPtr save;
+
+	if (!s)
+		return;
+
+#if FLYNN_SCROLLBACK_LINES > 0
+	s->terminal.sb_count = 0;
+	s->terminal.sb_head = 0;
+	s->terminal.scroll_offset = 0;
+
+	GetPort(&save);
+	SetPort(s->window);
+	session_update_scrollbar(s);
+	{
+		Rect r = s->window->portRect;
+		InvalRect(&r);
+	}
+	SetPort(save);
+#endif
+}

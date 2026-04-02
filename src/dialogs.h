@@ -24,6 +24,15 @@
 /* Dialog resource IDs */
 #define DLOG_ABOUT_ID       130
 #define DLOG_DNS_ID         133
+#define DLOG_FIND_ID        138
+#define DLOG_DISCONN_ID     139  /* Disconnect alert with Reconnect */
+
+/* Find dialog items (must match DITL 138) */
+#define FIND_OK             1
+#define FIND_CANCEL         2
+#define FIND_LABEL          3
+#define FIND_TEXT           4
+#define FIND_DEFAULT_BTN    5
 
 #ifdef FLYNN_FAVORITES
 #define DLOG_FAVORITES_ID   131
@@ -94,6 +103,17 @@ void do_about(void);
 
 /* Show the DNS server configuration dialog */
 void do_dns_server_dialog(void);
+
+/* Reconnect active session with saved host/port */
+void do_reconnect(void);
+
+/* Find in scrollback */
+void do_find(void);
+void do_find_again(void);
+Boolean find_has_last_search(void);
+
+/* Clear scrollback buffer */
+void do_clear_scrollback(void);
 
 /* Status window UI (moved from connection.c) */
 WindowPtr conn_status_show(const char *msg);

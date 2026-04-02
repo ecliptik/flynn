@@ -161,3 +161,384 @@ do_select_all(void)
 	/* Update menus to reflect selection state */
 	update_menus();
 }
+
+/* ---- Show Clipboard window (adapted from Geomys) ---- */
+
+#define CLIP_WIN_KIND   100
+#define CLIP_WIN_W      300
+#define CLIP_WIN_H      160
+#define CLIP_MIN_W      150
+#define CLIP_MIN_H      80
+#define CLIP_SB_W       15
+
+static WindowPtr g_clip_window = 0L;
+static TEHandle g_clip_te = 0L;
+static ControlHandle g_clip_vscroll = 0L;
+static ControlHandle g_clip_hscroll = 0L;
+
+static void
+clip_calc_rects(Rect *view_r, Rect *dest_r)
+{
+	*view_r = g_clip_window->portRect;
+	view_r->left += 4;
+	view_r->top += 4;
+	view_r->right -= (CLIP_SB_W + 4);
+	view_r->bottom -= (CLIP_SB_W + 4);
+	*dest_r = *view_r;
+	dest_r->right = dest_r->left + 2000;
+}
+
+static pascal void
+clip_vscroll_action(ControlHandle ctl, short part)
+{
+	short delta = 0, old_val, new_val, max_val;
+	short page_lines;
+
+	if (!g_clip_te || part == 0)
+		return;
+
+	page_lines = ((*g_clip_te)->viewRect.bottom -
+	    (*g_clip_te)->viewRect.top) /
+	    (*g_clip_te)->lineHeight;
+	if (page_lines < 1) page_lines = 1;
+
+	switch (part) {
+	case inUpButton:    delta = -1; break;
+	case inDownButton:  delta = 1; break;
+	case inPageUp:      delta = -(page_lines - 1); break;
+	case inPageDown:    delta = page_lines - 1; break;
+	}
+
+	old_val = GetControlValue(ctl);
+	max_val = GetControlMaximum(ctl);
+	new_val = old_val + delta;
+	if (new_val < 0) new_val = 0;
+	if (new_val > max_val) new_val = max_val;
+	SetControlValue(ctl, new_val);
+
+	TEScroll(0, (old_val - new_val) *
+	    (*g_clip_te)->lineHeight, g_clip_te);
+}
+
+static pascal void
+clip_hscroll_action(ControlHandle ctl, short part)
+{
+	short delta = 0, old_val, new_val, max_val;
+	short page_w;
+
+	if (!g_clip_te || part == 0)
+		return;
+
+	page_w = (*g_clip_te)->viewRect.right -
+	    (*g_clip_te)->viewRect.left;
+
+	switch (part) {
+	case inUpButton:    delta = -8; break;
+	case inDownButton:  delta = 8; break;
+	case inPageUp:      delta = -(page_w - 16); break;
+	case inPageDown:    delta = page_w - 16; break;
+	}
+
+	old_val = GetControlValue(ctl);
+	max_val = GetControlMaximum(ctl);
+	new_val = old_val + delta;
+	if (new_val < 0) new_val = 0;
+	if (new_val > max_val) new_val = max_val;
+	SetControlValue(ctl, new_val);
+
+	TEScroll(old_val - new_val, 0, g_clip_te);
+}
+
+static void
+clip_update_scroll(void)
+{
+	short n_lines, vis_lines, max_v;
+	short max_w, vis_w, max_h;
+
+	if (!g_clip_te)
+		return;
+
+	if (g_clip_vscroll) {
+		n_lines = (*g_clip_te)->nLines;
+		if ((*g_clip_te)->teLength > 0 &&
+		    (*((char **)(*g_clip_te)->hText))
+		    [(*g_clip_te)->teLength - 1] != '\r')
+			n_lines++;
+		vis_lines = ((*g_clip_te)->viewRect.bottom -
+		    (*g_clip_te)->viewRect.top) /
+		    (*g_clip_te)->lineHeight;
+		max_v = n_lines - vis_lines;
+		if (max_v < 0) max_v = 0;
+		SetControlMaximum(g_clip_vscroll, max_v);
+	}
+
+	if (g_clip_hscroll) {
+		short i;
+		GrafPtr save;
+
+		GetPort(&save);
+		SetPort(g_clip_window);
+		TextFont(3);
+		TextSize(9);
+
+		max_w = 0;
+		for (i = 0; i < (*g_clip_te)->nLines; i++) {
+			short start, end, w;
+			char *text;
+
+			start = (*g_clip_te)->lineStarts[i];
+			if (i + 1 < (*g_clip_te)->nLines)
+				end = (*g_clip_te)->lineStarts[i + 1];
+			else
+				end = (*g_clip_te)->teLength;
+
+			HLock((*g_clip_te)->hText);
+			text = *(*g_clip_te)->hText;
+			w = TextWidth(text, start, end - start);
+			HUnlock((*g_clip_te)->hText);
+
+			if (w > max_w) max_w = w;
+		}
+
+		vis_w = (*g_clip_te)->viewRect.right -
+		    (*g_clip_te)->viewRect.left;
+		max_h = max_w - vis_w;
+		if (max_h < 0) max_h = 0;
+		SetControlMaximum(g_clip_hscroll, max_h);
+
+		SetPort(save);
+	}
+}
+
+static void
+clip_resize(void)
+{
+	Rect r, view_r, dest_r;
+	short dv, dh;
+
+	if (!g_clip_window)
+		return;
+
+	r = g_clip_window->portRect;
+
+	if (g_clip_vscroll) {
+		MoveControl(g_clip_vscroll, r.right - CLIP_SB_W, -1);
+		SizeControl(g_clip_vscroll, CLIP_SB_W + 1,
+		    r.bottom - CLIP_SB_W + 2);
+	}
+
+	if (g_clip_hscroll) {
+		MoveControl(g_clip_hscroll, -1, r.bottom - CLIP_SB_W);
+		SizeControl(g_clip_hscroll,
+		    r.right - CLIP_SB_W + 2, CLIP_SB_W + 1);
+	}
+
+	if (g_clip_te) {
+		clip_calc_rects(&view_r, &dest_r);
+
+		dv = (*g_clip_te)->viewRect.top -
+		    (*g_clip_te)->destRect.top;
+		dh = (*g_clip_te)->viewRect.left -
+		    (*g_clip_te)->destRect.left;
+
+		(*g_clip_te)->viewRect = view_r;
+		(*g_clip_te)->destRect = dest_r;
+		TECalText(g_clip_te);
+
+		clip_update_scroll();
+	}
+}
+
+void
+do_show_clipboard(void)
+{
+	Handle scrap_h;
+	long scrap_len, scrap_offset;
+	Rect bounds, view_r, dest_r, scroll_r;
+	short mbar_h;
+	GrafPtr save;
+
+	if (g_clip_window) {
+		SelectWindow(g_clip_window);
+		return;
+	}
+
+	GetPort(&save);
+
+	mbar_h = GetMBarHeight();
+	bounds.left = (qd.screenBits.bounds.right -
+	    CLIP_WIN_W) / 2;
+	bounds.top = mbar_h + 30;
+	bounds.right = bounds.left + CLIP_WIN_W;
+	bounds.bottom = bounds.top + CLIP_WIN_H;
+
+	g_clip_window = NewWindow(0L, &bounds,
+	    "\pClipboard", true, documentProc,
+	    (WindowPtr)-1L, true, 0L);
+	if (!g_clip_window) {
+		SetPort(save);
+		return;
+	}
+
+	((WindowPeek)g_clip_window)->windowKind = CLIP_WIN_KIND;
+
+	SetPort(g_clip_window);
+
+	/* Vertical scrollbar */
+	scroll_r.left = g_clip_window->portRect.right - CLIP_SB_W;
+	scroll_r.top = g_clip_window->portRect.top - 1;
+	scroll_r.right = g_clip_window->portRect.right + 1;
+	scroll_r.bottom = g_clip_window->portRect.bottom -
+	    (CLIP_SB_W - 1);
+	g_clip_vscroll = NewControl(g_clip_window,
+	    &scroll_r, "\p", true, 0, 0, 0,
+	    scrollBarProc, 0L);
+
+	/* Horizontal scrollbar */
+	scroll_r.left = g_clip_window->portRect.left - 1;
+	scroll_r.top = g_clip_window->portRect.bottom - CLIP_SB_W;
+	scroll_r.right = g_clip_window->portRect.right -
+	    (CLIP_SB_W - 1);
+	scroll_r.bottom = g_clip_window->portRect.bottom + 1;
+	g_clip_hscroll = NewControl(g_clip_window,
+	    &scroll_r, "\p", true, 0, 0, 0,
+	    scrollBarProc, 0L);
+
+	/* TextEdit */
+	TextFont(3);    /* Geneva */
+	TextSize(9);
+	clip_calc_rects(&view_r, &dest_r);
+
+	g_clip_te = TENew(&dest_r, &view_r);
+	if (!g_clip_te) {
+		DisposeWindow(g_clip_window);
+		g_clip_window = 0L;
+		g_clip_vscroll = 0L;
+		g_clip_hscroll = 0L;
+		SetPort(save);
+		return;
+	}
+
+	/* Get clipboard text */
+	scrap_len = GetScrap(0L, 'TEXT', &scrap_offset);
+	if (scrap_len > 0) {
+		if (scrap_len > 4096)
+			scrap_len = 4096;
+		scrap_h = NewHandle(scrap_len);
+		if (scrap_h) {
+			GetScrap(scrap_h, 'TEXT', &scrap_offset);
+			HLock(scrap_h);
+			TESetText(*scrap_h, scrap_len, g_clip_te);
+			HUnlock(scrap_h);
+			DisposeHandle(scrap_h);
+		}
+	} else {
+		TESetText("(Clipboard is empty.)", 21,
+		    g_clip_te);
+	}
+
+	clip_update_scroll();
+	SetPort(save);
+}
+
+WindowPtr
+clipboard_window_ptr(void)
+{
+	return g_clip_window;
+}
+
+void
+clipboard_window_update(WindowPtr win)
+{
+	GrafPtr save;
+
+	if (win != g_clip_window || !g_clip_te)
+		return;
+
+	GetPort(&save);
+	SetPort(win);
+	EraseRect(&win->portRect);
+	TEUpdate(&win->portRect, g_clip_te);
+	DrawControls(win);
+	DrawGrowIcon(win);
+	SetPort(save);
+}
+
+void
+clipboard_window_close(void)
+{
+	if (g_clip_te) {
+		TEDispose(g_clip_te);
+		g_clip_te = 0L;
+	}
+	g_clip_vscroll = 0L;
+	g_clip_hscroll = 0L;
+	if (g_clip_window) {
+		DisposeWindow(g_clip_window);
+		g_clip_window = 0L;
+	}
+}
+
+void
+clipboard_window_click(WindowPtr win, Point where)
+{
+	ControlHandle ctl;
+	short ctl_part;
+
+	if (win != g_clip_window)
+		return;
+
+	SetPort(win);
+	GlobalToLocal(&where);
+	ctl_part = FindControl(where, win, &ctl);
+
+	if (ctl && ctl_part != 0) {
+		if (ctl_part == inThumb) {
+			short old_val = GetControlValue(ctl);
+
+			TrackControl(ctl, where, 0L);
+			{
+				short new_val = GetControlValue(ctl);
+				if (ctl == g_clip_vscroll)
+					TEScroll(0,
+					    (old_val - new_val) *
+					    (*g_clip_te)->lineHeight,
+					    g_clip_te);
+				else if (ctl == g_clip_hscroll)
+					TEScroll(
+					    old_val - new_val, 0,
+					    g_clip_te);
+			}
+		} else if (ctl == g_clip_vscroll) {
+			TrackControl(ctl, where,
+			    (ControlActionUPP)clip_vscroll_action);
+		} else if (ctl == g_clip_hscroll) {
+			TrackControl(ctl, where,
+			    (ControlActionUPP)clip_hscroll_action);
+		}
+	}
+}
+
+void
+clipboard_window_grow(WindowPtr win, Point where)
+{
+	Rect limit;
+	long new_size;
+
+	if (win != g_clip_window)
+		return;
+
+	SetRect(&limit, CLIP_MIN_W, CLIP_MIN_H,
+	    qd.screenBits.bounds.right,
+	    qd.screenBits.bounds.bottom);
+	new_size = GrowWindow(win, where, &limit);
+	if (new_size == 0)
+		return;
+
+	SetPort(win);
+	EraseRect(&win->portRect);
+	SizeWindow(win, LoWord(new_size),
+	    HiWord(new_size), true);
+	clip_resize();
+	InvalRect(&win->portRect);
+}

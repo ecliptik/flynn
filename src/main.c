@@ -18,6 +18,7 @@
 #include <Multiverse.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "main.h"
 #include "session.h"
@@ -108,6 +109,111 @@ ae_print_doc(const AppleEvent *evt, AppleEvent *reply, long refcon)
 	return errAEEventNotHandled;
 }
 
+/*
+ * GURL Apple Event handler for telnet:// URLs.
+ * Allows System 7 web browsers to hand off telnet:// links to Flynn.
+ * URL format: telnet://host[:port]
+ */
+static pascal OSErr
+ae_get_url(const AppleEvent *evt, AppleEvent *reply, long refcon)
+{
+	AEDesc url_desc;
+	char url[512];
+	long url_len;
+	OSErr err;
+	char host[256];
+	short port = DEFAULT_PORT;
+	char *p, *host_start, *port_start;
+	Session *s;
+	WindowPtr sw;
+	char smsg[80];
+	short hlen;
+
+#pragma unused(reply, refcon)
+
+	err = AEGetParamDesc(evt, keyDirectObject,
+	    typeChar, &url_desc);
+	if (err != noErr)
+		return err;
+
+	url_len = GetHandleSize(url_desc.dataHandle);
+	if (url_len <= 0 || url_len >= (long)sizeof(url)) {
+		AEDisposeDesc(&url_desc);
+		return errAEEventNotHandled;
+	}
+
+	HLock(url_desc.dataHandle);
+	memcpy(url, *url_desc.dataHandle, url_len);
+	url[url_len] = '\0';
+	HUnlock(url_desc.dataHandle);
+	AEDisposeDesc(&url_desc);
+
+	/* Parse telnet://host[:port] */
+	p = url;
+	if (strncmp(p, "telnet://", 9) == 0)
+		p += 9;
+	else
+		return errAEEventNotHandled;
+
+	/* Skip optional user@ (not used) */
+	{
+		char *at = strchr(p, '@');
+		if (at)
+			p = at + 1;
+	}
+
+	host_start = p;
+
+	/* Find port separator or end */
+	port_start = strchr(p, ':');
+	if (port_start) {
+		hlen = port_start - host_start;
+		port = (short)atoi(port_start + 1);
+		if (port <= 0)
+			port = DEFAULT_PORT;
+	} else {
+		/* Strip trailing slash */
+		hlen = strlen(host_start);
+		if (hlen > 0 && host_start[hlen - 1] == '/')
+			hlen--;
+	}
+
+	if (hlen <= 0 || hlen >= (short)sizeof(host))
+		return errAEEventNotHandled;
+
+	memcpy(host, host_start, hlen);
+	host[hlen] = '\0';
+
+	/* Create session and connect */
+	term_ui_ensure_metrics(prefs.font_id, prefs.font_size);
+	s = session_new();
+	if (!s)
+		return errAEEventNotHandled;
+	session_init_from_prefs(s);
+	if (active_session &&
+	    active_session->conn.state == CONN_STATE_CONNECTED)
+		SelectWindow(s->window);
+	active_session = s;
+
+	snprintf(smsg, sizeof(smsg), "Connecting to %.50s\311",
+	    host);
+	sw = conn_status_show(smsg);
+	if (conn_connect(&s->conn, host, port, sw)) {
+		conn_status_close(sw);
+		telnet_init(&s->telnet);
+		s->telnet.preferred_ttype = prefs.terminal_type;
+		s->telnet.cols = s->terminal.active_cols;
+		s->telnet.rows = s->terminal.active_rows;
+		terminal_reset(&s->terminal);
+		set_wtitlef(s->window, "Flynn - %s", host);
+	} else {
+		conn_status_close(sw);
+		session_destroy_and_fixup(s);
+	}
+	update_menus();
+	return noErr;
+}
+
 static void
 init_apple_events(void)
 {
@@ -127,6 +233,10 @@ init_apple_events(void)
 		AEInstallEventHandler(kCoreEventClass,
 		    kAEPrintDocuments,
 		    NewAEEventHandlerUPP(ae_print_doc), 0L, false);
+
+		/* GURL/GURL: handle telnet:// URLs from browsers */
+		AEInstallEventHandler('GURL', 'GURL',
+		    NewAEEventHandlerUPP(ae_get_url), 0L, false);
 	}
 }
 
@@ -294,10 +404,26 @@ session_handle_disconnect(Session *sess)
 			notification_posted = true;
 		}
 	} else if (sess == active_session) {
-		ParamText(
-		    "\pConnection closed by remote host",
-		    "\p", "\p", "\p");
-		NoteAlert(128, 0L);
+		/* Show disconnect alert with Reconnect option
+		 * if the session has a host to reconnect to */
+		if (sess->conn.host[0]) {
+			short alert_item;
+
+			ParamText(
+			    "\pConnection closed by remote host",
+			    "\p", "\p", "\p");
+			alert_item = NoteAlert(DLOG_DISCONN_ID,
+			    0L);
+			if (alert_item == 2) {
+				/* Reconnect */
+				do_reconnect();
+			}
+		} else {
+			ParamText(
+			    "\pConnection closed by remote host",
+			    "\p", "\p", "\p");
+			NoteAlert(128, 0L);
+		}
 	}
 }
 
@@ -505,6 +631,24 @@ main_event_loop(void)
 				short drain;
 				long draw_deadline = 0;
 
+				/* NOP keep-alive for single session */
+				if (active_session->conn.state ==
+				    CONN_STATE_CONNECTED &&
+				    active_session->conn
+				    .last_send_tick > 0 &&
+				    (TickCount() -
+				    active_session->conn
+				    .last_send_tick) >= 7200) {
+					unsigned char nop_buf[4];
+					short nop_len = 0;
+
+					telnet_send_nop(nop_buf,
+					    &nop_len);
+					conn_send(
+					    &active_session->conn,
+					    (char *)nop_buf, nop_len);
+				}
+
 				/* Jump scroll: suppress draws while
 				 * TCP data is still arriving.  Draw
 				 * when stream pauses or after 4 ticks
@@ -586,6 +730,32 @@ main_event_loop(void)
 			}
 
 			bg_tick++;
+
+			/* NOP keep-alive: send IAC NOP on
+			 * connected sessions idle > 120s.
+			 * Cheap check every tick — only sends
+			 * when 7200 ticks have elapsed. */
+			for (si = 0; si < MAX_SESSIONS; si++) {
+				sess = session_get(si);
+				if (!sess)
+					continue;
+				if (sess->conn.state ==
+				    CONN_STATE_CONNECTED &&
+				    sess->conn.last_send_tick > 0 &&
+				    (TickCount() -
+				    sess->conn.last_send_tick)
+				    >= 7200) {
+					unsigned char nop_buf[4];
+					short nop_len = 0;
+
+					telnet_send_nop(nop_buf,
+					    &nop_len);
+					conn_send(&sess->conn,
+					    (char *)nop_buf,
+					    nop_len);
+				}
+			}
+
 			for (si = 0; si < MAX_SESSIONS; si++) {
 				sess = session_get(si);
 				if (!sess)
@@ -911,6 +1081,10 @@ handle_mouse_down(EventRecord *event)
 		break;
 	case inGoAway:
 		if (TrackGoAway(win, event->where)) {
+			if (win == clipboard_window_ptr()) {
+				clipboard_window_close();
+				break;
+			}
 			sess = session_from_window(win);
 			if (sess) {
 				if (sess->conn.state ==
@@ -980,6 +1154,10 @@ handle_mouse_down(EventRecord *event)
 		Rect limit_rect;
 		short min_w, min_h, max_w, max_h;
 
+		if (win == clipboard_window_ptr()) {
+			clipboard_window_grow(win, event->where);
+			break;
+		}
 		sess = session_from_window(win);
 		if (!sess)
 			break;
@@ -1000,6 +1178,13 @@ handle_mouse_down(EventRecord *event)
 		break;
 	}
 	case inContent:
+		if (win == clipboard_window_ptr()) {
+			if (win != FrontWindow())
+				SelectWindow(win);
+			else
+				clipboard_window_click(win, event->where);
+			break;
+		}
 		sess = session_from_window(win);
 		if (win != FrontWindow()) {
 			SelectWindow(win);
@@ -1065,6 +1250,18 @@ handle_update(EventRecord *event)
 	Session *sess;
 
 	win = (WindowPtr)event->message;
+
+	/* Clipboard viewer window */
+	if (win == clipboard_window_ptr()) {
+		GetPort(&old_port);
+		SetPort(win);
+		BeginUpdate(win);
+		clipboard_window_update(win);
+		EndUpdate(win);
+		SetPort(old_port);
+		return;
+	}
+
 	sess = session_from_window(win);
 
 	GetPort(&old_port);

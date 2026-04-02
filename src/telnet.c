@@ -549,3 +549,13 @@ telnet_send_naws(TelnetState *ts, unsigned char *send, short *sendlen,
 
 	send_bytes(send, sendlen, buf, len);
 }
+
+void
+telnet_send_nop(unsigned char *send, short *sendlen)
+{
+	unsigned char buf[2];
+
+	buf[0] = IAC;
+	buf[1] = NOP;
+	send_bytes(send, sendlen, buf, 2);
+}

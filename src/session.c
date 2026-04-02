@@ -20,6 +20,8 @@
 #include "color.h"
 #include "menus.h"
 
+extern FlynnPrefs prefs;
+
 static Session *sessions[MAX_SESSIONS];
 static short num_sessions = 0;
 
@@ -66,8 +68,13 @@ session_new(void)
 	win_w = LEFT_MARGIN * 2 + g_cell_width * TERM_DEFAULT_COLS +
 	    SCROLLBAR_WIDTH;
 	win_h = status_bar_height() + g_cell_height * TERM_DEFAULT_ROWS;
-	SetRect(&bounds, 2 + offset, 40 + offset,
-	    2 + offset + win_w, 40 + offset + win_h);
+	if (slot == 0) {
+		SetRect(&bounds, prefs.win_x, prefs.win_y,
+		    prefs.win_x + win_w, prefs.win_y + win_h);
+	} else {
+		SetRect(&bounds, 2 + offset, 40 + offset,
+		    2 + offset + win_w, 40 + offset + win_h);
+	}
 
 	/* Use NewCWindow on System 7 for color, NewWindow on System 6 */
 	/* zoomDocProc (8) = document window with zoom box + grow box */
@@ -127,6 +134,23 @@ session_destroy(Session *s)
 	/* Invalidate offscreen buffer — prevents stale content
 	 * from a destroyed session being blitted to a new window */
 	term_ui_invalidate_offscreen();
+
+	/* Save window position to prefs before disposing */
+	if (s->window) {
+		GrafPtr save;
+		Point pt;
+
+		GetPort(&save);
+		SetPort(s->window);
+		pt.h = 0;
+		pt.v = 0;
+		LocalToGlobal(&pt);
+		SetPort(save);
+
+		prefs.win_x = pt.h;
+		prefs.win_y = pt.v;
+		prefs_save(&prefs);
+	}
 
 	if (s->conn.state != CONN_STATE_IDLE)
 		conn_close(&s->conn);
@@ -201,7 +225,6 @@ session_any_connected(void)
 }
 
 /* External references to main.c globals */
-extern FlynnPrefs prefs;
 extern Session *active_session;
 
 void

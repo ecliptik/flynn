@@ -232,6 +232,7 @@ conn_connect(Connection *conn, const char *host, short port,
 
 	conn->state = CONN_STATE_CONNECTED;
 	conn->read_len = 0;
+	conn->last_send_tick = TickCount();
 	return true;
 }
 
@@ -315,6 +316,7 @@ OSErr
 conn_send(Connection *conn, char *data, short len)
 {
 	wdsEntry wds[2];
+	OSErr err;
 
 	if (len <= 0)
 		return -1;
@@ -325,5 +327,8 @@ conn_send(Connection *conn, char *data, short len)
 	wds[0].ptr = (Ptr)data;
 	wds[0].length = len;
 
-	return _TCPSend(&conn->pb, conn->stream, wds, 0L, 0L, false);
+	err = _TCPSend(&conn->pb, conn->stream, wds, 0L, 0L, false);
+	if (err == noErr)
+		conn->last_send_tick = TickCount();
+	return err;
 }

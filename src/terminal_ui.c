@@ -92,6 +92,10 @@ short			g_cell_height = CELL_HEIGHT;
 short			g_cell_baseline = CELL_HEIGHT - 2;
 short			g_font_id = 4;
 short			g_font_size = 9;
+/* Pre-computed cell height fractions (set by term_ui_set_font) */
+static short		g_cell_half_h = CELL_HEIGHT / 2;
+static short		g_cell_quarter_h = CELL_HEIGHT / 4;
+static short		g_cell_3quarter_h = CELL_HEIGHT * 3 / 4;
 extern FlynnPrefs	prefs;
 static short		g_dark_mode = 0;
 static short		g_mono_dark = 0;	/* monochrome dark mode active */
@@ -452,6 +456,47 @@ offscreen_fill_rect(Rect *r, unsigned char fill_val)
 }
 
 /*
+ * color_offscreen_fill_rect - fill rectangle in color GWorld directly
+ *
+ * Writes to the GWorld's PixMap baseAddr instead of EraseRect,
+ * avoiding QuickDraw trap overhead.  For 8-bit indexed GWorlds,
+ * each pixel is one byte (the palette index).
+ *
+ * fill_idx: color palette index (0=black, 15=white for ANSI palette)
+ */
+static void
+color_offscreen_fill_rect(Rect *r, unsigned char fill_idx)
+{
+	PixMapHandle pm;
+	Ptr base;
+	short rb, y;
+	short left, right, top, bot, width;
+
+	if (!g_color_gworld)
+		return;
+
+	pm = GetGWorldPixMap(g_color_gworld);
+	if (!pm)
+		return;
+
+	base = (**pm).baseAddr;
+	rb = (**pm).rowBytes & 0x3FFF;
+	left = r->left;
+	right = r->right;
+	top = r->top;
+	bot = r->bottom;
+
+	if (left < 0) left = 0;
+	if (top < 0) top = 0;
+	if (right <= left || bot <= top)
+		return;
+
+	width = right - left;
+	for (y = top; y < bot; y++)
+		memset(base + (long)y * rb + left, fill_idx, width);
+}
+
+/*
  * term_ui_has_offscreen - check if valid offscreen buffer matches dimensions
  */
 short
@@ -614,6 +659,9 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 	g_cell_baseline = fi.ascent + fi.leading;
 	g_font_id = font_id;
 	g_font_size = font_size;
+	g_cell_half_h = g_cell_height / 2;
+	g_cell_quarter_h = g_cell_height / 4;
+	g_cell_3quarter_h = g_cell_height * 3 / 4;
 
 	TextFace(0);
 	TextMode(srcOr);
@@ -922,12 +970,26 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 		if (g_has_color_qd && g_dark_mode) {
 			/* Color dark mode: erase with black background */
-			set_bg_color(0);
-			EraseRect(&r);
+#ifdef FLYNN_OFFSCREEN
+			if (use_color_offscreen)
+				color_offscreen_fill_rect(&r, 0);
+			else
+#endif
+			{
+				set_bg_color(0);
+				EraseRect(&r);
+			}
 		} else if (g_has_color_qd) {
 			/* Color light mode: erase with white background */
-			set_bg_color(15);
-			EraseRect(&r);
+#ifdef FLYNN_OFFSCREEN
+			if (use_color_offscreen)
+				color_offscreen_fill_rect(&r, 15);
+			else
+#endif
+			{
+				set_bg_color(15);
+				EraseRect(&r);
+			}
 #ifdef FLYNN_OFFSCREEN
 		} else if (use_offscreen) {
 			/* Direct offscreen fill: bypass QD traps */
@@ -1211,7 +1273,7 @@ try_merge_dec_run(unsigned char ch, const char *buf, short pos,
 	switch (ch) {
 	case 'q':
 		/* ─ horizontal line: single LineTo spanning N cells */
-		cy = y + g_cell_height / 2;
+		cy = y + g_cell_half_h;
 		if (attr & ATTR_BOLD)
 			PenSize(2, 1);
 		else
@@ -1259,7 +1321,7 @@ try_merge_glyph_run(unsigned char gid, const char *buf, short pos,
 		return 0;
 
 	mw = count * cell_w;
-	cy = y + g_cell_height / 2;
+	cy = y + g_cell_half_h;
 
 	switch (gid) {
 	/* --- Horizontal line merges --- */
@@ -2489,7 +2551,7 @@ draw_row(Terminal *term, short row)
 			/* Strikethrough post-pass */
 			if (run_attr & ATTR_STRIKETHROUGH) {
 				short strike_y = row_y +
-				    g_cell_height / 2;
+				    g_cell_half_h;
 				short x0 = run_x;
 				short x1 = run_x + run_w;
 				if (mono_eff_inv(run_attr))
@@ -2530,7 +2592,7 @@ draw_line_char(unsigned char ch, short x, short y, unsigned char attr)
 	Rect cell_r;
 
 	cx = x + g_cell_width / 2;
-	cy = y + g_cell_height / 2;
+	cy = y + g_cell_half_h;
 	right = x + g_cell_width - 1;
 	bottom = y + g_cell_height - 1;
 
@@ -2705,11 +2767,11 @@ draw_glyph_prim(unsigned char glyph_id, short x, short y,
 	Rect cell_r, r;
 
 	cx = x + g_cell_width / 2;
-	cy = y + g_cell_height / 2;
+	cy = y + g_cell_half_h;
 	right = x + g_cell_width - 1;
 	bottom = y + g_cell_height - 1;
 	w4 = g_cell_width / 4;
-	h4 = g_cell_height / 4;
+	h4 = g_cell_quarter_h;
 
 	SetRect(&cell_r, x, y, x + g_cell_width, y + g_cell_height);
 
@@ -4590,7 +4652,7 @@ draw_braille(unsigned char pattern, short x, short y, unsigned char attr)
 
 	/* Spacing between dot centers */
 	gap_x = g_cell_width / 2;
-	gap_y = g_cell_height / 4;
+	gap_y = g_cell_quarter_h;
 
 	/* Draw dots */
 	for (row_idx = 0; row_idx < 4; row_idx++) {

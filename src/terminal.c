@@ -126,6 +126,7 @@ terminal_init(Terminal *term)
 	term->g0_charset = 'B';
 	term->g1_charset = 'B';
 	term->gl_charset = 0;
+	term->charset_std = 1;	/* g0='B', gl=0 => standard */
 
 	/* DEC modes */
 	term->autowrap = 1;
@@ -181,10 +182,14 @@ terminal_init(Terminal *term)
 		/* alt_color and sb_color start NULL, allocated on demand */
 	}
 
-	/* Fill screen color array with defaults */
+	/* Fill screen color array with defaults and init row pointers */
 	if (term->has_color) {
+		short r;
 		memset(term->screen_color, COLOR_DEFAULT,
 		    (long)TERM_ROWS * TERM_COLS * sizeof(CellColor));
+		for (r = 0; r < TERM_ROWS; r++)
+			term->screen_color_rows[r] =
+			    &term->screen_color[r * TERM_COLS];
 	}
 
 #ifdef FLYNN_CURSOR_STYLES
@@ -239,8 +244,7 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 {
 	short i;
 	unsigned char ch;
-	/* Cached color row pointer: avoids cur_row*TERM_COLS multiply
-	 * per character in the ASCII fast path */
+	/* Cached color row pointer for ASCII fast path */
 	CellColor *cached_color_row = 0L;
 	short cached_color_row_idx = -1;
 
@@ -311,8 +315,7 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				}
 				/* Inline fast path: ASCII, no wrap, standard charset */
 				if (!term->wrap_pending &&
-				    term->gl_charset == 0 &&
-				    term->g0_charset == 'B') {
+				    term->charset_std) {
 					unsigned char a = term->cur_attr;
 					if (term->cur_fg != COLOR_DEFAULT ||
 					    term->cur_bg != COLOR_DEFAULT)
@@ -326,9 +329,8 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 							cached_color_row_idx =
 							    term->cur_row;
 							cached_color_row =
-							    &term->screen_color[
-							    term->cur_row *
-							    TERM_COLS];
+							    term->screen_color_rows[
+							    term->cur_row];
 						}
 						cached_color_row[
 						    term->cur_col].fg =
@@ -410,10 +412,13 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				case 0x0E:
 					/* SO - Shift Out: activate G1 */
 					term->gl_charset = 1;
+					term->charset_std = 0;
 					break;
 				case 0x0F:
 					/* SI - Shift In: activate G0 */
 					term->gl_charset = 0;
+					term->charset_std =
+					    (term->g0_charset == 'B');
 					break;
 				default:
 					/* Other C0 codes (NUL, etc): ignore */
@@ -459,7 +464,7 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 						    term->scroll_bottom, 1);
 					else if (term->cur_row > 0)
 						term->cur_row--;
-					term_dirty_row(term, term->cur_row);
+					TERM_DIRTY_ROW(term, term->cur_row);
 				} else if (ch == 0x90) {
 					/* DCS (8-bit C1) - same as ESC P */
 					term->parse_state = PARSE_DCS;
@@ -618,7 +623,7 @@ terminal_get_display_color(Terminal *term, short row, short col)
 
 #if FLYNN_SCROLLBACK_LINES > 0
 	if (term->scroll_offset == 0)
-		return &term->screen_color[row * TERM_COLS + col];
+		return &term->screen_color_rows[row][col];
 
 	sb_row = row - term->scroll_offset;
 	if (sb_row < 0) {
@@ -635,9 +640,9 @@ terminal_get_display_color(Terminal *term, short row, short col)
 		return &term->sb_color[sb_idx * TERM_COLS + col];
 	}
 
-	return &term->screen_color[sb_row * TERM_COLS + col];
+	return &term->screen_color_rows[sb_row][col];
 #else
-	return &term->screen_color[row * TERM_COLS + col];
+	return &term->screen_color_rows[row][col];
 #endif
 }
 
@@ -814,14 +819,13 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 		unsigned short *p = (unsigned short *)&term->screen_rows[r][c1];
 		for (c = c1; c <= c2; c++)
 			*p++ = fill;
-		term_dirty_row(term, r);
+		TERM_DIRTY_ROW(term, r);
 	}
 
 	/* Clear color arrays separately (System 7 only) */
 	if (term->has_color && term->screen_color) {
 		for (r = r1; r <= r2; r++) {
-			CellColor *cc = &term->screen_color[
-			    r * TERM_COLS + c1];
+			CellColor *cc = &term->screen_color_rows[r][c1];
 			for (c = c1; c <= c2; c++) {
 				cc->fg = COLOR_DEFAULT;
 				cc->bg = COLOR_DEFAULT;
@@ -856,7 +860,7 @@ term_save_scrollback(Terminal *term, short row)
 		}
 		if (term->sb_color) {
 			memcpy(&term->sb_color[term->sb_head * TERM_COLS],
-			    &term->screen_color[row * TERM_COLS],
+			    term->screen_color_rows[row],
 			    term->active_cols * sizeof(CellColor));
 		}
 	}
@@ -914,11 +918,9 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		    rows_to_move > 0) {
 			for (r = 0; r < rows_to_move; r++)
 				memmove(
-				    &term->screen_color[
-				    (long)(top + r) * TERM_COLS],
-				    &term->screen_color[
-				    (long)(top + count + r) *
-				    TERM_COLS],
+				    term->screen_color_rows[top + r],
+				    term->screen_color_rows[
+				    top + count + r],
 				    term->active_cols *
 				    sizeof(CellColor));
 		}
@@ -942,8 +944,7 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 		if (term->has_color && term->screen_color) {
 			for (r = bottom - count + 1; r <= bottom;
 			    r++) {
-				memset(&term->screen_color[
-				    (long)r * TERM_COLS],
+				memset(term->screen_color_rows[r],
 				    COLOR_DEFAULT,
 				    term->active_cols *
 				    sizeof(CellColor));
@@ -1037,11 +1038,10 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		    rows_to_move > 0) {
 			for (r = rows_to_move - 1; r >= 0; r--)
 				memmove(
-				    &term->screen_color[
-				    (long)(top + count + r) *
-				    TERM_COLS],
-				    &term->screen_color[
-				    (long)(top + r) * TERM_COLS],
+				    term->screen_color_rows[
+				    top + count + r],
+				    term->screen_color_rows[
+				    top + r],
 				    term->active_cols *
 				    sizeof(CellColor));
 		}
@@ -1064,8 +1064,7 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 		/* Clear color for exposed lines */
 		if (term->has_color && term->screen_color) {
 			for (r = top; r < top + count; r++) {
-				memset(&term->screen_color[
-				    (long)r * TERM_COLS],
+				memset(term->screen_color_rows[r],
 				    COLOR_DEFAULT,
 				    term->active_cols *
 				    sizeof(CellColor));
@@ -1157,13 +1156,11 @@ term_put_char(Terminal *term, unsigned char ch)
 		}
 		/* Shift color array too */
 		if (term->has_color && term->screen_color) {
+			CellColor *crow = term->screen_color_rows[
+			    term->cur_row];
 			for (c = term->active_cols - 1;
-			    c > term->cur_col; c--) {
-				term->screen_color[
-				    term->cur_row * TERM_COLS + c] =
-				    term->screen_color[
-				    term->cur_row * TERM_COLS + c - 1];
-			}
+			    c > term->cur_col; c--)
+				crow[c] = crow[c - 1];
 		}
 	}
 
@@ -1176,13 +1173,13 @@ term_put_char(Terminal *term, unsigned char ch)
 
 	/* Write color to separate color array (System 7 only) */
 	if (term->has_color && term->screen_color) {
-		CellColor *cc = &term->screen_color[
-		    term->cur_row * TERM_COLS + term->cur_col];
+		CellColor *cc = &term->screen_color_rows[
+		    term->cur_row][term->cur_col];
 		cc->fg = term->cur_fg;
 		cc->bg = term->cur_bg;
 	}
 
-	term_dirty_row(term, term->cur_row);
+	TERM_DIRTY_ROW(term, term->cur_row);
 
 	if (term->cur_col < term->active_cols - 1) {
 		term->cur_col++;
@@ -1214,7 +1211,7 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 		/* Fill current cell with space */
 		term->screen_rows[term->cur_row][term->cur_col].ch = ' ';
 		term->screen_rows[term->cur_row][term->cur_col].attr = ATTR_NORMAL;
-		term_dirty_row(term, term->cur_row);
+		TERM_DIRTY_ROW(term, term->cur_row);
 
 		if (term->autowrap) {
 			term_carriage_return(term);
@@ -1257,13 +1254,11 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 		}
 		/* Shift color array too */
 		if (term->has_color && term->screen_color) {
+			CellColor *crow = term->screen_color_rows[
+			    term->cur_row];
 			for (c = term->active_cols - 1;
-			    c > term->cur_col + shift - 1; c--) {
-				term->screen_color[
-				    term->cur_row * TERM_COLS + c] =
-				    term->screen_color[
-				    term->cur_row * TERM_COLS + c - shift];
-			}
+			    c > term->cur_col + shift - 1; c--)
+				crow[c] = crow[c - shift];
 		}
 	}
 
@@ -1273,13 +1268,13 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 
 	/* Write color for primary cell */
 	if (term->has_color && term->screen_color) {
-		CellColor *cc = &term->screen_color[
-		    term->cur_row * TERM_COLS + term->cur_col];
+		CellColor *cc = &term->screen_color_rows[
+		    term->cur_row][term->cur_col];
 		cc->fg = term->cur_fg;
 		cc->bg = term->cur_bg;
 	}
 
-	term_dirty_row(term, term->cur_row);
+	TERM_DIRTY_ROW(term, term->cur_row);
 
 	if (wide) {
 		/* Place wide spacer in second cell */
@@ -1289,8 +1284,8 @@ term_put_glyph(Terminal *term, unsigned char glyph_id,
 		term->screen_rows[term->cur_row][term->cur_col].attr = attr;
 		/* Write color for spacer cell too */
 		if (term->has_color && term->screen_color) {
-			CellColor *cc = &term->screen_color[
-			    term->cur_row * TERM_COLS + term->cur_col];
+			CellColor *cc = &term->screen_color_rows[
+			    term->cur_row][term->cur_col];
 			cc->fg = term->cur_fg;
 			cc->bg = term->cur_bg;
 		}
@@ -1358,13 +1353,13 @@ term_put_cp437(Terminal *term, unsigned char byte)
 	term->screen_rows[term->cur_row][term->cur_col].attr = attr;
 
 	if (term->has_color && term->screen_color) {
-		CellColor *cc = &term->screen_color[
-		    term->cur_row * TERM_COLS + term->cur_col];
+		CellColor *cc = &term->screen_color_rows[
+		    term->cur_row][term->cur_col];
 		cc->fg = term->cur_fg;
 		cc->bg = term->cur_bg;
 	}
 
-	term_dirty_row(term, term->cur_row);
+	TERM_DIRTY_ROW(term, term->cur_row);
 
 	if (term->cur_col < term->active_cols - 1)
 		term->cur_col++;
@@ -1445,6 +1440,8 @@ term_process_esc(Terminal *term, unsigned char ch)
 		term->g0_charset = term->saved_g0_charset;
 		term->g1_charset = term->saved_g1_charset;
 		term->gl_charset = term->saved_gl_charset;
+		term->charset_std = (term->gl_charset == 0 &&
+		    term->g0_charset == 'B');
 		term->origin_mode = term->saved_origin_mode;
 		term->autowrap = term->saved_autowrap;
 		term->wrap_pending = 0;
@@ -1521,8 +1518,11 @@ term_process_esc(Terminal *term, unsigned char ch)
 		if (term->intermediate == '(') {
 			/* ESC ( X - designate G0 charset */
 			if (ch == 'B' || ch == '0' || ch == 'A' ||
-			    ch == 'U' || ch == '1' || ch == '2')
+			    ch == 'U' || ch == '1' || ch == '2') {
 				term->g0_charset = ch;
+				term->charset_std =
+				    (ch == 'B' && term->gl_charset == 0);
+			}
 		} else if (term->intermediate == ')') {
 			/* ESC ) X - designate G1 charset */
 			if (ch == 'B' || ch == '0' || ch == 'A' ||
@@ -1926,19 +1926,17 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->screen_rows[term->cur_row][c].attr = ATTR_NORMAL;
 		}
 		if (term->has_color && term->screen_color) {
-			short row_off = term->cur_row * TERM_COLS;
+			CellColor *crow = term->screen_color_rows[
+			    term->cur_row];
 			for (c = term->active_cols - 1;
 			    c >= term->cur_col + p1; c--)
-				term->screen_color[row_off + c] =
-				    term->screen_color[row_off + c - p1];
+				crow[c] = crow[c - p1];
 			for (c = term->cur_col; c < term->cur_col + p1; c++) {
-				term->screen_color[row_off + c].fg =
-				    COLOR_DEFAULT;
-				term->screen_color[row_off + c].bg =
-				    COLOR_DEFAULT;
+				crow[c].fg = COLOR_DEFAULT;
+				crow[c].bg = COLOR_DEFAULT;
 			}
 		}
-		term_dirty_row(term, term->cur_row);
+		TERM_DIRTY_ROW(term, term->cur_row);
 		break;
 
 	case 'P':
@@ -1953,20 +1951,18 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->screen_rows[term->cur_row][c].attr = ATTR_NORMAL;
 		}
 		if (term->has_color && term->screen_color) {
-			short row_off = term->cur_row * TERM_COLS;
+			CellColor *crow = term->screen_color_rows[
+			    term->cur_row];
 			for (c = term->cur_col;
 			    c < term->active_cols - p1; c++)
-				term->screen_color[row_off + c] =
-				    term->screen_color[row_off + c + p1];
+				crow[c] = crow[c + p1];
 			for (c = term->active_cols - p1;
 			    c < term->active_cols; c++) {
-				term->screen_color[row_off + c].fg =
-				    COLOR_DEFAULT;
-				term->screen_color[row_off + c].bg =
-				    COLOR_DEFAULT;
+				crow[c].fg = COLOR_DEFAULT;
+				crow[c].bg = COLOR_DEFAULT;
 			}
 		}
-		term_dirty_row(term, term->cur_row);
+		TERM_DIRTY_ROW(term, term->cur_row);
 		break;
 
 	case 'X':
@@ -1977,15 +1973,14 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->screen_rows[term->cur_row][c].attr = ATTR_NORMAL;
 		}
 		if (term->has_color && term->screen_color) {
-			short row_off = term->cur_row * TERM_COLS;
+			CellColor *crow = term->screen_color_rows[
+			    term->cur_row];
 			for (c = term->cur_col; c < term->cur_col + p1; c++) {
-				term->screen_color[row_off + c].fg =
-				    COLOR_DEFAULT;
-				term->screen_color[row_off + c].bg =
-				    COLOR_DEFAULT;
+				crow[c].fg = COLOR_DEFAULT;
+				crow[c].bg = COLOR_DEFAULT;
 			}
 		}
-		term_dirty_row(term, term->cur_row);
+		TERM_DIRTY_ROW(term, term->cur_row);
 		break;
 
 	case 'r':
@@ -2217,6 +2212,7 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			term->g0_charset = 'B';
 			term->g1_charset = 'B';
 			term->gl_charset = 0;
+			term->charset_std = 1;
 			term->origin_mode = 0;
 			term->autowrap = 1;
 			term->cursor_key_mode = 0;
@@ -2895,11 +2891,14 @@ term_put_unicode(Terminal *term, long cp)
 		if (ch) {
 			unsigned char save_g0 = term->g0_charset;
 			unsigned char save_gl = term->gl_charset;
+			unsigned char save_std = term->charset_std;
 			term->g0_charset = '0';
 			term->gl_charset = 0;
+			term->charset_std = 0;
 			term_put_char(term, ch);
 			term->g0_charset = save_g0;
 			term->gl_charset = save_gl;
+			term->charset_std = save_std;
 		} else {
 			term_put_char(term, '-');
 		}
@@ -2944,4 +2943,169 @@ term_put_unicode(Terminal *term, long cp)
 
 	/* Everything else: fallback */
 	term_put_char(term, '?');
+}
+
+/* ----------------------------------------------------------------
+ * Find / Search
+ * ---------------------------------------------------------------- */
+
+/*
+ * find_get_cell - get a cell from screen or scrollback by logical row.
+ *
+ * row 0..active_rows-1 = live screen.
+ * row -1..-sb_count    = scrollback (most recent = -1).
+ * Returns NULL if out of range.
+ */
+static TermCell *
+find_get_cell(Terminal *term, short row, short col)
+{
+	short sb_idx;
+
+	if (col < 0 || col >= term->active_cols)
+		return 0L;
+
+	/* Live screen */
+	if (row >= 0 && row < term->active_rows)
+		return &term->screen_rows[row][col];
+
+#if FLYNN_SCROLLBACK_LINES > 0
+	/* Scrollback: row -1 = most recent, -sb_count = oldest */
+	if (row < 0 && row >= -term->sb_count) {
+		sb_idx = term->sb_head + row;	/* head + negative offset */
+		if (sb_idx < 0)
+			sb_idx += TERM_SCROLLBACK_LINES;
+		if (sb_idx >= TERM_SCROLLBACK_LINES)
+			sb_idx -= TERM_SCROLLBACK_LINES;
+		if (sb_idx < 0 || sb_idx >= TERM_SCROLLBACK_LINES)
+			return 0L;
+		return &term->scrollback[sb_idx][col];
+	}
+#endif
+
+	return 0L;
+}
+
+/*
+ * terminal_find - search for text in screen and scrollback
+ *
+ * Scans cells' .ch field for a case-sensitive match.
+ * start_row/start_col: position to start from (display coords).
+ * direction: 1 = forward, -1 = backward.
+ * On match, sets *found_row/*found_col and returns 1.
+ * found_row uses display coordinates (negative = scrollback).
+ * Returns 0 if not found (full wrap-around).
+ */
+short
+terminal_find(Terminal *term, const char *text, short text_len,
+    short start_row, short start_col, short direction,
+    short *found_row, short *found_col)
+{
+	short first_row, last_row;
+	short row, col, ti;
+	short total_rows, checked;
+	TermCell *cell;
+
+	if (!text || text_len <= 0)
+		return 0;
+
+#if FLYNN_SCROLLBACK_LINES > 0
+	first_row = -term->sb_count;
+#else
+	first_row = 0;
+#endif
+	last_row = term->active_rows - 1;
+	total_rows = last_row - first_row + 1;
+
+	row = start_row;
+	col = start_col;
+
+	/* Advance one position past start so repeated Find moves forward */
+	if (direction > 0) {
+		col++;
+		if (col >= term->active_cols) {
+			col = 0;
+			row++;
+			if (row > last_row)
+				row = first_row;
+		}
+	} else {
+		col--;
+		if (col < 0) {
+			col = term->active_cols - 1;
+			row--;
+			if (row < first_row)
+				row = last_row;
+		}
+	}
+
+	/* Scan with wrap-around, limit to total_rows * active_cols checks */
+	checked = 0;
+	while (checked < total_rows) {
+		/* Scan columns in this row */
+		if (direction > 0) {
+			for (; col <= term->active_cols - text_len; col++) {
+				/* Match text_len characters */
+				cell = find_get_cell(term, row, col);
+				if (!cell)
+					goto next_fwd;
+				if (cell_to_char(cell) !=
+				    (unsigned char)text[0])
+					continue;
+				/* Check remaining characters */
+				for (ti = 1; ti < text_len; ti++) {
+					cell = find_get_cell(term, row,
+					    col + ti);
+					if (!cell)
+						break;
+					if (cell_to_char(cell) !=
+					    (unsigned char)text[ti])
+						break;
+				}
+				if (ti == text_len) {
+					*found_row = row;
+					*found_col = col;
+					return 1;
+				}
+			}
+next_fwd:
+			col = 0;
+			row++;
+			if (row > last_row)
+				row = first_row;
+		} else {
+			/* Backward: scan right to left */
+			if (col > term->active_cols - text_len)
+				col = term->active_cols - text_len;
+			for (; col >= 0; col--) {
+				cell = find_get_cell(term, row, col);
+				if (!cell)
+					goto next_bwd;
+				if (cell_to_char(cell) !=
+				    (unsigned char)text[0])
+					continue;
+				for (ti = 1; ti < text_len; ti++) {
+					cell = find_get_cell(term, row,
+					    col + ti);
+					if (!cell)
+						break;
+					if (cell_to_char(cell) !=
+					    (unsigned char)text[ti])
+						break;
+				}
+				if (ti == text_len) {
+					*found_row = row;
+					*found_col = col;
+					return 1;
+				}
+			}
+next_bwd:
+			col = term->active_cols - 1;
+			row--;
+			if (row < first_row)
+				row = last_row;
+		}
+		checked++;
+	}
+
+	return 0;
 }

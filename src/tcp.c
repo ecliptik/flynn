@@ -165,7 +165,7 @@ _TCPSend(TCPiopb *pb, StreamPtr stream, wdsEntry *wdsPtr, Ptr userData,
 	pb->csParam.send.ulpTimeoutValue = 30;
 	pb->csParam.send.ulpTimeoutAction = 1;
 	pb->csParam.send.validityFlags = 0xC0;
-	pb->csParam.send.pushFlag = 1; /* XXX */
+	pb->csParam.send.pushFlag = 1; /* push immediately — no Nagle buffering */
 	pb->csParam.send.urgentFlag = 0;
 	pb->csParam.send.wdsPtr	= (Ptr)wdsPtr;
 	pb->csParam.send.sendFree = 0;

@@ -71,13 +71,20 @@ Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archi
 - **Backspace DEL/BS toggle**
 
 **Finger Protocol (RFC 1288)**
-- **Finger client** (File > Finger..., Cmd+F)
+- **Finger client** (File > Finger..., Cmd+I)
 - **User and host queries** with optional verbose (/W) flag
 - **Finger forwarding** (user@host@gateway auto-split)
 - **Remembers last host/user** across launches
 
 **Session Management**
 - **Session bookmarks** (with per-bookmark Telnet/Finger protocol)
+- **Reconnect** on disconnect (Cmd+R) and one-click reconnect in disconnect alert
+- **Telnet NOP keep-alive** prevents idle connection drops (120 second interval)
+- **Find in Scrollback** (Cmd+F / Cmd+G Find Again)
+- **Show Clipboard** viewer window with scrollbars
+- **Reset Terminal** clears screen and parser state without disconnecting
+- **Window position** saved and restored across launches
+- **GURL Apple Event** handler for telnet:// URLs from System 7 browsers
 - **Settings persistence**
 - **MultiFinder, Apple Events, and Notification Manager support**
 
@@ -100,9 +107,13 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | Paste | Cmd+V | Sends clipboard to connection |
 | Select All | Cmd+A | Selects entire terminal screen |
 | F1-F10 | Cmd+1..0 | For M0110 keyboards without function keys |
+| Find | Cmd+F | Search scrollback and screen |
+| Find Again | Cmd+G | Repeat last search |
 | Bookmarks | Cmd+B | Open bookmark manager |
+| Add Favorite | Cmd+D | Save current session as bookmark |
+| Finger | Cmd+I | Finger protocol query |
 | New Session | Cmd+N | New session (new window if connected) |
-| Finger | Cmd+F | Finger protocol query |
+| Reconnect | Cmd+R | Reconnect to same host after disconnect |
 | Save Contents | Cmd+S | Save scrollback and screen to text file |
 | Close Window | Cmd+W | Close active session window |
 | Quit | Cmd+Q | Quit Flynn |

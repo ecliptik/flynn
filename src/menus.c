@@ -166,6 +166,34 @@ update_menus(void)
 	DisableItem(edit_menu, EDIT_MENU_SELALL_ID);
 #endif
 
+	/* File menu: Reconnect when disconnected but host is set */
+	if (active_session &&
+	    active_session->conn.state != CONN_STATE_CONNECTED &&
+	    active_session->conn.host[0])
+		EnableItem(file_menu, FILE_MENU_RECONNECT_ID);
+	else
+		DisableItem(file_menu, FILE_MENU_RECONNECT_ID);
+
+	/* Edit menu: Find when session exists, Find Again when last
+	 * search text exists, Clear Scrollback when scrollback > 0 */
+	if (active_session)
+		EnableItem(edit_menu, EDIT_MENU_FIND_ID);
+	else
+		DisableItem(edit_menu, EDIT_MENU_FIND_ID);
+	if (active_session && find_has_last_search())
+		EnableItem(edit_menu, EDIT_MENU_FINDAGAIN_ID);
+	else
+		DisableItem(edit_menu, EDIT_MENU_FINDAGAIN_ID);
+#if FLYNN_SCROLLBACK_LINES > 0
+	if (active_session &&
+	    active_session->terminal.sb_count > 0)
+		EnableItem(edit_menu, EDIT_MENU_CLRSCROLL_ID);
+	else
+		DisableItem(edit_menu, EDIT_MENU_CLRSCROLL_ID);
+#else
+	DisableItem(edit_menu, EDIT_MENU_CLRSCROLL_ID);
+#endif
+
 	/* Control menu: enable only when connected to telnet
 	 * (not applicable to finger sessions) */
 	if (ctrl_menu) {
@@ -185,6 +213,11 @@ update_menus(void)
 			else
 				DisableItem(ctrl_menu, ci);
 		}
+		/* Reset Terminal: enabled when session exists */
+		if (active_session)
+			EnableItem(ctrl_menu, CTRL_MENU_RESET);
+		else
+			DisableItem(ctrl_menu, CTRL_MENU_RESET);
 	}
 
 	update_window_menu();
@@ -351,11 +384,11 @@ handle_file_menu(short item)
 			update_menus();
 		}
 		break;
+	case FILE_MENU_RECONNECT_ID:
+		do_reconnect();
+		break;
 	case FILE_MENU_SAVE_ID:
 		do_save_session();
-		break;
-	case FILE_MENU_DNS_ID:
-		do_dns_server_dialog();
 		break;
 	case FILE_MENU_QUIT_ID:
 		if (session_any_connected()) {
@@ -388,6 +421,21 @@ handle_edit_menu(short item)
 		case EDIT_MENU_SELALL_ID:
 			do_select_all();
 			break;
+		case EDIT_MENU_FIND_ID:
+			do_find();
+			break;
+		case EDIT_MENU_FINDAGAIN_ID:
+			do_find_again();
+			break;
+		case EDIT_MENU_CLRSCROLL_ID:
+			do_clear_scrollback();
+			break;
+		case EDIT_MENU_SHOW_CLIP_ID:
+			if (clipboard_window_ptr())
+				clipboard_window_close();
+			else
+				do_show_clipboard();
+			break;
 		}
 	}
 }
@@ -407,8 +455,27 @@ handle_ctrl_menu(short item)
 	};
 	short i;
 
-	if (!active_session ||
-	    active_session->conn.state != CONN_STATE_CONNECTED)
+	if (!active_session)
+		return;
+
+	/* Reset Terminal: works even when disconnected */
+	if (item == CTRL_MENU_RESET) {
+		GrafPtr save;
+		Session *s = active_session;
+
+		terminal_reset(&s->terminal);
+		term_dirty_all(&s->terminal);
+		GetPort(&save);
+		SetPort(s->window);
+		term_ui_invalidate_offscreen();
+		term_ui_draw(s->window, &s->terminal);
+		if (prefs.show_status_bar)
+			draw_status_bar(s->window, s);
+		SetPort(save);
+		return;
+	}
+
+	if (active_session->conn.state != CONN_STATE_CONNECTED)
 		return;
 
 	/* Special case: Break sends IAC BRK */
@@ -569,6 +636,9 @@ handle_prefs_menu(short item)
 		break;
 	}
 #endif
+	case PREFS_DNS_ID:
+		do_dns_server_dialog();
+		break;
 	}
 }
 

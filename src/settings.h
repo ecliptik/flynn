@@ -5,7 +5,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	14
+#define PREFS_VERSION	15
 #define MAX_BOOKMARKS	20
 #define MAX_RECENT	5
 
@@ -41,6 +41,7 @@ typedef struct {
 	char		finger_host[128];	/* last finger host */
 	char		finger_user[64];	/* last finger username */
 	unsigned char	bookmark_verbose[MAX_BOOKMARKS];	/* 1=send /W for finger */
+	short		win_x, win_y;	/* saved window position (global coords) */
 } FlynnPrefs;
 
 /* Load preferences from "Flynn Preferences" file. Returns defaults if not found. */

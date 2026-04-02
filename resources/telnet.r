@@ -21,11 +21,12 @@ resource 'MENU' (129, "File") {
 	129, textMenuProc, allEnabled, enabled, "File",
 	{
 		"New Session\311", noIcon, "N", noMark, plain;
-		"Finger\311", noIcon, "F", noMark, plain;
 		"Close Session", noIcon, "W", noMark, plain;
+		"Reconnect", noIcon, "R", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Finger\311", noIcon, "I", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Save Contents\311", noIcon, "S", noMark, plain;
-		"DNS Server\311", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Quit", noIcon, "Q", noMark, plain
 	}
@@ -41,7 +42,14 @@ resource 'MENU' (130, "Edit") {
 		"Paste", noIcon, "V", noMark, plain;
 		"Clear", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Select All", noIcon, "A", noMark, plain
+		"Select All", noIcon, "A", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Find\311", noIcon, "F", noMark, plain;
+		"Find Again", noIcon, "G", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Clear Scrollback", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Show Clipboard", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -55,7 +63,9 @@ resource 'MENU' (131, "Options") {
 		"Status Bar", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Backspace Sends BS", noIcon, noKey, noMark, plain;
-		"Local Echo", noIcon, noKey, noMark, plain
+		"Local Echo", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"DNS Server\311", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -108,7 +118,9 @@ resource 'MENU' (132, "Control") {
 		"Send Ctrl-Z", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Send Break", noIcon, noKey, noMark, plain;
-		"Send Escape", noIcon, ".", noMark, plain
+		"Send Escape", noIcon, ".", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Reset Terminal", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -490,6 +502,71 @@ resource 'DITL' (137, "Finger") {
 		/* 8: Default button outline (UserItem) */
 		{101, 206, 129, 284},
 		UserItem { disabled };
+	}
+};
+
+/* Find dialog */
+resource 'DLOG' (138, "Find") {
+	{100, 120, 180, 400},
+	dBoxProc,
+	visible,
+	noGoAway,
+	0x0,
+	138,
+	"Find",
+	noAutoCenter
+};
+
+resource 'DITL' (138, "Find") {
+	{
+		/* 1: Find button */
+		{45, 200, 65, 260},
+		Button { enabled, "Find" };
+
+		/* 2: Cancel button */
+		{45, 125, 65, 185},
+		Button { enabled, "Cancel" };
+
+		/* 3: Search text label */
+		{15, 10, 31, 55},
+		StaticText { disabled, "Find:" };
+
+		/* 4: Search text field */
+		{15, 60, 31, 260},
+		EditText { enabled, "" };
+
+		/* 5: Default button outline (UserItem) */
+		{41, 196, 69, 264},
+		UserItem { disabled };
+	}
+};
+
+/* Disconnect alert with Reconnect button */
+resource 'ALRT' (139) {
+	{60, 80, 180, 420},
+	139,
+	{
+		OK, visible, sound1,
+		OK, visible, sound1,
+		OK, visible, sound1,
+		OK, visible, sound1
+	},
+	noAutoCenter
+};
+
+resource 'DITL' (139, "Disconnect Alert") {
+	{
+		/* 1: OK button */
+		{85, 250, 105, 320},
+		Button { enabled, "OK" };
+
+		/* 2: Reconnect button */
+		{85, 140, 105, 230},
+		Button { enabled, "Reconnect" };
+
+		/* 3: Text */
+		{15, 75, 70, 325},
+		StaticText { disabled, "^0" };
 	}
 };
 

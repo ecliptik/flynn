@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Telnet NOP keep-alive: sends IAC NOP after 120 seconds idle to prevent NAT/firewall drops
+- Reconnect (Cmd+R): reconnect to same host after disconnect, also available in File menu
+- Reconnect button on disconnect alert: one-click reconnect when remote host closes connection
+- Reset Terminal in Control menu: clears screen and resets parser state without disconnecting
+- Clear Scrollback in Edit menu: frees scrollback buffer for long sessions
+- Find in Scrollback (Cmd+F) with Find Again (Cmd+G): search backward through terminal content
+- Show Clipboard viewer window in Edit menu: TextEdit display with scrollbars, resize support
+- GURL Apple Event handler: System 7 browsers can hand off telnet:// URLs to Flynn
+- Window position saved to preferences and restored on next launch
+
 ### Fixed
 - DNS response parser signed short overflow on crafted RDLEN values
 - OSC parameter accumulation signed short overflow (guard tightened)
@@ -12,13 +23,21 @@ All notable changes to this project will be documented in this file.
 - Grow box and scrollbar column not redrawn after window resize snap-to-grid
 
 ### Changed
+- File menu reorganized: New, Close, Reconnect, Finger, Save, Quit (DNS Server moved to Options)
+- Finger shortcut changed from Cmd+F to Cmd+I (Cmd+F now Find, matching Geomys)
 - Screen row pointer table eliminates row×132 multiply on all screen accesses (+200 bytes/session)
+- Color row pointer table eliminates multiply for color array access on System 7
 - Glyph cache uses direct lookup table instead of linear search (O(1) vs O(49))
+- Charset-is-standard cached flag reduces per-character struct reads in fast path
+- Pre-computed cell height fractions eliminate divides in glyph rendering
+- Color offscreen direct fill bypasses EraseRect QuickDraw trap on System 7
 - adjust_cursor() only called on mouse movement, not every idle tick
 - Color cube RGB decomposition uses subtraction loops instead of division (no hardware divide on 68000)
 - DNS resolver stack buffers made static (saves ~1.5KB stack)
 - Deduplicated show_ttype_popup between connect and bookmark edit dialogs
 - Removed dead code: TelnetState.sb_opt, favorites_init_menu(), redundant telnet_init zeroing
+- Build flag: -fomit-frame-pointer frees A6 register on 68000
+- Inline TERM_DIRTY_ROW macro saves JSR/RTS overhead per dirty-row mark
 
 ## [1.9.8] - 2026-03-31
 

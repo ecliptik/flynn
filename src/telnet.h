@@ -83,4 +83,9 @@ void telnet_process(TelnetState *ts, unsigned char *in, short inlen,
 void telnet_send_naws(TelnetState *ts, unsigned char *send, short *sendlen,
     short cols, short rows);
 
+/*
+ * Generate IAC NOP (2 bytes) for keep-alive.
+ */
+void telnet_send_nop(unsigned char *send, short *sendlen);
+
 #endif /* TELNET_H */

@@ -21,19 +21,27 @@
 
 /* File menu items (fully static) */
 #define FILE_MENU_CONNECT_ID    1
-#define FILE_MENU_FINGER_ID     2   /* Finger... */
-#define FILE_MENU_DISCONNECT_ID 3
+#define FILE_MENU_DISCONNECT_ID 2
+#define FILE_MENU_RECONNECT_ID  3   /* Reconnect (Cmd+R) */
 /* separator = 4 */
-#define FILE_MENU_SAVE_ID       5
-#define FILE_MENU_DNS_ID        6
-/* separator = 7 */
-#define FILE_MENU_QUIT_ID       8
+#define FILE_MENU_FINGER_ID     5   /* Finger... (Cmd+I) */
+/* separator = 6 */
+#define FILE_MENU_SAVE_ID       7
+/* separator = 8 */
+#define FILE_MENU_QUIT_ID       9
 
 /* Edit menu items */
-#define EDIT_MENU_COPY_ID   4
-#define EDIT_MENU_PASTE_ID  5
+#define EDIT_MENU_COPY_ID       4
+#define EDIT_MENU_PASTE_ID      5
 /* separator = 7 */
-#define EDIT_MENU_SELALL_ID 8
+#define EDIT_MENU_SELALL_ID     8
+/* separator = 9 */
+#define EDIT_MENU_FIND_ID       10  /* Find... (Cmd+F) */
+#define EDIT_MENU_FINDAGAIN_ID  11  /* Find Again (Cmd+G) */
+/* separator = 12 */
+#define EDIT_MENU_CLRSCROLL_ID  13  /* Clear Scrollback */
+/* separator = 14 */
+#define EDIT_MENU_SHOW_CLIP_ID  15  /* Show Clipboard */
 
 /* Options menu items (hierarchical submenus for Font and Terminal Type) */
 #define PREFS_FONT_HIER      1   /* Font submenu trigger */
@@ -44,6 +52,8 @@
 /* separator = 6 */
 #define PREFS_BKSP_DEL_ID    7
 #define PREFS_LOCAL_ECHO_ID  8
+/* separator = 9 */
+#define PREFS_DNS_ID         10
 
 /* Font submenu (MENU 134) items */
 #define FONT_MENU_ID        134
@@ -87,6 +97,8 @@
 /* separator = 7 */
 #define CTRL_MENU_BREAK     8
 #define CTRL_MENU_ESC       9
+/* separator = 10 */
+#define CTRL_MENU_RESET     11  /* Reset Terminal */
 
 /* Max window content area for grid computation */
 #define MAX_WIN_WIDTH       500

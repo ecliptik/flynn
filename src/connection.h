@@ -44,6 +44,7 @@ typedef struct {
 	short       protocol;	/* PROTO_TELNET(0) or PROTO_FINGER(1) */
 	char        username[64];
 	ip_addr     dns_server;	/* DNS server to use for lookups */
+	unsigned long last_send_tick;	/* TickCount of last data send (for NOP keep-alive) */
 } Connection;
 
 /* Connect directly to host:port without showing a dialog.
