@@ -29,11 +29,12 @@
 #include "menus.h"
 #include "favorites.h"
 #include "finger.h"
+#include "color.h"
 
 /* Menu handles (private to this module) */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
 static MenuHandle window_menu;
-static MenuHandle font_submenu, ttype_submenu;
+static MenuHandle font_submenu, size_submenu, ttype_submenu;
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -71,8 +72,24 @@ init_menus(void)
 
 	/* Load and insert hierarchical submenus */
 	font_submenu = GetMenu(FONT_MENU_ID);
-	if (font_submenu)
+	if (font_submenu) {
 		InsertMenu(font_submenu, -1);
+		/* Append System 7 fonts at runtime */
+		if (g_has_color_qd) {
+			AppendMenu(font_submenu, "\p ");
+			SetMenuItemText(font_submenu,
+			    FONT_HELVETICA_ID, "\pHelvetica");
+			AppendMenu(font_submenu, "\p ");
+			SetMenuItemText(font_submenu,
+			    FONT_TIMES_ID, "\pTimes");
+			AppendMenu(font_submenu, "\p ");
+			SetMenuItemText(font_submenu,
+			    FONT_PALATINO_ID, "\pPalatino");
+		}
+	}
+	size_submenu = GetMenu(SIZE_MENU_ID);
+	if (size_submenu)
+		InsertMenu(size_submenu, -1);
 	ttype_submenu = GetMenu(TTYPE_MENU_ID);
 	if (ttype_submenu)
 		InsertMenu(ttype_submenu, -1);
@@ -81,6 +98,9 @@ init_menus(void)
 		SetItemCmd(prefs_menu, PREFS_FONT_HIER, 0x1B);
 		SetItemMark(prefs_menu, PREFS_FONT_HIER,
 		    FONT_MENU_ID);
+		SetItemCmd(prefs_menu, PREFS_SIZE_HIER, 0x1B);
+		SetItemMark(prefs_menu, PREFS_SIZE_HIER,
+		    SIZE_MENU_ID);
 		SetItemCmd(prefs_menu, PREFS_TTYPE_HIER, 0x1B);
 		SetItemMark(prefs_menu, PREFS_TTYPE_HIER,
 		    TTYPE_MENU_ID);
@@ -296,18 +316,36 @@ update_prefs_menu(void)
 
 	/* Font submenu checkmarks */
 	if (font_submenu) {
-		CheckItem(font_submenu, FONT_MONACO9_ID,
-		    fid == 4 && fsz == 9);
-		CheckItem(font_submenu, FONT_MONACO12_ID,
-		    fid == 4 && fsz == 12);
-		CheckItem(font_submenu, FONT_COURIER10_ID,
-		    fid == 22 && fsz == 10);
-		CheckItem(font_submenu, FONT_CHICAGO12_ID,
-		    fid == 0 && fsz == 12);
-		CheckItem(font_submenu, FONT_GENEVA9_ID,
-		    fid == 3 && fsz == 9);
-		CheckItem(font_submenu, FONT_GENEVA10_ID,
-		    fid == 3 && fsz == 10);
+		short fi, fc;
+
+		fc = CountMItems(font_submenu);
+		for (fi = 1; fi <= fc; fi++)
+			CheckItem(font_submenu, fi, false);
+
+		if (fid == 4)
+			CheckItem(font_submenu, FONT_MONACO_ID, true);
+		else if (fid == 3)
+			CheckItem(font_submenu, FONT_GENEVA_ID, true);
+		else if (fid == 0)
+			CheckItem(font_submenu, FONT_CHICAGO_ID, true);
+		else if (fid == 22)
+			CheckItem(font_submenu, FONT_COURIER_ID, true);
+		else if (fid == 2)
+			CheckItem(font_submenu, FONT_NEWYORK_ID, true);
+		else if (fid == 21 && g_has_color_qd)
+			CheckItem(font_submenu, FONT_HELVETICA_ID, true);
+		else if (fid == 20 && g_has_color_qd)
+			CheckItem(font_submenu, FONT_TIMES_ID, true);
+		else if (fid == 16 && g_has_color_qd)
+			CheckItem(font_submenu, FONT_PALATINO_ID, true);
+	}
+
+	/* Size submenu checkmarks */
+	if (size_submenu) {
+		CheckItem(size_submenu, SIZE_9_ID, fsz == 9);
+		CheckItem(size_submenu, SIZE_10_ID, fsz == 10);
+		CheckItem(size_submenu, SIZE_12_ID, fsz == 12);
+		CheckItem(size_submenu, SIZE_14_ID, fsz == 14);
 	}
 
 	/* Terminal Type submenu checkmarks */
@@ -319,20 +357,23 @@ update_prefs_menu(void)
 			    ttype == ttype_from_menu[i]);
 	}
 
-	/* Options menu checkmarks */
+	/* Options menu verb toggles (Geomys HIG style) */
 #ifdef FLYNN_DARK_MODE
-	CheckItem(prefs_menu, PREFS_DARK_ID,
-	    prefs.dark_mode != 0);
+	SetMenuItemText(prefs_menu, PREFS_DARK_ID,
+	    prefs.dark_mode ? "\pDark Mode Off" : "\pDark Mode On");
 #else
 	DisableItem(prefs_menu, PREFS_DARK_ID);
 #endif
-	CheckItem(prefs_menu, PREFS_BKSP_DEL_ID,
-	    prefs.backspace_bs != 0);
-	CheckItem(prefs_menu, PREFS_LOCAL_ECHO_ID,
-	    prefs.local_echo != 0);
+	SetMenuItemText(prefs_menu, PREFS_BKSP_DEL_ID,
+	    prefs.backspace_bs ?
+	    "\pBackspace Sends DEL" : "\pBackspace Sends BS");
+	SetMenuItemText(prefs_menu, PREFS_LOCAL_ECHO_ID,
+	    prefs.local_echo ?
+	    "\pLocal Echo Off" : "\pLocal Echo On");
 #ifdef FLYNN_STATUS_BAR
-	CheckItem(prefs_menu, PREFS_STATUS_BAR_ID,
-	    prefs.show_status_bar != 0);
+	SetMenuItemText(prefs_menu, PREFS_STATUS_BAR_ID,
+	    prefs.show_status_bar ?
+	    "\pHide Status Bar" : "\pShow Status Bar");
 #else
 	DisableItem(prefs_menu, PREFS_STATUS_BAR_ID);
 #endif
@@ -504,25 +545,40 @@ handle_ctrl_menu(short item)
 static void
 handle_font_submenu(short item)
 {
+	short new_id = -1;
+
 	switch (item) {
-	case FONT_MONACO9_ID:
-		do_font_change(4, 9);
-		break;
-	case FONT_MONACO12_ID:
-		do_font_change(4, 12);
-		break;
-	case FONT_COURIER10_ID:
-		do_font_change(22, 10);
-		break;
-	case FONT_CHICAGO12_ID:
-		do_font_change(0, 12);
-		break;
-	case FONT_GENEVA9_ID:
-		do_font_change(3, 9);
-		break;
-	case FONT_GENEVA10_ID:
-		do_font_change(3, 10);
-		break;
+	case FONT_MONACO_ID:    new_id = 4; break;   /* Monaco */
+	case FONT_GENEVA_ID:    new_id = 3; break;   /* Geneva */
+	case FONT_CHICAGO_ID:   new_id = 0; break;   /* Chicago */
+	case FONT_COURIER_ID:   new_id = 22; break;  /* Courier */
+	case FONT_NEWYORK_ID:   new_id = 2; break;   /* New York */
+	case FONT_HELVETICA_ID: new_id = 21; break;  /* Helvetica */
+	case FONT_TIMES_ID:     new_id = 20; break;  /* Times */
+	case FONT_PALATINO_ID:  new_id = 16; break;  /* Palatino */
+	}
+	if (new_id >= 0) {
+		short sz = active_session ?
+		    active_session->font_size : prefs.font_size;
+		do_font_change(new_id, sz);
+	}
+}
+
+static void
+handle_size_submenu(short item)
+{
+	short new_sz = -1;
+
+	switch (item) {
+	case SIZE_9_ID:  new_sz = 9; break;
+	case SIZE_10_ID: new_sz = 10; break;
+	case SIZE_12_ID: new_sz = 12; break;
+	case SIZE_14_ID: new_sz = 14; break;
+	}
+	if (new_sz > 0) {
+		short fid = active_session ?
+		    active_session->font_id : prefs.font_id;
+		do_font_change(fid, new_sz);
 	}
 }
 
@@ -694,6 +750,9 @@ handle_menu(long menu_id)
 		break;
 	case FONT_MENU_ID:
 		handle_font_submenu(item);
+		break;
+	case SIZE_MENU_ID:
+		handle_size_submenu(item);
 		break;
 	case TTYPE_MENU_ID:
 		handle_ttype_submenu(item);

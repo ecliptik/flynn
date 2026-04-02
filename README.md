@@ -58,7 +58,7 @@ Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archi
 - **Multiple sessions** (up to 4 simultaneous windows)
 - **Resizable window and scrollback** (80x24 up to 132x50, 192-line scrollback)
 - **Status bar** showing terminal size, protocol, and connection info
-- **6 fonts** (Monaco 9/12, Courier 10, Chicago 12, Geneva 9/10)
+- **8 fonts** (Monaco, Geneva, Chicago, Courier, New York; Helvetica, Times, Palatino on System 7) with independent size selection (9, 10, 12, 14)
 - **Dark mode**
 
 **Input & Interaction**

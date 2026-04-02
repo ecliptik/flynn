@@ -43,26 +43,37 @@
 /* separator = 14 */
 #define EDIT_MENU_SHOW_CLIP_ID  15  /* Show Clipboard */
 
-/* Options menu items (hierarchical submenus for Font and Terminal Type) */
+/* Options menu items (hierarchical submenus for Font, Size, Terminal Type) */
 #define PREFS_FONT_HIER      1   /* Font submenu trigger */
-#define PREFS_TTYPE_HIER     2   /* Terminal Type submenu trigger */
-/* separator = 3 */
-#define PREFS_DARK_ID        4
-#define PREFS_STATUS_BAR_ID  5
-/* separator = 6 */
-#define PREFS_BKSP_DEL_ID    7
-#define PREFS_LOCAL_ECHO_ID  8
-/* separator = 9 */
-#define PREFS_DNS_ID         10
+#define PREFS_SIZE_HIER      2   /* Size submenu trigger */
+#define PREFS_TTYPE_HIER     3   /* Terminal Type submenu trigger */
+/* separator = 4 */
+#define PREFS_DARK_ID        5
+#define PREFS_STATUS_BAR_ID  6
+/* separator = 7 */
+#define PREFS_BKSP_DEL_ID    8
+#define PREFS_LOCAL_ECHO_ID  9
+/* separator = 10 */
+#define PREFS_DNS_ID         11
 
 /* Font submenu (MENU 134) items */
 #define FONT_MENU_ID        134
-#define FONT_MONACO9_ID      1
-#define FONT_MONACO12_ID     2
-#define FONT_COURIER10_ID    3
-#define FONT_CHICAGO12_ID    4
-#define FONT_GENEVA9_ID      5
-#define FONT_GENEVA10_ID     6
+#define FONT_MONACO_ID       1
+#define FONT_GENEVA_ID       2
+#define FONT_CHICAGO_ID      3
+#define FONT_COURIER_ID      4
+#define FONT_NEWYORK_ID      5
+/* 6-8: Helvetica, Times, Palatino appended at runtime on System 7 */
+#define FONT_HELVETICA_ID    6
+#define FONT_TIMES_ID        7
+#define FONT_PALATINO_ID     8
+
+/* Size submenu (MENU 137) items */
+#define SIZE_MENU_ID        137
+#define SIZE_9_ID            1
+#define SIZE_10_ID           2
+#define SIZE_12_ID           3
+#define SIZE_14_ID           4
 
 /* Terminal Type submenu (MENU 135) items */
 #define TTYPE_MENU_ID       135

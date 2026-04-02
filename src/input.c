@@ -372,6 +372,11 @@ handle_content_click(Session *s, EventRecord *event)
 	short row, col;
 	GrafPtr save;
 
+	/* Skip clicks in disconnected sessions to avoid
+	 * stale color cache rendering artifacts */
+	if (s->conn.state != CONN_STATE_CONNECTED)
+		return;
+
 	GetPort(&save);
 	SetPort(s->window);
 

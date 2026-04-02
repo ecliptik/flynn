@@ -21,16 +21,25 @@ All notable changes to this project will be documented in this file.
 - Window title from OSC 0/2 now strips control characters (bytes < 0x20)
 - Window resize on font change used wrong status bar height calculation
 - Grow box and scrollbar column not redrawn after window resize snap-to-grid
+- Cell width uses CharWidth('M') instead of widMax (fixes spacing with scaled bitmap fonts)
+- Status bar color cache invalidation after GWorld rendering on System 7
+- Zero-width selection no longer renders inverted cell on single click
+- Clicks in disconnected terminal sessions ignored (prevents stale color artifacts)
 
 ### Changed
-- File menu reorganized: New, Close, Reconnect, Finger, Save, Quit (DNS Server moved to Options)
+- Font and Size split into separate submenus (matching Geomys HIG)
+- New fonts: New York (System 6+), Helvetica, Times, Palatino (System 7 only, added at runtime)
+- Size submenu: 9, 10, 12, 14 — any font/size combination now possible
+- Options menu uses verb toggles (Show/Hide, On/Off) instead of checkmarks (matching Geomys)
+- DNS Server moved from File menu to Options menu
+- Status bar always white with black text regardless of dark mode (chrome, not content)
+- File menu reorganized: New, Close, Reconnect, Finger, Save, Quit
 - Finger shortcut changed from Cmd+F to Cmd+I (Cmd+F now Find, matching Geomys)
 - Screen row pointer table eliminates row×132 multiply on all screen accesses (+200 bytes/session)
 - Color row pointer table eliminates multiply for color array access on System 7
 - Glyph cache uses direct lookup table instead of linear search (O(1) vs O(49))
 - Charset-is-standard cached flag reduces per-character struct reads in fast path
 - Pre-computed cell height fractions eliminate divides in glyph rendering
-- Color offscreen direct fill bypasses EraseRect QuickDraw trap on System 7
 - adjust_cursor() only called on mouse movement, not every idle tick
 - Color cube RGB decomposition uses subtraction loops instead of division (no hardware divide on 68000)
 - DNS resolver stack buffers made static (saves ~1.5KB stack)

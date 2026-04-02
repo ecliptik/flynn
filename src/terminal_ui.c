@@ -654,7 +654,9 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 	TextSize(font_size);
 	GetFontInfo(&fi);
 
-	g_cell_width = fi.widMax;
+	g_cell_width = CharWidth('M');
+	/* CharWidth gives actual advance; fi.widMax can be inflated
+	 * by QuickDraw bitmap scaling at non-native sizes */
 	g_cell_height = fi.ascent + fi.descent + fi.leading;
 	g_cell_baseline = fi.ascent + fi.leading;
 	g_font_id = font_id;
@@ -2021,7 +2023,9 @@ draw_row(Terminal *term, short row)
 		short sr, sc, er, ec;
 
 		sel_normalize(&sr, &sc, &er, &ec);
-		if (row >= sr && row <= er) {
+		/* Skip zero-width selections (single click, no drag) */
+		if ((sr != er || sc != ec) &&
+		    row >= sr && row <= er) {
 			if (sr == er) {
 				/* Single-row selection */
 				sel_start_col = sc;
@@ -5070,15 +5074,26 @@ draw_status_bar(WindowPtr win, Session *s)
 	bar_top = win->portRect.bottom - SCROLLBAR_WIDTH;
 	bar_right = win->portRect.right - SCROLLBAR_WIDTH;
 
-	/* Background fill (always, even when hidden) */
+	/* Invalidate color cache — term_ui_draw's GWorld rendering
+	 * leaves cached indices out of sync with the window port */
+#ifdef FLYNN_COLOR
+	if (g_has_color_qd) {
+		cached_fg_idx = -1;
+		cached_bg_idx = -1;
+	}
+#endif
+
+	/* Background fill — always white regardless of dark mode
+	 * (status bar is chrome, not content; matches Geomys HIG) */
 	SetRect(&bar_r, 0, bar_top, bar_right, win->portRect.bottom);
-	if (g_dark_mode) {
-		if (g_has_color_qd) {
-			set_bg_color(0);
-			EraseRect(&bar_r);
-		} else {
-			PaintRect(&bar_r);
-		}
+#ifdef FLYNN_COLOR
+	if (g_has_color_qd)
+		set_bg_color(15);
+#endif
+	if (g_dark_mode && !g_has_color_qd) {
+		/* Mono dark: invert to get white background */
+		BackColor(whiteColor);
+		EraseRect(&bar_r);
 	} else {
 		EraseRect(&bar_r);
 	}
@@ -5087,19 +5102,9 @@ draw_status_bar(WindowPtr win, Session *s)
 		return;
 
 	/* 1px separator line at top of status bar */
+	ForeColor(blackColor);
 	MoveTo(0, bar_top);
-	if (g_dark_mode && !g_has_color_qd) {
-		PenMode(patBic);
-		LineTo(bar_right - 1, bar_top);
-		PenNormal();
-	} else if (g_dark_mode && g_has_color_qd) {
-		set_fg_color(8);
-		LineTo(bar_right - 1, bar_top);
-		set_fg_color(15);
-	} else {
-		ForeColor(blackColor);
-		LineTo(bar_right - 1, bar_top);
-	}
+	LineTo(bar_right - 1, bar_top);
 
 	/* Build status text */
 	{
@@ -5146,15 +5151,9 @@ draw_status_bar(WindowPtr win, Session *s)
 	TextSize(9);
 	TextFace(0);
 
-	if (g_dark_mode && !g_has_color_qd) {
-		TextMode(srcBic);
-	} else if (g_dark_mode && g_has_color_qd) {
-		set_fg_color(15);
-		TextMode(srcOr);
-	} else {
-		ForeColor(blackColor);
-		TextMode(srcOr);
-	}
+	/* Always black text on white background */
+	ForeColor(blackColor);
+	TextMode(srcOr);
 
 	{
 		short text_w;

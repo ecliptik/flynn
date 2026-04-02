@@ -57,13 +57,14 @@ resource 'MENU' (131, "Options") {
 	131, textMenuProc, allEnabled, enabled, "Options",
 	{
 		"Font", noIcon, noKey, noMark, plain;
+		"Size", noIcon, noKey, noMark, plain;
 		"Terminal Type", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Dark Mode", noIcon, noKey, noMark, plain;
-		"Status Bar", noIcon, noKey, noMark, plain;
+		"Dark Mode On", noIcon, noKey, noMark, plain;
+		"Show Status Bar", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Backspace Sends BS", noIcon, noKey, noMark, plain;
-		"Local Echo", noIcon, noKey, noMark, plain;
+		"Backspace Sends DEL", noIcon, noKey, noMark, plain;
+		"Local Echo On", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"DNS Server\311", noIcon, noKey, noMark, plain
 	}
@@ -72,12 +73,22 @@ resource 'MENU' (131, "Options") {
 resource 'MENU' (134, "Font") {
 	134, textMenuProc, allEnabled, enabled, "Font",
 	{
-		"Monaco 9", noIcon, noKey, noMark, plain;
-		"Monaco 12", noIcon, noKey, noMark, plain;
-		"Courier 10", noIcon, noKey, noMark, plain;
-		"Chicago 12", noIcon, noKey, noMark, plain;
-		"Geneva 9", noIcon, noKey, noMark, plain;
-		"Geneva 10", noIcon, noKey, noMark, plain
+		"Monaco", noIcon, noKey, noMark, plain;
+		"Geneva", noIcon, noKey, noMark, plain;
+		"Chicago", noIcon, noKey, noMark, plain;
+		"Courier", noIcon, noKey, noMark, plain;
+		"New York", noIcon, noKey, noMark, plain
+		/* Helvetica, Times, Palatino appended at runtime on System 7 */
+	}
+};
+
+resource 'MENU' (137, "Size") {
+	137, textMenuProc, allEnabled, enabled, "Size",
+	{
+		"9", noIcon, noKey, noMark, plain;
+		"10", noIcon, noKey, noMark, plain;
+		"12", noIcon, noKey, noMark, plain;
+		"14", noIcon, noKey, noMark, plain
 	}
 };
 
