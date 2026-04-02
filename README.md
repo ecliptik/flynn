@@ -77,15 +77,10 @@ Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archi
 - **Remembers last host/user** across launches
 
 **Session Management**
-- **Session bookmarks** (with per-bookmark Telnet/Finger protocol)
-- **Reconnect** on disconnect (Cmd+R) and one-click reconnect in disconnect alert
-- **Telnet NOP keep-alive** prevents idle connection drops (120 second interval)
-- **Find in Scrollback** (Cmd+F / Cmd+G Find Again)
-- **Show Clipboard** viewer window with scrollbars
-- **Reset Terminal** clears screen and parser state without disconnecting
-- **Window position** saved and restored across launches
-- **GURL Apple Event** handler for telnet:// URLs from System 7 browsers
-- **Settings persistence**
+- **Bookmarks** with per-bookmark protocol, font, and terminal type
+- **Reconnect** (Cmd+R) and keep-alive (NOP every 120s)
+- **Find in Scrollback** (Cmd+F / Cmd+G), Show Clipboard, Reset Terminal
+- **Persistent settings**, window position, and telnet:// URL handling
 - **MultiFinder, Apple Events, and Notification Manager support**
 
 ## Keyboard Shortcuts
