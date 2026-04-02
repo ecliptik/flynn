@@ -75,6 +75,10 @@ void setup_default_button_outline(DialogPtr dlg, short outline_item);
 pascal Boolean std_dlg_filter(DialogPtr dlg, EventRecord *evt,
     short *item);
 
+/* Show terminal type popup menu at a dialog item */
+short show_ttype_popup(DialogPtr dlg, short item_num,
+    short current_ttype, Boolean include_default);
+
 /* Show the Connect dialog */
 void do_connect(void);
 

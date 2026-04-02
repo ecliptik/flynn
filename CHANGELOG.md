@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- DNS response parser signed short overflow on crafted RDLEN values
+- OSC parameter accumulation signed short overflow (guard tightened)
+- Window title from OSC 0/2 now strips control characters (bytes < 0x20)
+- Window resize on font change used wrong status bar height calculation
+
+### Changed
+- Terminal fast path caches screen row pointer (eliminates per-character multiply on 68000)
+- Glyph cache uses direct lookup table instead of linear search (O(1) vs O(49))
+- adjust_cursor() only called on mouse movement, not every idle tick
+- Color cube RGB decomposition uses subtraction loops instead of division (no hardware divide on 68000)
+- DNS resolver stack buffers made static (saves ~1.5KB stack)
+- Deduplicated show_ttype_popup between connect and bookmark edit dialogs
+- Removed dead code: TelnetState.sb_opt, favorites_init_menu(), redundant telnet_init zeroing
+
 ## [1.9.8] - 2026-03-31
 
 ### Added

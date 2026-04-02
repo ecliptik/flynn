@@ -86,11 +86,16 @@ color_get_rgb(unsigned char index, RGBColor *rgb)
 		g = ansi_palette[index][1];
 		b = ansi_palette[index][2];
 	} else if (index < 232) {
-		/* 6x6x6 color cube: index = 16 + 36*R + 6*G + B */
+		/* 6x6x6 color cube: index = 16 + 36*R + 6*G + B
+		 * Use subtraction loops instead of division —
+		 * 68000 has no hardware divide (~150 cycles each) */
 		short ci = index - 16;
-		r = cube_vals[ci / 36];
-		g = cube_vals[(ci / 6) % 6];
-		b = cube_vals[ci % 6];
+		short ri = 0, gi_val = 0;
+		while (ci >= 36) { ci -= 36; ri++; }
+		while (ci >= 6) { ci -= 6; gi_val++; }
+		r = cube_vals[ri];
+		g = cube_vals[gi_val];
+		b = cube_vals[ci];
 	} else {
 		/* Grayscale ramp: 8, 18, 28, ..., 238 */
 		r = 8 + (index - 232) * 10;

@@ -376,8 +376,8 @@ do_font_change(short font_id, short font_size)
 	/* Compute window size for default grid */
 	win_w = LEFT_MARGIN * 2 +
 	    TERM_DEFAULT_COLS * g_cell_width + SCROLLBAR_WIDTH;
-	win_h = STATUSBAR_MARGIN +
-	    TERM_DEFAULT_ROWS * g_cell_height + SCROLLBAR_WIDTH;
+	win_h = status_bar_height() +
+	    TERM_DEFAULT_ROWS * g_cell_height;
 	if (win_w > MAX_WIN_WIDTH)
 		win_w = MAX_WIN_WIDTH;
 	if (win_h > MAX_WIN_HEIGHT)

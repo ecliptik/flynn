@@ -307,7 +307,7 @@ apply_bookmark_font(Session *s, Bookmark *bm)
  * Returns new ttype selection, or current_ttype if no change.
  * Updates button title on selection.
  */
-static short
+short
 show_ttype_popup(DialogPtr dlg, short item_num,
     short current_ttype, Boolean include_default)
 {

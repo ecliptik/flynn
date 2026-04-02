@@ -232,8 +232,10 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 {
 	short i;
 	unsigned char ch;
-	/* Cached color row pointer: avoids cur_row*TERM_COLS multiply
+	/* Cached row pointers: avoid cur_row*TERM_COLS multiply
 	 * per character in the ASCII fast path */
+	TermCell *cached_screen_row = term->screen[term->cur_row];
+	short cached_screen_row_idx = term->cur_row;
 	CellColor *cached_color_row = 0L;
 	short cached_color_row_idx = -1;
 
@@ -310,8 +312,16 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					if (term->cur_fg != COLOR_DEFAULT ||
 					    term->cur_bg != COLOR_DEFAULT)
 						a |= ATTR_HAS_COLOR;
-					term->screen[term->cur_row][term->cur_col].ch = ch;
-					term->screen[term->cur_row][term->cur_col].attr = a;
+					if (term->cur_row !=
+					    cached_screen_row_idx) {
+						cached_screen_row_idx =
+						    term->cur_row;
+						cached_screen_row =
+						    term->screen[
+						    term->cur_row];
+					}
+					cached_screen_row[term->cur_col].ch = ch;
+					cached_screen_row[term->cur_col].attr = a;
 					if (term->has_color &&
 					    term->screen_color) {
 						if (term->cur_row !=
@@ -2437,7 +2447,7 @@ term_process_osc(Terminal *term, unsigned char ch)
 			unsigned char d = term->osc_buf[i];
 			if (d < '0' || d > '9')
 				break;
-			if (term->osc_param > 9999)
+			if (term->osc_param > 999)
 				break;
 			term->osc_param = term->osc_param * 10 +
 			    (d - '0');
@@ -2484,6 +2494,13 @@ term_finish_osc(Terminal *term)
 			len = sizeof(term->window_title) - 1;
 		memcpy(term->window_title, term->osc_buf, len);
 		term->window_title[len] = '\0';
+		/* Strip control characters to prevent misleading text */
+		{
+			short ti;
+			for (ti = 0; term->window_title[ti]; ti++)
+				if ((unsigned char)term->window_title[ti] < 0x20)
+					term->window_title[ti] = ' ';
+		}
 		term->title_changed = 1;
 		break;
 	case 1:

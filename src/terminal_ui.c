@@ -1615,18 +1615,15 @@ static struct {
 } g_glyph_cache;
 
 /*
- * glyph_cache_find - look up glyph in cache, return index or -1
+ * glyph_cache_find - look up glyph in cache via direct lookup table.
+ * 256-entry table (512 bytes) replaces linear scan over 49 entries.
  */
+static short glyph_cache_idx[256];
+
 static short
 glyph_cache_find(unsigned char gid)
 {
-	short i;
-
-	for (i = 0; i < GLYPH_CACHE_COUNT; i++) {
-		if (cached_glyph_ids[i] == gid)
-			return i;
-	}
-	return -1;
+	return (gid < 256) ? glyph_cache_idx[gid] : -1;
 }
 
 #ifdef FLYNN_GLYPHS
@@ -1647,6 +1644,7 @@ glyph_cache_rebuild(void)
 	rb = (g_cell_width + 15) / 16 * 2;
 	if (rb > GLYPH_CACHE_MAX_RB || g_cell_height > GLYPH_CACHE_MAX_H) {
 		g_glyph_cache.valid = 0;
+		memset(glyph_cache_idx, 0xFF, sizeof(glyph_cache_idx));
 		return;
 	}
 
@@ -1690,6 +1688,11 @@ glyph_cache_rebuild(void)
 	g_glyph_cache.cell_h = g_cell_height;
 	g_glyph_cache.rowBytes = rb;
 	g_glyph_cache.valid = 1;
+
+	/* Populate direct lookup table */
+	memset(glyph_cache_idx, 0xFF, sizeof(glyph_cache_idx));
+	for (i = 0; i < GLYPH_CACHE_COUNT; i++)
+		glyph_cache_idx[cached_glyph_ids[i]] = i;
 }
 #endif /* FLYNN_GLYPHS */
 

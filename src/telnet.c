@@ -128,7 +128,6 @@ telnet_init(TelnetState *ts)
 {
 	memset(ts, 0, sizeof(TelnetState));
 	ts->state = TELNET_STATE_NORMAL;
-	ts->sb_overflow = 0;
 	ts->cols = 80;
 	ts->rows = 24;
 }

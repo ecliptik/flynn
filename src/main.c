@@ -493,6 +493,7 @@ main_event_loop(void)
 			Session *sess;
 			short prev_state;
 			static unsigned short bg_tick = 0;
+			static Point last_mouse_pt = { -1, -1 };
 
 			/* Save user interaction state (selection, cursor)
 			 * before cycling through sessions */
@@ -576,7 +577,11 @@ main_event_loop(void)
 					    &active_session->terminal);
 					SetPort(save);
 				}
-				adjust_cursor(event.where);
+				if (event.where.h != last_mouse_pt.h ||
+				    event.where.v != last_mouse_pt.v) {
+					last_mouse_pt = event.where;
+					adjust_cursor(event.where);
+				}
 				break;
 			}
 
@@ -693,7 +698,11 @@ main_event_loop(void)
 				session_load_font(active_session);
 			}
 
-			adjust_cursor(event.where);
+			if (event.where.h != last_mouse_pt.h ||
+			    event.where.v != last_mouse_pt.v) {
+				last_mouse_pt = event.where;
+				adjust_cursor(event.where);
+			}
 			break;
 		}
 		case keyDown:

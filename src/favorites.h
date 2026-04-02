@@ -7,9 +7,6 @@
 
 #ifdef FLYNN_FAVORITES
 
-/* Initialize top-level Favorites menu (called from init_menus) */
-void favorites_init_menu(void);
-
 /* Rebuild dynamic menu items (separator + bookmark entries) */
 void favorites_rebuild_menu(void);
 
@@ -26,7 +23,6 @@ void favorites_add(void);
 void add_recent_bookmark(short index);
 
 #else
-#define favorites_init_menu()       ((void)0)
 #define favorites_rebuild_menu()    ((void)0)
 #define favorites_menu_click(i)     ((void)0)
 #define favorites_manage()          ((void)0)
