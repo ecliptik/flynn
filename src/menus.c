@@ -130,7 +130,7 @@ init_menus(void)
 		} else {
 			SetMenuItemText(prefs_menu, PREFS_THEME_HIER,
 			    prefs.dark_mode ?
-			    "\pDark Mode Off" : "\pDark Mode On");
+			    "\pTurn Dark Mode Off" : "\pTurn Dark Mode On");
 		}
 #endif
 	}
@@ -454,11 +454,11 @@ update_prefs_menu(void)
 	} else {
 		SetMenuItemText(prefs_menu, PREFS_THEME_HIER,
 		    theme_is_dark() ?
-		    "\pDark Mode Off" : "\pDark Mode On");
+		    "\pTurn Dark Mode Off" : "\pTurn Dark Mode On");
 	}
 #elif defined(FLYNN_DARK_MODE)
 	SetMenuItemText(prefs_menu, PREFS_DARK_ID,
-	    prefs.dark_mode ? "\pDark Mode Off" : "\pDark Mode On");
+	    prefs.dark_mode ? "\pTurn Dark Mode Off" : "\pTurn Dark Mode On");
 #else
 	DisableItem(prefs_menu, PREFS_DARK_ID);
 #endif
@@ -473,12 +473,12 @@ update_prefs_menu(void)
 		    prefs.local_echo;
 		SetMenuItemText(prefs_menu, PREFS_BKSP_DEL_ID,
 		    bs_val ?
-		    "\pBackspace Sends DEL" :
-		    "\pBackspace Sends BS");
+		    "\pSwitch Backspace to DEL (^?)" :
+		    "\pSwitch Backspace to BS (^H)");
 		SetMenuItemText(prefs_menu, PREFS_LOCAL_ECHO_ID,
 		    echo_val ?
-		    "\pLocal Echo Off" :
-		    "\pLocal Echo On");
+		    "\pTurn Local Echo Off" :
+		    "\pTurn Local Echo On");
 	}
 #ifdef FLYNN_STATUS_BAR
 	SetMenuItemText(prefs_menu, PREFS_STATUS_BAR_ID,
@@ -933,6 +933,9 @@ handle_prefs_menu(short item)
 #endif
 		prefs_save(&prefs);
 		update_prefs_menu();
+		if (active_session)
+			draw_status_bar(active_session->window,
+			    active_session);
 		break;
 	case PREFS_LOCAL_ECHO_ID:
 		if (active_session)
@@ -954,6 +957,9 @@ handle_prefs_menu(short item)
 #endif
 		prefs_save(&prefs);
 		update_prefs_menu();
+		if (active_session)
+			draw_status_bar(active_session->window,
+			    active_session);
 		break;
 #ifdef FLYNN_STATUS_BAR
 	case PREFS_STATUS_BAR_ID: {

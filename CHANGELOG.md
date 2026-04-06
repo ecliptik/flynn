@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Edit Favorite dialog: redesigned with title bar (noGrowDocProc), split Font/Size popups, Theme/Backspace/Echo settings per favorite
+- Manage Favorites dialog: title bar added for consistency (noGrowDocProc)
+- Status bar shows Backspace (BS/DEL) and Local Echo (Echo On/Off) indicators
 - Theme engine: 9 built-in themes (Light, Dark, Solarized Light/Dark, Tokyo Light/Dark, Green Screen, Classic, Platinum) with 4 optional themes (Dracula, Monokai, Nord, Gruvbox)
 - Per-window settings: theme, terminal type, backspace, and local echo are independent per session
 - Per-bookmark theme/backspace/local echo persistence (saved alongside existing per-bookmark font/terminal type)
@@ -24,6 +27,9 @@ All notable changes to this project will be documented in this file.
 - Window position saved to preferences and restored on next launch
 
 ### Fixed
+- favorites_add() sentinel bug: bm_theme_id/bm_backspace_bs/bm_local_echo initialized to 0 (wrong value) instead of -1 (use global default) via memset; now captures actual session values
+- Backspace popup in Edit Favorite: `^H` and `^?` were parsed as Menu Manager metacharacters by AppendMenu, graying out items; fixed with SetMenuItemText
+- Status bar not updating on Backspace/Local Echo toggle from Options menu
 - Color desync: reverted pointer-rotation scroll to memmove (fixes gray/wrong ANSI colors after scroll on System 7)
 - Dark theme white holes: skip color GWorld for non-white-bg themes, draw directly to window (avoids Window Manager BeginUpdate white fill)
 - Disconnect color preservation: snap_color buffer saves/restores CellColor data alongside TermCell content
@@ -47,7 +53,10 @@ All notable changes to this project will be documented in this file.
 - Font and Size split into separate submenus (matching Geomys HIG)
 - New fonts: New York (System 6+), Helvetica, Times, Palatino (System 7 only, added at runtime)
 - Size submenu: 9, 10, 12, 14 — any font/size combination now possible
-- Options menu uses verb toggles (Show/Hide, On/Off) instead of checkmarks (matching Geomys)
+- Options menu uses Apple HIG action verbs: "Turn Dark Mode On/Off", "Show/Hide Status Bar", "Turn Local Echo On/Off", "Switch Backspace to BS/DEL (^H/^?)"
+- Removed trailing colons from all dialog labels (Connect, Favorites, DNS Server, Finger, Find)
+- Edit Favorite: Host and Port on same row, all settings show resolved values (no ambiguous "Default" option)
+- Favorites popup menus list current value first for Backspace and Echo
 - DNS Server moved from File menu to Options menu
 - Status bar always white with black text regardless of dark mode (chrome, not content)
 - File menu reorganized: New, Close, Reconnect, Finger, Save, Quit

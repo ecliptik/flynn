@@ -67,8 +67,8 @@ resource 'MENU' (131, "Options") {
 		"Theme", noIcon, noKey, noMark, plain;
 		"Show Status Bar", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Backspace Sends DEL", noIcon, noKey, noMark, plain;
-		"Local Echo On", noIcon, noKey, noMark, plain;
+		"Switch Backspace to BS", noIcon, noKey, noMark, plain;
+		"Turn Local Echo On", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"DNS Server\311", noIcon, noKey, noMark, plain
 	}
@@ -179,7 +179,7 @@ resource 'DITL' (129, "Connect") {
 
 		/* 3: Host label */
 		{15, 15, 31, 85},
-		StaticText { disabled, "Host:" };
+		StaticText { disabled, "Host" };
 
 		/* 4: Host field */
 		{15, 90, 31, 325},
@@ -187,7 +187,7 @@ resource 'DITL' (129, "Connect") {
 
 		/* 5: Port label */
 		{45, 15, 61, 85},
-		StaticText { disabled, "Port:" };
+		StaticText { disabled, "Port" };
 
 		/* 6: Port field */
 		{45, 90, 61, 160},
@@ -199,7 +199,7 @@ resource 'DITL' (129, "Connect") {
 
 		/* 8: Username label */
 		{75, 15, 91, 85},
-		StaticText { disabled, "Username:" };
+		StaticText { disabled, "Username" };
 
 		/* 9: Username field */
 		{75, 90, 91, 235},
@@ -211,7 +211,7 @@ resource 'DITL' (129, "Connect") {
 
 		/* 11: Terminal label */
 		{105, 15, 121, 85},
-		StaticText { disabled, "Terminal:" };
+		StaticText { disabled, "Terminal" };
 
 		/* 12: Terminal type button */
 		{103, 90, 123, 235},
@@ -307,12 +307,12 @@ resource 'DITL' (128, "Alert") {
 /* Favorites manager dialog */
 resource 'DLOG' (131, "Favorites") {
 	{40, 60, 300, 430},
-	dBoxProc,
+	noGrowDocProc,
 	visible,
 	noGoAway,
 	0x0,
 	131,
-	"Favorites",
+	"Manage Favorites",
 	noAutoCenter
 };
 
@@ -332,7 +332,7 @@ resource 'DITL' (131, "Favorites") {
 
 		/* 4: Label */
 		{5, 15, 21, 120},
-		StaticText { disabled, "Favorites:" };
+		StaticText { disabled, "Favorites" };
 
 		/* 5: List area (UserItem, enabled for List Manager clicks) */
 		{25, 15, 218, 265},
@@ -362,8 +362,8 @@ resource 'DITL' (131, "Favorites") {
 
 /* Favorite add/edit dialog */
 resource 'DLOG' (132, "Edit Favorite") {
-	{40, 90, 310, 420},
-	dBoxProc,
+	{42, 65, 318, 445},
+	noGrowDocProc,
 	visible,
 	noGoAway,
 	0x0,
@@ -375,76 +375,108 @@ resource 'DLOG' (132, "Edit Favorite") {
 resource 'DITL' (132, "Edit Favorite") {
 	{
 		/* 1: OK button */
-		{235, 245, 255, 315},
+		{234, 290, 254, 365},
 		Button { enabled, "OK" };
 
 		/* 2: Cancel button */
-		{235, 155, 255, 225},
+		{234, 205, 254, 275},
 		Button { enabled, "Cancel" };
 
 		/* 3: Name label */
-		{15, 15, 31, 90},
-		StaticText { disabled, "Name:" };
+		{8, 10, 24, 80},
+		StaticText { disabled, "Name" };
 
 		/* 4: Name field */
-		{15, 95, 31, 315},
+		{8, 82, 24, 365},
 		EditText { enabled, "" };
 
 		/* 5: Host label */
-		{45, 15, 61, 90},
-		StaticText { disabled, "Host:" };
+		{32, 10, 48, 80},
+		StaticText { disabled, "Host" };
 
-		/* 6: Host field */
-		{45, 95, 61, 315},
+		/* 6: Host field — shares row with Port */
+		{32, 82, 48, 265},
 		EditText { enabled, "" };
 
-		/* 7: Port label */
-		{75, 15, 91, 90},
-		StaticText { disabled, "Port:" };
+		/* 7: Port label — same row as Host */
+		{32, 275, 48, 305},
+		StaticText { disabled, "Port" };
 
 		/* 8: Port field */
-		{75, 95, 91, 165},
+		{32, 308, 48, 365},
 		EditText { enabled, "23" };
 
 		/* 9: Username label */
-		{105, 15, 121, 90},
-		StaticText { disabled, "Username:" };
+		{56, 10, 72, 80},
+		StaticText { disabled, "User" };
 
 		/* 10: Username field */
-		{105, 95, 121, 255},
+		{56, 82, 72, 265},
 		EditText { enabled, "" };
 
 		/* 11: Terminal label */
-		{140, 15, 156, 90},
-		StaticText { disabled, "Terminal:" };
+		{86, 10, 102, 80},
+		StaticText { disabled, "Terminal" };
 
 		/* 12: Terminal type button */
-		{138, 95, 158, 205},
-		Button { enabled, "Default" };
+		{84, 82, 104, 220},
+		Button { enabled, "xterm" };
 
 		/* 13: Font label */
-		{170, 15, 186, 90},
-		StaticText { disabled, "Font:" };
+		{112, 10, 128, 80},
+		StaticText { disabled, "Font" };
 
 		/* 14: Font button */
-		{168, 95, 188, 205},
-		Button { enabled, "Default" };
+		{110, 82, 130, 185},
+		Button { enabled, "Monaco" };
 
 		/* 15: Default button outline (UserItem) */
-		{231, 241, 259, 319},
+		{230, 286, 258, 369},
 		UserItem { disabled };
 
 		/* 16: Protocol label */
-		{200, 15, 216, 90},
-		StaticText { disabled, "Protocol:" };
+		{190, 10, 206, 80},
+		StaticText { disabled, "Protocol" };
 
 		/* 17: Protocol button */
-		{198, 95, 218, 205},
+		{188, 82, 208, 185},
 		Button { enabled, "Telnet" };
 
 		/* 18: Verbose checkbox (finger only, right of protocol) */
-		{201, 215, 217, 315},
+		{191, 195, 207, 365},
 		CheckBox { enabled, "Verbose (/W)" };
+
+		/* 19: Size label */
+		{112, 195, 128, 230},
+		StaticText { disabled, "Size" };
+
+		/* 20: Size button */
+		{110, 232, 130, 300},
+		Button { enabled, "9" };
+
+		/* 21: Theme label */
+		{138, 10, 154, 80},
+		StaticText { disabled, "Theme" };
+
+		/* 22: Theme button */
+		{136, 82, 156, 220},
+		Button { enabled, "Light" };
+
+		/* 23: Backspace label */
+		{164, 10, 180, 80},
+		StaticText { disabled, "Backspace" };
+
+		/* 24: Backspace button */
+		{162, 82, 182, 185},
+		Button { enabled, "DEL" };
+
+		/* 25: Echo label */
+		{164, 195, 180, 230},
+		StaticText { disabled, "Echo" };
+
+		/* 26: Echo button */
+		{162, 232, 182, 300},
+		Button { enabled, "Off" };
 	}
 };
 
@@ -472,7 +504,7 @@ resource 'DITL' (133, "DNS Server") {
 
 		/* Label */
 		{15, 15, 31, 110},
-		StaticText { disabled, "DNS Server:" };
+		StaticText { disabled, "DNS Server" };
 
 		/* IP address field */
 		{15, 115, 31, 280},
@@ -512,7 +544,7 @@ resource 'DITL' (137, "Finger") {
 
 		/* 3: Host label */
 		{15, 15, 31, 85},
-		StaticText { disabled, "Host:" };
+		StaticText { disabled, "Host" };
 
 		/* 4: Host field */
 		{15, 90, 31, 280},
@@ -520,7 +552,7 @@ resource 'DITL' (137, "Finger") {
 
 		/* 5: Username label */
 		{45, 15, 61, 85},
-		StaticText { disabled, "Username:" };
+		StaticText { disabled, "Username" };
 
 		/* 6: Username field */
 		{45, 90, 61, 230},
@@ -560,7 +592,7 @@ resource 'DITL' (138, "Find") {
 
 		/* 3: Search text label */
 		{15, 10, 31, 55},
-		StaticText { disabled, "Find:" };
+		StaticText { disabled, "Find" };
 
 		/* 4: Search text field */
 		{15, 60, 31, 260},

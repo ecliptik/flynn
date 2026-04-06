@@ -5256,6 +5256,8 @@ draw_status_bar(WindowPtr win, Session *s)
 	/* Build status text */
 	{
 		char ttype[16];
+		const char *bksp = s->backspace_bs ? "BS" : "DEL";
+		const char *echo = s->local_echo ? "Echo On" : "Echo Off";
 
 		if (s->conn.protocol == PROTO_FINGER) {
 			if (s->conn.username[0])
@@ -5277,18 +5279,20 @@ draw_status_bar(WindowPtr win, Session *s)
 			if (s->conn.state ==
 			    CONN_STATE_CONNECTED) {
 				snprintf(status, sizeof(status),
-				    " %dx%d %s | %s:%d",
+				    " %dx%d %s %s %s | %s:%d",
 				    s->terminal.active_cols,
 				    s->terminal.active_rows,
-				    ttype, s->conn.host,
+				    ttype, bksp, echo,
+				    s->conn.host,
 				    s->conn.port);
 			} else {
 				snprintf(status,
 				    sizeof(status),
-				    " %dx%d %s | Disconnected",
+				    " %dx%d %s %s %s"
+				    " | Disconnected",
 				    s->terminal.active_cols,
 				    s->terminal.active_rows,
-				    ttype);
+				    ttype, bksp, echo);
 			}
 		}
 	}

@@ -50,7 +50,7 @@
 #define BM_MOVE_DOWN        9
 #define BM_CONNECT          10
 
-/* Favorite add/edit dialog items (DITL 132 — unchanged) */
+/* Favorite add/edit dialog items (DITL 132) */
 #define BME_OK              1
 #define BME_CANCEL          2
 #define BME_NAME_LABEL      3
@@ -69,6 +69,14 @@
 #define BME_PROTO_LABEL     16
 #define BME_PROTO_BTN       17
 #define BME_VERBOSE_CHK     18
+#define BME_SIZE_LABEL      19
+#define BME_SIZE_BTN        20
+#define BME_THEME_LABEL     21
+#define BME_THEME_BTN       22
+#define BME_BKSP_LABEL      23
+#define BME_BKSP_BTN        24
+#define BME_ECHO_LABEL      25
+#define BME_ECHO_BTN        26
 #endif /* FLYNN_FAVORITES */
 
 /* Set a button's title text (used by favorites edit dialog too) */

@@ -27,6 +27,8 @@
 #include "menus.h"
 #include "favorites.h"
 #include "finger.h"
+#include "theme.h"
+#include "color.h"
 
 #ifdef FLYNN_FAVORITES
 
@@ -46,6 +48,9 @@ static short g_bme_font_id;
 static short g_bme_font_size;
 static short g_bme_protocol;
 static short g_bme_verbose;
+static signed char g_bme_theme_id;	/* -1=default */
+static signed char g_bme_backspace;	/* -1=default */
+static signed char g_bme_echo;		/* -1=default */
 
 /* List Manager handle for manage dialog */
 static ListHandle g_fav_list;
@@ -162,6 +167,72 @@ favorites_menu_click(short item)
 	}
 }
 
+/* ---- Button title helpers ---- */
+
+/* Font ID to name mapping (matches Options > Font menu) */
+static const char *
+font_name_from_id(short fid)
+{
+	switch (fid) {
+	case 4:  return "Monaco";
+	case 3:  return "Geneva";
+	case 0:  return "Chicago";
+	case 22: return "Courier";
+	case 2:  return "New York";
+	case 21: return "Helvetica";
+	case 20: return "Times";
+	case 16: return "Palatino";
+	default: return "Unknown";
+	}
+}
+
+static void
+bme_set_font_title(DialogPtr dlg, short fid)
+{
+	bme_set_btn_title(dlg, BME_FONT_BTN,
+	    font_name_from_id(fid));
+}
+
+static void
+bme_set_size_title(DialogPtr dlg, short fsz)
+{
+	char buf[8];
+
+	snprintf(buf, sizeof(buf), "%d", fsz);
+	bme_set_btn_title(dlg, BME_SIZE_BTN, buf);
+}
+
+static void
+bme_set_theme_title(DialogPtr dlg, signed char tid)
+{
+#ifdef FLYNN_THEMES
+	const TerminalTheme *th;
+
+	th = theme_get_by_index(tid);
+	if (th)
+		bme_set_btn_title(dlg, BME_THEME_BTN, th->name);
+	else
+		bme_set_btn_title(dlg, BME_THEME_BTN, "Light");
+#else
+	(void)tid;
+	bme_set_btn_title(dlg, BME_THEME_BTN, "Light");
+#endif
+}
+
+static void
+bme_set_bksp_title(DialogPtr dlg, signed char val)
+{
+	bme_set_btn_title(dlg, BME_BKSP_BTN,
+	    val ? "BS (^H)" : "DEL (^?)");
+}
+
+static void
+bme_set_echo_title(DialogPtr dlg, signed char val)
+{
+	bme_set_btn_title(dlg, BME_ECHO_BTN,
+	    val ? "On" : "Off");
+}
+
 /* ---- Bookmark edit dialog ---- */
 
 static pascal Boolean
@@ -215,52 +286,48 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 		if (PtInRect(pt, &item_rect)) {
 			g_bme_ttype = show_ttype_popup(dlg,
 			    BME_TTYPE_BTN, g_bme_ttype,
-			    true);
+			    false);
 			*item = BME_TTYPE_BTN;
 			return true;
 		}
 
-		/* Font popup menu */
+		/* Font popup menu (name only, matches Options > Font) */
 		GetDialogItem(dlg, BME_FONT_BTN,
 		    &item_type, &item_h, &item_rect);
 		if (PtInRect(pt, &item_rect)) {
+			/* Font IDs matching Options > Font menu order */
+			static const short fids[] =
+			    { 4, 3, 0, 22, 2, 21, 20, 16 };
+			static const char * const fnames[] = {
+			    "Monaco", "Geneva", "Chicago",
+			    "Courier", "New York",
+			    "Helvetica", "Times", "Palatino"
+			};
+			short nfonts = g_has_color_qd ? 8 : 5;
 			MenuHandle fpopup;
 			Point fpopup_pt;
 			long fresult;
 			short fchoice, fi;
-			short cur_item = 1;  /* Default */
+			short cur_item = 1;
 
 			fpopup = NewMenu(203, "\p");
-			AppendMenu(fpopup, "\pDefault");
-			for (fi = 0; fi < NUM_FONT_PRESETS; fi++) {
+			for (fi = 0; fi < nfonts; fi++) {
 				Str255 ps;
-				short len;
-
-				len = strlen(font_presets[fi].name);
+				short len = strlen(fnames[fi]);
 				ps[0] = len;
-				memcpy(ps + 1,
-				    font_presets[fi].name, len);
+				memcpy(ps + 1, fnames[fi], len);
 				AppendMenu(fpopup, "\p ");
 				SetMenuItemText(fpopup,
-				    fi + 2, ps);
+				    fi + 1, ps);
 			}
 			InsertMenu(fpopup, -1);
 
-			/* Find current selection for checkmark */
-			if (g_bme_font_id == 0 &&
-			    g_bme_font_size == 0) {
-				cur_item = 1;  /* Default */
-			} else {
-				for (fi = 0;
-				    fi < NUM_FONT_PRESETS;
-				    fi++) {
-					if (font_presets[fi].font_id
-					    == g_bme_font_id &&
-					    font_presets[fi].font_size
-					    == g_bme_font_size) {
-						cur_item = fi + 2;
-						break;
-					}
+			cur_item = 1;
+			for (fi = 0; fi < nfonts; fi++) {
+				if (fids[fi] ==
+				    g_bme_font_id) {
+					cur_item = fi + 1;
+					break;
 				}
 			}
 			CheckItem(fpopup, cur_item, true);
@@ -274,30 +341,226 @@ bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 			fchoice = LoWord(fresult);
 
 			if (fchoice > 0) {
-				char btn_text[32];
-
-				if (fchoice == 1) {
-					g_bme_font_id = 0;
-					g_bme_font_size = 0;
-				} else {
-					g_bme_font_id =
-					    font_presets
-					    [fchoice - 2].font_id;
-					g_bme_font_size =
-					    font_presets
-					    [fchoice - 2].font_size;
-				}
-				font_to_str(g_bme_font_id,
-				    g_bme_font_size, btn_text,
-				    sizeof(btn_text));
-				bme_set_btn_title(dlg,
-				    BME_FONT_BTN, btn_text);
+				g_bme_font_id =
+				    fids[fchoice - 1];
+				bme_set_font_title(dlg,
+				    g_bme_font_id);
 			}
 
 			DeleteMenu(203);
 			DisposeMenu(fpopup);
 
 			*item = BME_FONT_BTN;
+			return true;
+		}
+
+		/* Size popup menu (matches Options > Size) */
+		GetDialogItem(dlg, BME_SIZE_BTN,
+		    &item_type, &item_h, &item_rect);
+		if (PtInRect(pt, &item_rect)) {
+			static const short sizes[] = { 9, 10, 12, 14 };
+			MenuHandle spopup;
+			Point spopup_pt;
+			long sresult;
+			short schoice, si;
+			short cur_item = 1;
+
+			spopup = NewMenu(205, "\p");
+			AppendMenu(spopup, "\p9");
+			AppendMenu(spopup, "\p10");
+			AppendMenu(spopup, "\p12");
+			AppendMenu(spopup, "\p14");
+			InsertMenu(spopup, -1);
+
+			cur_item = 1;
+			for (si = 0; si < 4; si++) {
+				if (sizes[si] ==
+				    g_bme_font_size) {
+					cur_item = si + 1;
+					break;
+				}
+			}
+			CheckItem(spopup, cur_item, true);
+
+			spopup_pt.h = item_rect.left;
+			spopup_pt.v = item_rect.top;
+			LocalToGlobal(&spopup_pt);
+
+			sresult = PopUpMenuSelect(spopup,
+			    spopup_pt.v, spopup_pt.h, cur_item);
+			schoice = LoWord(sresult);
+
+			if (schoice > 0) {
+				g_bme_font_size =
+				    sizes[schoice - 1];
+				bme_set_size_title(dlg,
+				    g_bme_font_size);
+			}
+
+			DeleteMenu(205);
+			DisposeMenu(spopup);
+
+			*item = BME_SIZE_BTN;
+			return true;
+		}
+
+#ifdef FLYNN_THEMES
+		/* Theme popup menu */
+		GetDialogItem(dlg, BME_THEME_BTN,
+		    &item_type, &item_h, &item_rect);
+		if (PtInRect(pt, &item_rect)) {
+			MenuHandle tpopup;
+			Point tpopup_pt;
+			long tresult;
+			short tchoice;
+			short cur_item = 1;
+			short tc = theme_usable_count();
+			short ti;
+
+			tpopup = NewMenu(206, "\p");
+			for (ti = 0; ti < tc; ti++) {
+				const TerminalTheme *th;
+				Str255 ps;
+				short len;
+
+				th = theme_get_by_index(ti);
+				if (!th)
+					continue;
+				len = strlen(th->name);
+				if (len > 254) len = 254;
+				ps[0] = len;
+				memcpy(ps + 1, th->name, len);
+				AppendMenu(tpopup, "\p ");
+				SetMenuItemText(tpopup,
+				    ti + 1, ps);
+			}
+			InsertMenu(tpopup, -1);
+
+			if (g_bme_theme_id >= 0 &&
+			    g_bme_theme_id < tc)
+				cur_item = g_bme_theme_id + 1;
+			CheckItem(tpopup, cur_item, true);
+
+			tpopup_pt.h = item_rect.left;
+			tpopup_pt.v = item_rect.top;
+			LocalToGlobal(&tpopup_pt);
+
+			tresult = PopUpMenuSelect(tpopup,
+			    tpopup_pt.v, tpopup_pt.h,
+			    cur_item);
+			tchoice = LoWord(tresult);
+
+			if (tchoice > 0) {
+				g_bme_theme_id =
+				    tchoice - 1;
+				bme_set_theme_title(dlg,
+				    g_bme_theme_id);
+			}
+
+			DeleteMenu(206);
+			DisposeMenu(tpopup);
+
+			*item = BME_THEME_BTN;
+			return true;
+		}
+#endif /* FLYNN_THEMES */
+
+		/* Backspace popup menu */
+		GetDialogItem(dlg, BME_BKSP_BTN,
+		    &item_type, &item_h, &item_rect);
+		if (PtInRect(pt, &item_rect)) {
+			MenuHandle bpopup;
+			Point bpopup_pt;
+			long bresult;
+			short bchoice;
+			short cur_item;
+
+			bpopup = NewMenu(207, "\p");
+			/* Current value first */
+			if (g_bme_backspace) {
+				AppendMenu(bpopup, "\p ");
+				SetMenuItemText(bpopup, 1,
+				    "\pBS (^H)");
+				AppendMenu(bpopup, "\p ");
+				SetMenuItemText(bpopup, 2,
+				    "\pDEL (^?)");
+			} else {
+				AppendMenu(bpopup, "\p ");
+				SetMenuItemText(bpopup, 1,
+				    "\pDEL (^?)");
+				AppendMenu(bpopup, "\p ");
+				SetMenuItemText(bpopup, 2,
+				    "\pBS (^H)");
+			}
+			InsertMenu(bpopup, -1);
+
+			CheckItem(bpopup, 1, true);
+
+			bpopup_pt.h = item_rect.left;
+			bpopup_pt.v = item_rect.top;
+			LocalToGlobal(&bpopup_pt);
+
+			bresult = PopUpMenuSelect(bpopup,
+			    bpopup_pt.v, bpopup_pt.h, 1);
+			bchoice = LoWord(bresult);
+
+			if (bchoice == 2) {
+				/* Picked the other option */
+				g_bme_backspace =
+				    !g_bme_backspace;
+				bme_set_bksp_title(dlg,
+				    g_bme_backspace);
+			}
+
+			DeleteMenu(207);
+			DisposeMenu(bpopup);
+
+			*item = BME_BKSP_BTN;
+			return true;
+		}
+
+		/* Echo popup menu */
+		GetDialogItem(dlg, BME_ECHO_BTN,
+		    &item_type, &item_h, &item_rect);
+		if (PtInRect(pt, &item_rect)) {
+			MenuHandle epopup;
+			Point epopup_pt;
+			long eresult;
+			short echoice;
+			short cur_item;
+
+			epopup = NewMenu(208, "\p");
+			/* Current value first */
+			if (g_bme_echo) {
+				AppendMenu(epopup, "\pOn");
+				AppendMenu(epopup, "\pOff");
+			} else {
+				AppendMenu(epopup, "\pOff");
+				AppendMenu(epopup, "\pOn");
+			}
+			InsertMenu(epopup, -1);
+
+			CheckItem(epopup, 1, true);
+
+			epopup_pt.h = item_rect.left;
+			epopup_pt.v = item_rect.top;
+			LocalToGlobal(&epopup_pt);
+
+			eresult = PopUpMenuSelect(epopup,
+			    epopup_pt.v, epopup_pt.h, 1);
+			echoice = LoWord(eresult);
+
+			if (echoice == 2) {
+				/* Picked the other option */
+				g_bme_echo = !g_bme_echo;
+				bme_set_echo_title(dlg,
+				    g_bme_echo);
+			}
+
+			DeleteMenu(208);
+			DisposeMenu(epopup);
+
+			*item = BME_ECHO_BTN;
 			return true;
 		}
 
@@ -378,13 +641,29 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
 	if (!dlg)
 		return false;
 
-	/* Initialize shared state for filter proc from bookmark */
+	/* Initialize shared state for filter proc from bookmark.
+	 * Resolve sentinel values (-1 / 0) to actual values. */
 	g_bme_ttype = bm->terminal_type;
+	if (g_bme_ttype < 0)
+		g_bme_ttype = prefs.terminal_type;
 	g_bme_font_id = bm->font_id;
 	g_bme_font_size = bm->font_size;
+	if (g_bme_font_id == 0 && g_bme_font_size == 0) {
+		g_bme_font_id = prefs.font_id;
+		g_bme_font_size = prefs.font_size;
+	}
 	g_bme_protocol = (bm_idx >= 0 &&
 	    bm_idx < MAX_BOOKMARKS) ?
 	    prefs.bookmark_protocol[bm_idx] : 0;
+	g_bme_theme_id = bm->bm_theme_id;
+	if (g_bme_theme_id < 0)
+		g_bme_theme_id = (signed char)prefs.theme_id;
+	g_bme_backspace = bm->bm_backspace_bs;
+	if (g_bme_backspace < 0)
+		g_bme_backspace = prefs.backspace_bs;
+	g_bme_echo = bm->bm_local_echo;
+	if (g_bme_echo < 0)
+		g_bme_echo = prefs.local_echo;
 
 	/* Pre-fill fields from bookmark struct */
 	if (bm->name[0])
@@ -403,10 +682,14 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
 	ttype_to_str(g_bme_ttype, btn_text, sizeof(btn_text));
 	bme_set_btn_title(dlg, BME_TTYPE_BTN, btn_text);
 
-	/* Set font button text */
-	font_to_str(g_bme_font_id, g_bme_font_size, btn_text,
-	    sizeof(btn_text));
-	bme_set_btn_title(dlg, BME_FONT_BTN, btn_text);
+	/* Set font + size button text (split popups) */
+	bme_set_font_title(dlg, g_bme_font_id);
+	bme_set_size_title(dlg, g_bme_font_size);
+
+	/* Set theme, backspace, echo button text */
+	bme_set_theme_title(dlg, g_bme_theme_id);
+	bme_set_bksp_title(dlg, g_bme_backspace);
+	bme_set_echo_title(dlg, g_bme_echo);
 
 	/* Set protocol button text */
 	bme_set_btn_title(dlg, BME_PROTO_BTN,
@@ -499,10 +782,13 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
 	dlg_get_text(dlg, BME_USER_FIELD, bm->username,
 	    sizeof(bm->username));
 
-	/* Store terminal type, font from filter proc state */
+	/* Store terminal type, font, theme, backspace, echo */
 	bm->terminal_type = g_bme_ttype;
 	bm->font_id = g_bme_font_id;
 	bm->font_size = g_bme_font_size;
+	bm->bm_theme_id = g_bme_theme_id;
+	bm->bm_backspace_bs = g_bme_backspace;
+	bm->bm_local_echo = g_bme_echo;
 	/* Store protocol and verbose in prefs arrays */
 	if (bm_idx >= 0 && bm_idx < MAX_BOOKMARKS) {
 		prefs.bookmark_protocol[bm_idx] = g_bme_protocol;
@@ -777,7 +1063,18 @@ favorites_manage(void)
 			memset(&prefs.bookmarks[prefs.bookmark_count],
 			    0, sizeof(Bookmark));
 			prefs.bookmarks[prefs.bookmark_count].port = 23;
-			prefs.bookmarks[prefs.bookmark_count].terminal_type = -1;
+			prefs.bookmarks[prefs.bookmark_count].terminal_type =
+			    prefs.terminal_type;
+			prefs.bookmarks[prefs.bookmark_count].font_id =
+			    prefs.font_id;
+			prefs.bookmarks[prefs.bookmark_count].font_size =
+			    prefs.font_size;
+			prefs.bookmarks[prefs.bookmark_count].bm_theme_id =
+			    (signed char)prefs.theme_id;
+			prefs.bookmarks[prefs.bookmark_count].bm_backspace_bs =
+			    (signed char)prefs.backspace_bs;
+			prefs.bookmarks[prefs.bookmark_count].bm_local_echo =
+			    (signed char)prefs.local_echo;
 			prefs.bookmark_protocol[prefs.bookmark_count] = 0;
 			if (bm_edit_dialog(
 			    &prefs.bookmarks[prefs.bookmark_count],
@@ -998,6 +1295,8 @@ favorites_add(void)
 		return;
 
 	memset(&bm, 0, sizeof(Bookmark));
+
+	/* Capture all session settings directly */
 	strncpy(bm.host, s->conn.host, sizeof(bm.host) - 1);
 	bm.port = s->conn.port;
 	if (s->conn.username[0])
@@ -1005,10 +1304,11 @@ favorites_add(void)
 		    sizeof(bm.username) - 1);
 	bm.font_id = s->font_id;
 	bm.font_size = s->font_size;
-	if (s->telnet.preferred_ttype >= 0)
-		bm.terminal_type = s->telnet.preferred_ttype;
-	else
-		bm.terminal_type = -1;
+	bm.terminal_type = (s->telnet.preferred_ttype >= 0) ?
+	    s->telnet.preferred_ttype : prefs.terminal_type;
+	bm.bm_theme_id = (signed char)s->theme_id;
+	bm.bm_backspace_bs = (signed char)s->backspace_bs;
+	bm.bm_local_echo = (signed char)s->local_echo;
 
 	/* Auto-generate name from window title (user@hostname:path).
 	 * Extract just user@hostname, stripping :path and beyond.
