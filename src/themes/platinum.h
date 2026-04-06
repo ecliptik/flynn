@@ -1,7 +1,11 @@
 /*
  * themes/platinum.h - Mac OS 8/9 Platinum theme
+ * Optional theme - not included in default build.
  * Gray background with purple accents, inspired by Platinum appearance.
  * Requires Color QuickDraw.
+ *
+ * To enable: add #include, theme_table[] entry, bump THEME_COUNT,
+ * add THEME_PLATINUM index constant, and add menu item.
  */
 
 static const TerminalTheme theme_platinum = {

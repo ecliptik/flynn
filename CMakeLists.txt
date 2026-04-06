@@ -73,7 +73,7 @@ if(FLYNN_COLOR)
     list(APPEND FLYNN_SOURCES src/color.c)
 endif()
 if(FLYNN_THEMES)
-    list(APPEND FLYNN_SOURCES src/theme.c)
+    list(APPEND FLYNN_SOURCES src/theme.c src/theme_import.c)
 endif()
 
 add_application(Flynn ${FLYNN_SOURCES} resources/telnet.r)

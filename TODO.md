@@ -8,3 +8,6 @@
 - [x] Expanded emoji and glyph coverage (202 primitives + 17 emoji) — v1.9.3
 - [x] Finger protocol support (RFC 1288) with forwarding
 - [ ] Gopher protocol support
+
+## Bugs
+- [ ] Connecting dialog not centered on window/desktop (visible on Basilisk II / System 7)

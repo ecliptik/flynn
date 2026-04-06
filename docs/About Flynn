@@ -411,6 +411,32 @@ additional items for networking and display mode.
   Automatically set when changing terminal type:
   ANSI-BBS enables BS, all others use DEL.
 
+  Theme (submenu)
+  ~~~~~~~~~~~~~~~
+  Choose a color theme for the terminal. 16 built-in
+  themes are available on color Macs:
+
+    Light, Dark (work on all systems)
+    Solarized Light, Solarized Dark
+    TokyoNight Day, TokyoNight
+    Amber CRT, System 7, Compact Mac
+    Dracula, Nord
+    Green Screen, Classic, Monokai, Gruvbox, Platinum
+
+  On monochrome systems, only Light and Dark are
+  available. Each window can use a different theme.
+
+  Import Theme: Import a Ghostty-format theme file
+  (.txt, .theme, .ghostty). Colors are automatically
+  snapped to the Mac 256-color palette. Up to 4
+  custom themes can be stored.
+
+  Export Theme: Export the current theme as a Ghostty-
+  format text file for sharing or editing.
+
+  Remove Theme: Remove a previously imported custom
+  theme to free a slot.
+
   Dark Mode
   ~~~~~~~~~
   Toggle between light mode (black text on white) and

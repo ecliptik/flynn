@@ -1,11 +1,11 @@
 /*
- * themes/tokyo_dark.h - Tokyo Night Dark theme
+ * themes/tokyo_dark.h - TokyoNight theme
  * Deep blue-black background with pastel accents.
  * Requires Color QuickDraw.
  */
 
 static const TerminalTheme theme_tokyo_dark = {
-	"Tokyo Dark",   /* name */
+	"TokyoNight",   /* name */
 	1,              /* is_color */
 	1,              /* is_dark */
 
@@ -13,7 +13,7 @@ static const TerminalTheme theme_tokyo_dark = {
 	{
 		{ 0x00, 0x00, 0x33 },  /*  0: bg */
 		{ 0xFF, 0x33, 0x66 },  /*  1: red */
-		{ 0x33, 0xCC, 0x66 },  /*  2: green */
+		{ 0x99, 0xCC, 0x66 },  /*  2: green (sage) */
 		{ 0xFF, 0x99, 0x33 },  /*  3: yellow */
 		{ 0x33, 0x99, 0xFF },  /*  4: blue */
 		{ 0xCC, 0x66, 0xFF },  /*  5: magenta */

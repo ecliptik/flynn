@@ -1,7 +1,11 @@
 /*
  * themes/green_screen.h - Green Screen (phosphor terminal) theme
+ * Optional theme - not included in default build.
  * Classic green-on-black CRT aesthetic with amber errors.
  * Requires Color QuickDraw.
+ *
+ * To enable: add #include, theme_table[] entry, bump THEME_COUNT,
+ * add THEME_GREEN_SCREEN index constant, and add menu item.
  */
 
 static const TerminalTheme theme_green_screen = {

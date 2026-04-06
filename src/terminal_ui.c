@@ -2058,6 +2058,7 @@ draw_row(Terminal *term, short row)
 	short last_face = -1;
 	short row_y;
 	short sel_start_col, sel_end_col;
+	short run_in_sel;
 	short cell_w, eff_cols;
 #ifdef FLYNN_DBLWIDTH
 	unsigned char lattr;
@@ -2171,17 +2172,18 @@ draw_row(Terminal *term, short row)
 		run_start = col;
 		run_len = 0;
 		has_non_space = 0;
+		run_in_sel = 0;
 
 		if (use_color) {
-			/* Color path: collect run matching attr+color */
+			/* Color path: collect run matching attr+color+sel */
 			unsigned char cell_fg, cell_bg;
+			short cell_in_sel;
 
 			while (col < eff_cols) {
 				cell = &row_cells[col];
 				cell_attr = cell->attr;
-				if (col >= sel_start_col &&
-				    col <= sel_end_col)
-					cell_attr ^= ATTR_INVERSE;
+				cell_in_sel = (col >= sel_start_col &&
+				    col <= sel_end_col) ? 1 : 0;
 
 				cell_fg = COLOR_DEFAULT;
 				cell_bg = COLOR_DEFAULT;
@@ -2195,11 +2197,15 @@ draw_row(Terminal *term, short row)
 					run_attr = cell_attr;
 					run_fg = cell_fg;
 					run_bg = cell_bg;
+					run_in_sel = cell_in_sel;
 				} else {
 					if (cell_attr != run_attr)
 						break;
-					if (cell_fg != run_fg ||
-					    cell_bg != run_bg)
+					if (cell_in_sel != run_in_sel)
+						break;
+					if (!run_in_sel &&
+					    (cell_fg != run_fg ||
+					    cell_bg != run_bg))
 						break;
 				}
 
@@ -2329,28 +2335,50 @@ draw_row(Terminal *term, short row)
 #endif
 				}
 
+#ifdef FLYNN_THEMES
+				/* Selected runs use theme sel_bg/sel_fg
+				 * directly, overriding all per-cell colors
+				 * for consistent, readable selection. */
+				if (run_in_sel && g_has_color_qd) {
+					Rect bg_r;
+					SetRect(&bg_r,
+					    run_x, row_y,
+					    run_x + run_w,
+					    row_bottom(row));
+					theme_set_default_bg(
+					    &theme_current()->sel_bg);
+					EraseRect(&bg_r);
+					theme_set_default_fg(
+					    &theme_current()->sel_fg);
+#ifdef FLYNN_COLOR
+					cached_fg_idx = -1;
+					cached_bg_idx = -1;
+#endif
+					g_eff_fg = 0;
+					g_eff_bg = 0;
+				} else
+#endif
+				{
 				/* Draw bg when it differs from erase
 				 * color (theme default bg) */
-				{
 #ifdef FLYNN_THEMES
-					if (!bg_is_default) {
+				if (!bg_is_default) {
 #else
-					unsigned char erase_bg =
-					    g_dark_mode ? 0 : 15;
-					if (eff_bg != erase_bg) {
+				unsigned char erase_bg =
+				    g_dark_mode ? 0 : 15;
+				if (eff_bg != erase_bg) {
 #endif
-						Rect bg_r;
-						SetRect(&bg_r,
-						    run_x, row_y,
-						    run_x + run_w,
-						    row_bottom(row));
+					Rect bg_r;
+					SetRect(&bg_r,
+					    run_x, row_y,
+					    run_x + run_w,
+					    row_bottom(row));
 #ifdef FLYNN_THEMES
-						set_bg_color(eff_bg);
+					set_bg_color(eff_bg);
 #else
-						set_bg_color(eff_bg);
+					set_bg_color(eff_bg);
 #endif
-						EraseRect(&bg_r);
-					}
+					EraseRect(&bg_r);
 				}
 
 				/* Set fg for pen-based paths
@@ -2374,6 +2402,7 @@ draw_row(Terminal *term, short row)
 				set_fg_color(eff_fg);
 				g_eff_fg = eff_fg;
 				g_eff_bg = eff_bg;
+				}
 			}
 
 			/* Cell type dispatch */
@@ -2523,6 +2552,12 @@ draw_row(Terminal *term, short row)
 			if (use_color) {
 #ifdef FLYNN_COLOR
 				cached_fg_idx = -1;
+#endif
+#ifdef FLYNN_THEMES
+				if (run_in_sel && g_has_color_qd)
+					theme_set_default_fg(
+					    &theme_current()->sel_fg);
+				else
 #endif
 				set_fg_color(eff_fg);
 			}
@@ -4850,9 +4885,25 @@ draw_cursor(Terminal *term, short on)
 #else
 		cursor_set_rect(&cur_r, crow, ccol, 0);
 #endif
-		PenMode(patXor);
-		PaintRect(&cur_r);
-		PenNormal();
+		/* On color displays, paint a solid fg-colored cursor.
+		 * XOR/HiliteMode produce wrong colors on indexed
+		 * palettes.  Blink restores bg color; the character
+		 * cell is redrawn on the next term_ui_draw pass. */
+#ifdef FLYNN_THEMES
+		if (g_has_color_qd) {
+			theme_set_default_fg(
+			    &theme_current()->default_fg);
+			PaintRect(&cur_r);
+#ifdef FLYNN_COLOR
+			cached_fg_idx = -1;
+#endif
+		} else
+#endif
+		{
+			PenMode(patXor);
+			PaintRect(&cur_r);
+			PenNormal();
+		}
 
 		cursor_visible = 1;
 		cursor_prev_row = crow;
@@ -4903,11 +4954,33 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 	GetPort(&old_port);
 	SetPort(win);
 
-	/* XOR the cursor rect to toggle it */
+	/* Toggle cursor: fg color when on, bg color when off.
+	 * Mono path uses self-inverting XOR. */
 	cursor_set_rect(&cur_r, crow, ccol, style);
-	PenMode(patXor);
-	PaintRect(&cur_r);
-	PenNormal();
+#ifdef FLYNN_THEMES
+	if (g_has_color_qd) {
+		if (cursor_visible) {
+			/* Erase cursor: fill with bg */
+			theme_set_default_bg(
+			    &theme_current()->default_bg);
+			EraseRect(&cur_r);
+		} else {
+			/* Draw cursor: fill with fg */
+			theme_set_default_fg(
+			    &theme_current()->default_fg);
+			PaintRect(&cur_r);
+		}
+#ifdef FLYNN_COLOR
+		cached_fg_idx = -1;
+		cached_bg_idx = -1;
+#endif
+	} else
+#endif
+	{
+		PenMode(patXor);
+		PaintRect(&cur_r);
+		PenNormal();
+	}
 
 	cursor_visible = !cursor_visible;
 

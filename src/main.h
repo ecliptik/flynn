@@ -109,12 +109,14 @@
 #define THEME_ITEM_SOLARIZED_DARK  5
 #define THEME_ITEM_TOKYO_LIGHT     6
 #define THEME_ITEM_TOKYO_DARK      7
-#define THEME_ITEM_GREEN_SCREEN    8
-#define THEME_ITEM_CLASSIC         9
-#define THEME_ITEM_PLATINUM        10
+#define THEME_ITEM_AMBER_CRT       8
+#define THEME_ITEM_SYSTEM7         9
+#define THEME_ITEM_COMPACT_MAC     10
+#define THEME_ITEM_DRACULA         11
+#define THEME_ITEM_NORD            12
 
 #define THEME_ITEM_FIRST           1
-#define THEME_ITEM_LAST            10
+#define THEME_ITEM_LAST            12
 
 /* Window menu */
 #define WINDOW_MENU_ID      133

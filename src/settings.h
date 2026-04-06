@@ -5,7 +5,9 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	17
+#include "theme.h"
+
+#define PREFS_VERSION	18
 #define MAX_BOOKMARKS	20
 #define MAX_RECENT	5
 
@@ -46,6 +48,11 @@ typedef struct {
 	unsigned char	bookmark_verbose[MAX_BOOKMARKS];	/* 1=send /W for finger */
 	short		win_x, win_y;	/* saved window position (global coords) */
 	unsigned char	theme_id;	/* 0=Light, 1=Dark, 2+=color themes */
+	/* Custom imported themes (v18) */
+#ifdef FLYNN_THEMES
+	CustomTheme	custom_themes[MAX_CUSTOM_THEMES];
+	short		custom_theme_count;
+#endif
 } FlynnPrefs;
 
 /* Load preferences from "Flynn Preferences" file. Returns defaults if not found. */

@@ -187,6 +187,12 @@ This flag controls whether the color code is compiled in at all. On a Mac Plus o
 monochrome Mac, leave this OFF to save code space. On System 7 with a color display,
 enable it for full xterm 256-color rendering.
 
+When enabled, 16 built-in color themes are available (Solarized Light/Dark, TokyoNight
+Day/Night, Amber CRT, System 7, Compact Mac, Dracula, Nord, Green Screen, Classic,
+Monokai, Gruvbox, Platinum) plus import/export of Ghostty-format theme files. Imported
+themes are automatically cube-snapped to the Mac 256-color palette. Up to 4 custom
+themes can be stored in preferences. See [THEMES.md](THEMES.md) for details.
+
 ### Glyphs (--glyphs)
 
 Custom rendering for 180+ Unicode symbols including box-drawing characters, block

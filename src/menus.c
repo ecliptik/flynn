@@ -33,13 +33,14 @@
 #include "logging.h"
 #include "printing.h"
 #include "theme.h"
+#include "theme_import.h"
 
 /* Menu handles (private to this module) */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
 static MenuHandle window_menu;
 static MenuHandle font_submenu, size_submenu, ttype_submenu;
 #ifdef FLYNN_THEMES
-static MenuHandle theme_submenu;
+MenuHandle theme_submenu;
 #endif
 
 /* External references to main.c globals */
@@ -136,21 +137,19 @@ init_menus(void)
 	}
 
 #ifdef FLYNN_THEMES
-	/* Set initial theme checkmark (color systems only) */
+	/* Build dynamic theme menu items and set initial checkmark */
 	if (g_has_color_qd && theme_submenu) {
-		short t, check_item;
+		short t, check_item, total;
 
-		for (t = THEME_ITEM_FIRST; t <= THEME_ITEM_LAST; t++)
+		theme_rebuild_menu();
+
+		total = CountMItems(theme_submenu);
+		for (t = THEME_ITEM_FIRST; t <= total; t++)
 			CheckItem(theme_submenu, t, false);
 
-		/* Map theme_id to menu item (separator at item 3
-		 * offsets color themes by +2) */
-		if (prefs.theme_id < THEME_COUNT_MONO)
-			check_item = prefs.theme_id + 1;
-		else
-			check_item = prefs.theme_id + 2;
+		check_item = theme_id_to_menu_item(prefs.theme_id);
 		if (check_item >= THEME_ITEM_FIRST &&
-		    check_item <= THEME_ITEM_LAST)
+		    check_item <= total)
 			CheckItem(theme_submenu, check_item, true);
 	}
 #endif
@@ -438,18 +437,16 @@ update_prefs_menu(void)
 	/* Theme: submenu checkmarks on color, toggle text on mono */
 #ifdef FLYNN_THEMES
 	if (g_has_color_qd && theme_submenu) {
-		short t, check_item, cur;
+		short t, check_item, cur, total;
 
 		cur = active_session ?
 		    active_session->theme_id : theme_get();
-		for (t = THEME_ITEM_FIRST; t <= THEME_ITEM_LAST; t++)
+		total = CountMItems(theme_submenu);
+		for (t = THEME_ITEM_FIRST; t <= total; t++)
 			CheckItem(theme_submenu, t, false);
-		if (cur < THEME_COUNT_MONO)
-			check_item = cur + 1;
-		else
-			check_item = cur + 2;
+		check_item = theme_id_to_menu_item(cur);
 		if (check_item >= THEME_ITEM_FIRST &&
-		    check_item <= THEME_ITEM_LAST)
+		    check_item <= total)
 			CheckItem(theme_submenu, check_item, true);
 	} else {
 		SetMenuItemText(prefs_menu, PREFS_THEME_HIER,
@@ -751,16 +748,24 @@ handle_theme_menu(short item)
 	short new_theme;
 	GrafPtr save;
 
-	/* Map menu item to theme index.
-	 * Items 1-2 → index 0-1 (Light, Dark).
-	 * Item 3 is separator.
-	 * Items 4-10 → index 2-8 (color themes). */
-	if (item <= THEME_ITEM_DARK)
-		new_theme = item - 1;
-	else if (item >= THEME_ITEM_SOLARIZED_LIGHT)
-		new_theme = item - 2;
-	else
-		return;	/* separator */
+	/* Map menu item to theme index using dynamic mapping.
+	 * Returns -2 for Import, -3 for Remove, -4 for Export. */
+	new_theme = theme_menu_item_to_id(item);
+
+	if (new_theme == -2) {
+		do_import_theme();
+		return;
+	}
+	if (new_theme == -3) {
+		do_remove_theme();
+		return;
+	}
+	if (new_theme == -4) {
+		do_export_theme();
+		return;
+	}
+	if (new_theme < 0)
+		return;	/* separator or unknown */
 
 	if (!active_session)
 		return;
@@ -783,8 +788,10 @@ handle_theme_menu(short item)
 
 	/* Update checkmarks */
 	if (theme_submenu) {
-		short t;
-		for (t = THEME_ITEM_FIRST; t <= THEME_ITEM_LAST; t++)
+		short t, total;
+
+		total = CountMItems(theme_submenu);
+		for (t = THEME_ITEM_FIRST; t <= total; t++)
 			CheckItem(theme_submenu, t, t == item);
 	}
 

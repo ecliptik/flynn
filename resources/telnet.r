@@ -124,11 +124,13 @@ resource 'MENU' (138, "Theme") {
 		"-", noIcon, noKey, noMark, plain;
 		"Solarized Light", noIcon, noKey, noMark, plain;
 		"Solarized Dark", noIcon, noKey, noMark, plain;
-		"Tokyo Light", noIcon, noKey, noMark, plain;
-		"Tokyo Dark", noIcon, noKey, noMark, plain;
-		"Green Screen", noIcon, noKey, noMark, plain;
-		"Classic", noIcon, noKey, noMark, plain;
-		"Platinum", noIcon, noKey, noMark, plain
+		"TokyoNight Day", noIcon, noKey, noMark, plain;
+		"TokyoNight", noIcon, noKey, noMark, plain;
+		"Amber CRT", noIcon, noKey, noMark, plain;
+		"System 7", noIcon, noKey, noMark, plain;
+		"Compact Mac", noIcon, noKey, noMark, plain;
+		"Dracula", noIcon, noKey, noMark, plain;
+		"Nord", noIcon, noKey, noMark, plain
 	}
 };
 

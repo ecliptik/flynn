@@ -37,17 +37,38 @@ typedef struct {
 #define THEME_SOLARIZED_DARK    3
 #define THEME_TOKYO_LIGHT       4
 #define THEME_TOKYO_DARK        5
-#define THEME_GREEN_SCREEN      6
-#define THEME_CLASSIC           7
-#define THEME_PLATINUM          8
+#define THEME_AMBER_CRT         6
+#define THEME_SYSTEM7           7
+#define THEME_COMPACT_MAC       8
+#define THEME_DRACULA           9
+#define THEME_NORD              10
 
 /* Total theme count (mono themes always available, color themes conditional) */
 #define THEME_COUNT_MONO   2
 #ifdef FLYNN_COLOR
-#define THEME_COUNT        9
+#define THEME_COUNT        11
 #else
 #define THEME_COUNT        2
 #endif
+
+/* Custom (imported) theme support */
+#define MAX_CUSTOM_THEMES      4
+#define CUSTOM_THEME_NAME_LEN  32
+#define THEME_CUSTOM_BASE      THEME_COUNT
+
+/* Persistent custom theme (fixed-size, stored in prefs) */
+typedef struct {
+	char           name[CUSTOM_THEME_NAME_LEN];
+	unsigned char  in_use;
+	unsigned char  is_dark;        /* auto-detected from bg luminance */
+	ThemeRGB       ansi[16];       /* 48 bytes */
+	ThemeRGB       default_fg;
+	ThemeRGB       default_bg;
+	ThemeRGB       cursor_color;
+	ThemeRGB       sel_bg;
+	ThemeRGB       sel_fg;
+	ThemeRGB       bold_color;     /* {0,0,0} = unused for imports */
+} CustomTheme;
 
 /* Initialize theme system -- call after color_detect() and prefs_load() */
 void theme_init(short theme_id);
@@ -60,7 +81,7 @@ short theme_get(void);
 /* Get theme by index (for menu building) */
 const TerminalTheme *theme_get_by_index(short index);
 
-/* Get count of usable themes (respects runtime color detection) */
+/* Get count of usable themes (respects runtime color detection + custom) */
 short theme_usable_count(void);
 
 /* Apply ThemeRGB to QuickDraw foreground/background (with cache) */
@@ -80,10 +101,17 @@ short theme_is_color(void);
  * Must be called on every exit path that may have set theme colors. */
 void theme_restore_colors(void);
 
+/* Custom theme management */
+void theme_load_custom(void);
+void theme_rebuild_menu(void);
+short theme_id_to_menu_item(short theme_id);
+short theme_menu_item_to_id(short item);
+
 #else /* !FLYNN_THEMES */
 
 #define THEME_LIGHT  0
 #define THEME_COUNT  0
+#define MAX_CUSTOM_THEMES 0
 #define theme_init(id)              ((void)0)
 #define theme_current()             ((void *)0)
 #define theme_set(i)                ((void)0)
@@ -96,6 +124,8 @@ void theme_restore_colors(void);
 #define theme_is_dark()             0
 #define theme_is_color()            0
 #define theme_restore_colors()      ((void)0)
+#define theme_load_custom()         ((void)0)
+#define theme_rebuild_menu()        ((void)0)
 
 #endif /* FLYNN_THEMES */
 

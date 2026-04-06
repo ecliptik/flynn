@@ -1,15 +1,15 @@
 # Flynn Theme Guide
 
-This guide covers the Flynn theme system: how themes work, how to create custom themes, and how to integrate them into the build.
+This guide covers the Flynn theme system: how themes work, how to create custom themes, how importing works, and known limitations.
 
 ## Overview
 
-Flynn uses a compile-time theme system. Each theme is a static `TerminalTheme` struct defined in a header file under `src/themes/`. Themes are compiled into the binary — there is no runtime theme loading. This keeps memory usage minimal and avoids heap allocation for theme data.
+Flynn uses a compile-time theme system for built-in themes and a runtime import system for custom themes. Each built-in theme is a static `TerminalTheme` struct defined in a header file under `src/themes/`. Custom themes can be imported from Ghostty-format files at runtime and are stored in preferences.
 
-Two categories of themes exist:
+Two categories of built-in themes exist:
 
 - **Mono themes** (Light, Dark) — work on all systems, including the Mac Plus. These use only black and white values; color fields are present but ignored on monochrome hardware.
-- **Color themes** (Solarized, Tokyo Night, Green Screen, Classic, Platinum) — require a Mac II or later with Color QuickDraw. Detected at runtime via `SysEnvirons()`. Color themes are only compiled when `FLYNN_COLOR=ON`.
+- **Color themes** — require a Mac II or later with Color QuickDraw. Detected at runtime via `SysEnvirons()`. Color themes are only compiled when `FLYNN_COLOR=ON`.
 
 ## Built-in Themes
 
@@ -17,13 +17,74 @@ Two categories of themes exist:
 |-------|------|-------------|
 | Light | Mono | White background, black text. Default theme, works everywhere. |
 | Dark | Mono | Black background, white text. Uses `srcBic` rendering for flicker-free display. |
-| Solarized Light | Color | Ethan Schoonover's Solarized palette, light variant. |
-| Solarized Dark | Color | Solarized palette, dark variant. |
-| Tokyo Night Light | Color | Based on the Tokyo Night color scheme, light variant. |
-| Tokyo Night Dark | Color | Tokyo Night, dark variant. |
-| Green Screen | Color | Phosphor green on black, classic CRT terminal aesthetic. |
-| Classic | Color | 1990s terminal colors — standard HTML-era ANSI palette, white background. |
-| Platinum | Color | Mac OS 8/9 Appearance Manager inspired — gray background, purple accents. |
+| Solarized Light | Color | Ethan Schoonover's Solarized palette, light variant. Canonical base colors, cube-snapped accents. |
+| Solarized Dark | Color | Solarized palette, dark variant. Canonical base colors, cube-snapped accents. |
+| TokyoNight Day | Color | Based on the TokyoNight color scheme, light variant. Cube-snapped. |
+| TokyoNight | Color | TokyoNight, dark variant. Cube-snapped. |
+| Amber CRT | Color | Amber phosphor terminal aesthetic. All ANSI colors warm-shifted. Cube-snapped. |
+| System 7 | Color | Mac 16-color System CLUT palette. Canonical Mac system colors. |
+| Compact Mac | Color | P7 phosphor CRT warmth (Mac Plus/SE/Classic). Cube-snapped. |
+| Dracula | Color | Canonical Dracula palette from draculatheme.com. |
+| Nord | Color | Canonical Nord palette from nordtheme.com. |
+| Green Screen | Color | Phosphor green on black, classic CRT terminal aesthetic. Cube-snapped. |
+| Classic | Color | 1990s terminal colors — standard HTML-era ANSI palette, white background. Cube-snapped. |
+| Monokai | Color | Monokai Pro inspired dark theme. Cube-snapped. |
+| Gruvbox | Color | Retro groove palette. Cube-snapped. |
+| Platinum | Color | Mac OS 8/9 Appearance Manager inspired — gray background, purple accents. Cube-snapped. |
+
+## Theme Import / Export
+
+### Importing Themes
+
+Flynn imports themes in **Ghostty format** — plain text files with `key = #rrggbb` entries. To import: Options > Theme > Import Theme, then select a `.txt`, `.theme`, or `.ghostty` file.
+
+**Required fields** (import fails without these):
+- All 16 palette entries: `palette = 0=#rrggbb` through `palette = 15=#rrggbb`
+- `background = #rrggbb`
+- `foreground = #rrggbb`
+
+**Optional fields** (defaults applied if missing):
+- `cursor-color` — defaults to foreground color
+- `selection-background` — defaults to foreground color
+- `selection-foreground` — defaults to background color
+- `cursor-text` — parsed but not used
+
+**Auto-detection:**
+- `is_dark` is automatically detected from background luminance using `(2R + 5G + B) / 8 < 128`
+- Theme name is derived from the filename (stripping `.txt`, `.theme`, `.ghostty` extensions)
+
+**Storage:** Up to 4 custom themes can be stored in preferences simultaneously. Use Remove Theme to free a slot.
+
+### Auto Cube-Snapping
+
+All imported colors are automatically **cube-snapped** to the nearest value in the 6x6x6 RGB cube:
+
+```
+0x00 (0)    0x33 (51)    0x66 (102)    0x99 (153)    0xCC (204)    0xFF (255)
+```
+
+This means every RGB channel is rounded to one of these 6 values. For example, Dracula's canonical purple `#BD93F9` would be imported as `#CC99FF`.
+
+**Why:** The classic Mac 256-color system palette is based on this cube. Colors outside it dither or quantize unpredictably, producing washed-out or wrong colors on 8-bit displays. Cube-snapping ensures what you see in the theme menu is what you get at any color depth.
+
+**Trade-off:** Imported themes will look slightly different from their canonical appearance on modern truecolor terminals. Subtle colors (like Solarized's cream backgrounds) lose nuance. Bold, saturated themes (like Dracula, Monokai) survive cube-snapping well. Pastel/muted themes degrade more.
+
+### Exporting Themes
+
+Export Theme writes the current active theme (built-in or custom) as a Ghostty-format text file. Exported files can be:
+- Shared with other Flynn users
+- Re-imported after editing in a text editor
+- Used in Ghostty or other terminals that support the format
+
+Note: exported built-in themes with canonical (non-cube-snapped) values will be cube-snapped if re-imported.
+
+### Import Limitations
+
+- **Max 4 custom themes** — limited by preferences storage size
+- **No truecolor preservation** — all imports are cube-snapped; the original exact colors are not retained
+- **Light theme readability** — imported light themes may have ANSI colors 7 (white) and 15 (bright white) that match the background, making some terminal output invisible. Test with `ls --color` after importing.
+- **256-color backgrounds** — very subtle background colors (close to white or close to black) will snap to pure white or pure black. Themes with distinctive backgrounds (tinted, colored) survive better.
+- **No undo** — importing overwrites the slot. Re-import the original file to restore.
 
 ## Theme Architecture
 
@@ -37,7 +98,16 @@ typedef struct {
 } ThemeRGB;
 ```
 
-At runtime, values are expanded to 16-bit `RGBColor` for QuickDraw via `x * 257` multiplication (maps 0x00-0xFF to 0x0000-0xFFFF). For best results on 256-color systems, choose colors from the 6x6x6 RGB cube (values: 0x00, 0x33, 0x66, 0x99, 0xCC, 0xFF).
+At runtime, values are expanded to 16-bit `RGBColor` for QuickDraw via `x * 257` multiplication (maps 0x00-0xFF to 0x0000-0xFFFF).
+
+### Cube-Snapped vs Canonical Themes
+
+Built-in themes use two strategies:
+
+- **Cube-snapped** — all RGB values are multiples of 0x33. Clean rendering at every color depth. Used for original themes (TokyoNight, Amber CRT, Compact Mac, Green Screen, Classic, Monokai, Gruvbox, Platinum) and partially for Solarized (accent colors).
+- **Canonical** — exact RGB values from the theme's official specification. Look correct at millions of colors, may degrade at 256 colors. Used for Dracula, Nord, and Solarized base colors. System 7 uses Mac System CLUT values which the Mac 256-color palette includes natively.
+
+Imported themes are always cube-snapped.
 
 ### TerminalTheme Struct
 
@@ -84,7 +154,7 @@ typedef struct {
 |-------|----------|
 | `default_fg` | Default foreground when no explicit SGR color is set (`COLOR_DEFAULT`) |
 | `default_bg` | Default background when no explicit SGR color is set (`COLOR_DEFAULT`) |
-| `cursor_color` | Text cursor (block, underline, or bar depending on DECSCUSR style) |
+| `cursor_color` | Text cursor color (note: cursor is currently drawn via XOR inversion, not this field) |
 
 **Selection:**
 | Field | Used for |
@@ -97,7 +167,7 @@ typedef struct {
 |-------|----------|
 | `bold_color` | Overrides default foreground for bold text. Only applies when no explicit ANSI color is set — `\e[1m` uses `bold_color`, but `\e[1;31m` uses standard bold-to-bright promotion (`index += 8`). Set to `{0,0,0}` to leave unused. |
 
-## Creating a Custom Theme
+## Creating a Built-in Theme
 
 ### Step 1: Create the Header File
 
@@ -107,7 +177,7 @@ Create a new file in `src/themes/`. Name it after your theme using snake_case:
 src/themes/my_theme.h
 ```
 
-Use an existing theme as a template. Here is a minimal example:
+Use an existing theme as a template. For best 256-color results, use cube-snapped values (multiples of 0x33). Here is a minimal example:
 
 ```c
 /*
@@ -242,10 +312,14 @@ The 16 ANSI colors must be distinguishable from each other and from the backgrou
 - **Colors 8-15** (bright): bold-to-bright promotion maps `index += 8` for bold text with explicit ANSI colors 0-7.
 - Test with `colortest` scripts, `htop`, `git diff`, `ls --color`, and vim color schemes.
 
+### Light Theme Readability
+
+Light themes require special attention to ANSI colors 7 (white) and 15 (bright white). Many terminal applications emit these colors expecting a dark background. On a light theme, white-on-white text is invisible. Consider remapping colors 7 and 15 to darker values that remain readable against the light background, as done in Solarized Light.
+
 ### Selection and Cursor Visibility
 
 - `sel_bg` and `sel_fg` should have high contrast with each other. Selection is temporary but must be clearly visible against any combination of ANSI foreground/background colors in the terminal.
-- `cursor_color` must be visible against both the default background and common ANSI background colors.
+- The cursor is currently drawn using XOR inversion (white XOR screen pixels). `cursor_color` is stored but not yet used for rendering.
 
 ### Bold Color Behavior
 
@@ -262,7 +336,7 @@ For maximum compatibility on 256-color Macs, stick to the 6x6x6 RGB cube. The sa
 0x00  0x33  0x66  0x99  0xCC  0xFF
 ```
 
-Colors outside this cube may dither on 8-bit displays. The built-in themes all use cube-safe values. Note that themes only override ANSI colors 0-15 — the 216-color cube (indices 16-231) and 24-step grayscale ramp (indices 232-255) are always the standard xterm palette.
+Colors outside this cube may dither on 8-bit displays. Imported themes are automatically cube-snapped to these values. Note that themes only override ANSI colors 0-15 — the 216-color cube (indices 16-231) and 24-step grayscale ramp (indices 232-255) are always the standard xterm palette.
 
 ### Mono Theme Constraints
 
@@ -284,7 +358,7 @@ Build presets:
 
 | Preset | `FLYNN_THEMES` | `FLYNN_COLOR` | Available Themes |
 |--------|----------------|---------------|------------------|
-| `full` | ON | ON | All 9 (mono + color) |
+| `full` | ON | ON | All (mono + color + up to 4 custom) |
 | `lite` | ON | OFF | Light, Dark only |
 | `minimal` | ON | OFF | Light, Dark only |
 
@@ -301,18 +375,26 @@ Override with CLI flags:
 src/
   theme.h               # TerminalTheme struct, theme API, index constants, no-op macros
   theme.c               # Theme engine: init, get/set, RGB cache, theme_table[], restore
+  theme_import.c         # Ghostty import/export, cube-snap, file I/O
   color.h               # Color QuickDraw detection (g_has_color_qd)
   color.c               # Runtime SysEnvirons() detection, color_get_rgb() (theme-aware for 0-15)
   themes/
     light.h             # Light (mono, default)
     dark.h              # Dark (mono)
-    solarized_light.h   # Solarized Light (color)
-    solarized_dark.h    # Solarized Dark (color)
-    tokyo_light.h       # Tokyo Night Light (color)
-    tokyo_dark.h        # Tokyo Night Dark (color)
-    green_screen.h      # Green Screen (color)
-    classic.h           # Classic (color)
-    platinum.h          # Platinum (color)
+    solarized_light.h   # Solarized Light (color, canonical base + cube-snapped accents)
+    solarized_dark.h    # Solarized Dark (color, canonical base + cube-snapped accents)
+    tokyo_light.h       # TokyoNight Day (color, cube-snapped)
+    tokyo_dark.h        # TokyoNight (color, cube-snapped)
+    amber_crt.h         # Amber CRT (color, cube-snapped)
+    system7.h           # System 7 (color, canonical Mac CLUT)
+    compact_mac.h       # Compact Mac (color, cube-snapped)
+    dracula.h           # Dracula (color, canonical)
+    nord.h              # Nord (color, canonical)
+    green_screen.h      # Green Screen (color, cube-snapped)
+    classic.h           # Classic (color, cube-snapped)
+    monokai.h           # Monokai (color, cube-snapped)
+    gruvbox.h           # Gruvbox (color, cube-snapped)
+    platinum.h          # Platinum (color, cube-snapped)
 resources/
   telnet.r              # Theme menu (MENU 138)
 ```

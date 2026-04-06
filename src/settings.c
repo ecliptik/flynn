@@ -492,6 +492,20 @@ prefs_load(FlynnPrefs *prefs)
 		}
 	}
 
+	if (prefs->version == 17) {
+		/* v17→v18 migration: add custom_themes[4] +
+		 * custom_theme_count. Zero-init the new fields
+		 * (no custom themes yet). */
+#ifdef FLYNN_THEMES
+		memset(prefs->custom_themes, 0,
+		    sizeof(prefs->custom_themes));
+		prefs->custom_theme_count = 0;
+#endif
+		prefs->version = PREFS_VERSION;
+		prefs_save(prefs);
+		return;
+	}
+
 	if (prefs->version != PREFS_VERSION)
 		prefs_defaults(prefs);
 }

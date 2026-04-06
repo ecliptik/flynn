@@ -59,7 +59,8 @@ Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archi
 - **Resizable window and scrollback** (80x24 up to 132x50, 192-line scrollback)
 - **Status bar** showing terminal size, protocol, and connection info
 - **8 fonts** (Monaco, Geneva, Chicago, Courier, New York; Helvetica, Times, Palatino on System 7) with independent size selection (9, 10, 12, 14)
-- **9 built-in themes** (Light, Dark, Solarized Light/Dark, Tokyo Light/Dark, Green Screen, Classic, Platinum) with per-window independence
+- **16 built-in themes** (Light, Dark, Solarized, TokyoNight, Dracula, Nord, Amber CRT, System 7, Compact Mac, Green Screen, Classic, Monokai, Gruvbox, Platinum) with per-window independence
+- **Theme import/export** in [Ghostty](https://ghostty.org) format — import any Ghostty theme file, auto-snapped to the Mac 256-color palette
 
 **Input & Interaction**
 - **Mouse text selection with copy/paste**
