@@ -13,6 +13,8 @@ Two categories of built-in themes exist:
 
 ## Built-in Themes
 
+11 themes are compiled into the default full build:
+
 | Theme | Type | Description |
 |-------|------|-------------|
 | Light | Mono | White background, black text. Default theme, works everywhere. |
@@ -26,11 +28,18 @@ Two categories of built-in themes exist:
 | Compact Mac | Color | P7 phosphor CRT warmth (Mac Plus/SE/Classic). Cube-snapped. |
 | Dracula | Color | Canonical Dracula palette from draculatheme.com. |
 | Nord | Color | Canonical Nord palette from nordtheme.com. |
-| Green Screen | Color | Phosphor green on black, classic CRT terminal aesthetic. Cube-snapped. |
-| Classic | Color | 1990s terminal colors — standard HTML-era ANSI palette, white background. Cube-snapped. |
-| Monokai | Color | Monokai Pro inspired dark theme. Cube-snapped. |
-| Gruvbox | Color | Retro groove palette. Cube-snapped. |
-| Platinum | Color | Mac OS 8/9 Appearance Manager inspired — gray background, purple accents. Cube-snapped. |
+
+### Additional Themes (not compiled by default)
+
+These theme headers exist in `src/themes/` and can be added to the build by registering them in `theme.h`, `theme.c`, and `telnet.r` (see [Creating a Built-in Theme](#creating-a-built-in-theme)):
+
+| Theme | Description |
+|-------|-------------|
+| Green Screen | Phosphor green on black, classic CRT terminal aesthetic. Cube-snapped. |
+| Classic | 1990s terminal colors — standard HTML-era ANSI palette, white background. Cube-snapped. |
+| Monokai | Monokai Pro inspired dark theme. Cube-snapped. |
+| Gruvbox | Retro groove palette. Cube-snapped. |
+| Platinum | Mac OS 8/9 Appearance Manager inspired — gray background, purple accents. Cube-snapped. |
 
 ## Theme Import / Export
 

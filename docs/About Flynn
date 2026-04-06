@@ -413,7 +413,7 @@ additional items for networking and display mode.
 
   Theme (submenu)
   ~~~~~~~~~~~~~~~
-  Choose a color theme for the terminal. 16 built-in
+  Choose a color theme for the terminal. 11 built-in
   themes are available on color Macs:
 
     Light, Dark (work on all systems)
@@ -421,7 +421,6 @@ additional items for networking and display mode.
     TokyoNight Day, TokyoNight
     Amber CRT, System 7, Compact Mac
     Dracula, Nord
-    Green Screen, Classic, Monokai, Gruvbox, Platinum
 
   On monochrome systems, only Light and Dark are
   available. Each window can use a different theme.
