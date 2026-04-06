@@ -102,7 +102,7 @@ flush_key_send(Session *s)
 static void
 local_echo(Session *s, const unsigned char *data, short len)
 {
-	if (!prefs.local_echo)
+	if (!s->local_echo)
 		return;
 	if (s->telnet.opts[TELOPT_ECHO] & OPTFLAG_REMOTE)
 		return;
@@ -249,7 +249,7 @@ handle_key_down(Session *s, EventRecord *event)
 
 	/* Backspace: DEL or BS per user preference */
 	if (vkey == 0x33) {
-		char bs = prefs.backspace_bs ? 0x08 : 0x7F;
+		char bs = s->backspace_bs ? 0x08 : 0x7F;
 		buffer_key_send(s, &bs, 1);
 		{
 			static const unsigned char bs_echo[] =

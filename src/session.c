@@ -20,6 +20,7 @@
 #include "color.h"
 #include "menus.h"
 #include "logging.h"
+#include "theme.h"
 
 extern FlynnPrefs prefs;
 
@@ -104,6 +105,23 @@ session_new(void)
 	 * displays without a custom palette.
 	 */
 
+	/* Pre-fill window with dark background for dark themes.
+	 * Without this, the window starts white and shows
+	 * briefly before the first draw covers it. */
+#ifdef FLYNN_COLOR
+	if (g_has_color_qd && prefs.dark_mode) {
+		GrafPtr save;
+		RGBColor black_c = {0, 0, 0};
+		RGBColor white_c = {0xFFFF, 0xFFFF, 0xFFFF};
+		GetPort(&save);
+		SetPort(s->window);
+		RGBBackColor(&black_c);
+		EraseRect(&s->window->portRect);
+		RGBBackColor(&white_c);
+		SetPort(save);
+	}
+#endif
+
 	/* Create vertical scroll bar in right border area.
 	 * Standard Mac positioning: overlap window frame by 1px
 	 * on top/right, stop above grow box at bottom. */
@@ -166,6 +184,8 @@ session_destroy(Session *s)
 		DisposePtr((Ptr)s->terminal.alt_color);
 	if (s->terminal.sb_color)
 		DisposePtr((Ptr)s->terminal.sb_color);
+	if (s->terminal.snap_color)
+		DisposePtr((Ptr)s->terminal.snap_color);
 
 #if FLYNN_SCROLLBACK_LINES > 0
 	if (s->scrollbar)
@@ -274,8 +294,15 @@ session_destroy_and_fixup(Session *s)
 	if (was_active)
 		active_session = 0L;
 	session_destroy(s);
-	if (was_active)
+	if (was_active) {
 		active_session = session_from_window(FrontWindow());
+		/* Restore surviving session's theme so update events
+		 * for the newly-exposed area use the correct theme */
+		if (active_session) {
+			session_load_font(active_session);
+			session_load_settings(active_session);
+		}
+	}
 }
 
 /*
@@ -294,7 +321,18 @@ session_init_from_prefs(Session *s)
 	term_ui_init(s->window, &s->terminal);
 	term_ui_save_state(&s->ui);
 	s->conn.dns_server = ip2long(prefs.dns_server);
-	s->terminal.dark_mode = prefs.dark_mode;
+	/* Inherit settings from active session, fall back to prefs */
+	if (active_session) {
+		s->theme_id = active_session->theme_id;
+		s->backspace_bs = active_session->backspace_bs;
+	} else {
+		s->theme_id = prefs.theme_id;
+		s->backspace_bs = prefs.backspace_bs;
+	}
+	s->terminal.dark_mode = theme_get_by_index(s->theme_id)->is_dark;
+	s->terminal.theme_id = s->theme_id;
+	s->local_echo = active_session ?
+	    active_session->local_echo : prefs.local_echo;
 	if (prefs.dark_mode)
 		PaintRect(&s->window->portRect);
 
@@ -379,6 +417,39 @@ session_load_font(Session *s)
 	g_cell_baseline = s->cell_baseline;
 	g_font_id = s->font_id;
 	g_font_size = s->font_size;
+}
+
+/* Save current global settings into session */
+void
+session_save_settings(Session *s)
+{
+	s->theme_id = (unsigned char)theme_get();
+	s->backspace_bs = prefs.backspace_bs;
+	s->local_echo = prefs.local_echo;
+}
+
+/*
+ * session_load_settings - restore session's theme and input settings.
+ *
+ * Lightweight: swaps theme globals and input prefs without redrawing.
+ * Call before any draw path (idle loop, update handler, window switch).
+ * The caller is responsible for triggering a redraw if needed.
+ */
+void
+session_load_settings(Session *s)
+{
+	/* Restore per-session backspace and echo */
+	prefs.backspace_bs = s->backspace_bs;
+	prefs.local_echo = s->local_echo;
+
+	/* Swap theme globals if different */
+	if (s->theme_id != (unsigned char)theme_get()) {
+		theme_set(s->theme_id);
+		term_ui_set_dark_mode(theme_is_dark());
+		s->terminal.dark_mode = theme_is_dark();
+		theme_reset_cache();
+		term_ui_invalidate_offscreen();
+	}
 }
 
 void
@@ -507,7 +578,7 @@ do_window_resize(Session *s, short width, short height)
 		SetRect(&margin, term_right, 0,
 		    s->window->portRect.right - SCROLLBAR_WIDTH,
 		    s->window->portRect.bottom - SCROLLBAR_WIDTH);
-		if (prefs.dark_mode)
+		if (theme_is_dark())
 			PaintRect(&margin);
 		else
 			EraseRect(&margin);
@@ -530,7 +601,7 @@ do_window_resize(Session *s, short width, short height)
 		    s->window->portRect.right - SCROLLBAR_WIDTH, 0,
 		    s->window->portRect.right,
 		    s->window->portRect.bottom);
-		if (prefs.dark_mode)
+		if (theme_is_dark())
 			PaintRect(&col_r);
 		else
 			EraseRect(&col_r);

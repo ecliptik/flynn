@@ -12,6 +12,7 @@ option(FLYNN_LOGGING       "Enable session logging to file"     ON)
 option(FLYNN_PRINTING      "Enable Page Setup and Print"        ON)
 option(FLYNN_FAVORITES     "Enable favorites/bookmarks"         ON)
 option(FLYNN_DARK_MODE     "Enable dark mode toggle"            ON)
+option(FLYNN_THEMES        "Enable theme engine"                ON)
 option(FLYNN_DBLWIDTH      "Enable double-width/height lines"   OFF)
 option(FLYNN_ALT_SCREEN    "Enable alternate screen buffer"     ON)
 option(FLYNN_OFFSCREEN     "Enable offscreen double-buffer"     ON)
@@ -71,6 +72,9 @@ endif()
 if(FLYNN_COLOR)
     list(APPEND FLYNN_SOURCES src/color.c)
 endif()
+if(FLYNN_THEMES)
+    list(APPEND FLYNN_SOURCES src/theme.c)
+endif()
 
 add_application(Flynn ${FLYNN_SOURCES} resources/telnet.r)
 
@@ -94,6 +98,7 @@ target_compile_definitions(Flynn PRIVATE
     $<$<BOOL:${FLYNN_LOGGING}>:FLYNN_LOGGING>
     $<$<BOOL:${FLYNN_PRINTING}>:FLYNN_PRINTING>
     $<$<BOOL:${FLYNN_DARK_MODE}>:FLYNN_DARK_MODE>
+    $<$<BOOL:${FLYNN_THEMES}>:FLYNN_THEMES>
     $<$<BOOL:${FLYNN_DBLWIDTH}>:FLYNN_DBLWIDTH>
     $<$<BOOL:${FLYNN_ALT_SCREEN}>:FLYNN_ALT_SCREEN>
     $<$<BOOL:${FLYNN_OFFSCREEN}>:FLYNN_OFFSCREEN>

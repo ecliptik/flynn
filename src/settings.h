@@ -5,7 +5,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
-#define PREFS_VERSION	15
+#define PREFS_VERSION	17
 #define MAX_BOOKMARKS	20
 #define MAX_RECENT	5
 
@@ -17,6 +17,9 @@ typedef struct {
 	short		terminal_type;	/* 0=xterm, 1=VT220, 2=VT100, 3=xterm-256color, 4=ansi; -1=use global */
 	short		font_id;	/* 0=use global default */
 	short		font_size;	/* 0=use global default */
+	signed char	bm_theme_id;	/* -1=use global default */
+	signed char	bm_backspace_bs;/* -1=use global default */
+	signed char	bm_local_echo;	/* -1=use global default */
 } Bookmark;
 
 typedef struct {
@@ -42,6 +45,7 @@ typedef struct {
 	char		finger_user[64];	/* last finger username */
 	unsigned char	bookmark_verbose[MAX_BOOKMARKS];	/* 1=send /W for finger */
 	short		win_x, win_y;	/* saved window position (global coords) */
+	unsigned char	theme_id;	/* 0=Light, 1=Dark, 2+=color themes */
 } FlynnPrefs;
 
 /* Load preferences from "Flynn Preferences" file. Returns defaults if not found. */

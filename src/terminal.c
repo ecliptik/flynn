@@ -23,6 +23,7 @@
 #include "terminal.h"
 #include "connection.h"
 #include "color.h"
+#include "theme.h"
 #include "glyphs.h"
 #include "cp437.h"
 
@@ -822,13 +823,21 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 	    r2 >= term->active_rows - 1 &&
 	    c2 >= term->active_cols - 1 &&
 	    !term->alt_active) {
-		/* Copy row-by-row via screen_rows[] since pointer
-		 * rotation may have reordered them */
-		short sr;
-		for (sr = 0; sr < TERM_ROWS; sr++)
-			memcpy(term->snap_screen[sr],
-			    term->screen_rows[sr],
-			    TERM_COLS * sizeof(TermCell));
+		memcpy(term->snap_screen, term->screen,
+		    sizeof(term->screen));
+		/* Save color data alongside screen content */
+		if (term->has_color && term->screen_color) {
+			long sc_size = (long)TERM_ROWS * TERM_COLS *
+			    sizeof(CellColor);
+			if (!term->snap_color)
+				term->snap_color =
+				    (CellColor *)NewPtr(sc_size);
+			if (term->snap_color) {
+				memcpy(term->snap_color,
+				    term->screen_color, sc_size);
+				term->snap_has_color = 1;
+			}
+		}
 		term->snap_valid = 1;
 	}
 
@@ -920,82 +929,53 @@ term_scroll_up(Terminal *term, short top, short bottom, short count)
 	}
 #endif
 
-	/* Pointer rotation: rotate screen_rows[] pointers instead of
-	 * memmove-ing TermCell data.  Eliminates count*active_cols*2
-	 * bytes of copying per scroll — just moves pointer values. */
+	/* Move lines up: per-row memmove using active_cols to
+	 * avoid moving unused columns (saves ~39% when 80 of 132) */
 	{
 		short rows_to_move = bottom - top - count + 1;
-
-		/* 1. Save pointers being scrolled off the top */
-		TermCell *saved_rows[TERM_ROWS];
-		for (r = 0; r < count; r++)
-			saved_rows[r] = term->screen_rows[top + r];
-
-		/* 2. Shift remaining pointers up */
-		for (r = 0; r < rows_to_move; r++)
-			term->screen_rows[top + r] =
-			    term->screen_rows[top + count + r];
-
-		/* 3. Place saved pointers at bottom (become cleared rows) */
-		for (r = 0; r < count; r++)
-			term->screen_rows[bottom - count + 1 + r] =
-			    saved_rows[r];
-
+		if (rows_to_move > 0) {
+			for (r = 0; r < rows_to_move; r++)
+				memmove(term->screen_rows[top + r],
+				    term->screen_rows[top + count + r],
+				    term->active_cols *
+				    sizeof(TermCell));
 #ifdef FLYNN_DBLWIDTH
-		/* Rotate line_attr[] values (plain array, not pointers) */
-		{
-			unsigned char saved_la[TERM_ROWS];
-			for (r = 0; r < count; r++)
-				saved_la[r] = term->line_attr[top + r];
-			for (r = 0; r < rows_to_move; r++)
-				term->line_attr[top + r] =
-				    term->line_attr[top + count + r];
-			for (r = 0; r < count; r++)
-				term->line_attr[bottom - count + 1 + r] =
-				    saved_la[r];
-		}
+			memmove(&term->line_attr[top],
+			    &term->line_attr[top + count],
+			    rows_to_move);
 #endif
+		}
 
-		/* Rotate color row pointers in parallel */
-		if (term->has_color && term->screen_color) {
-			CellColor *saved_cr[TERM_ROWS];
-			for (r = 0; r < count; r++)
-				saved_cr[r] =
-				    term->screen_color_rows[top + r];
+		/* Scroll color arrays in parallel */
+		if (term->has_color && term->screen_color &&
+		    rows_to_move > 0) {
 			for (r = 0; r < rows_to_move; r++)
-				term->screen_color_rows[top + r] =
+				memmove(
+				    term->screen_color_rows[top + r],
 				    term->screen_color_rows[
-				    top + count + r];
-			for (r = 0; r < count; r++)
-				term->screen_color_rows[
-				    bottom - count + 1 + r] =
-				    saved_cr[r];
+				    top + count + r],
+				    term->active_cols *
+				    sizeof(CellColor));
 		}
 	}
 
-	/* Clear newly exposed lines at bottom (word-at-a-time fill) */
-	{
-		unsigned short fill = ((unsigned short)' ' << 8) |
-		    ATTR_NORMAL;
-		for (r = bottom - count + 1; r <= bottom; r++) {
-			unsigned short *p =
-			    (unsigned short *)term->screen_rows[r];
-			for (c = 0; c < term->active_cols; c++)
-				*p++ = fill;
-#ifdef FLYNN_DBLWIDTH
-			term->line_attr[r] = LINE_ATTR_NORMAL;
-#endif
+	/* Clear newly exposed lines at bottom */
+	for (r = bottom - count + 1; r <= bottom; r++) {
+		TermCell *row_ptr = term->screen_rows[r];
+		for (c = 0; c < term->active_cols; c++) {
+			row_ptr[c].ch = ' ';
+			row_ptr[c].attr = ATTR_NORMAL;
 		}
+#ifdef FLYNN_DBLWIDTH
+		term->line_attr[r] = LINE_ATTR_NORMAL;
+#endif
 
 		/* Clear color for exposed lines */
 		if (term->has_color && term->screen_color) {
-			for (r = bottom - count + 1; r <= bottom;
-			    r++) {
-				memset(term->screen_color_rows[r],
-				    COLOR_DEFAULT,
-				    term->active_cols *
-				    sizeof(CellColor));
-			}
+			memset(term->screen_color_rows[r],
+			    COLOR_DEFAULT,
+			    term->active_cols *
+			    sizeof(CellColor));
 		}
 	}
 
@@ -1062,80 +1042,55 @@ term_scroll_down(Terminal *term, short top, short bottom, short count)
 	if (count > (bottom - top + 1))
 		count = bottom - top + 1;
 
-	/* Pointer rotation: rotate screen_rows[] pointers instead of
-	 * memmove-ing TermCell data.  Same as scroll_up but reversed —
-	 * save bottom pointers, shift down, place saved at top. */
+	/* Move lines down: per-row memmove using active_cols,
+	 * iterate in reverse (dest > src) to avoid overwriting */
 	{
 		short rows_to_move = bottom - top - count + 1;
-
-		/* 1. Save pointers being scrolled off the bottom */
-		TermCell *saved_rows[TERM_ROWS];
-		for (r = 0; r < count; r++)
-			saved_rows[r] =
-			    term->screen_rows[bottom - count + 1 + r];
-
-		/* 2. Shift remaining pointers down (reverse order) */
-		for (r = rows_to_move - 1; r >= 0; r--)
-			term->screen_rows[top + count + r] =
-			    term->screen_rows[top + r];
-
-		/* 3. Place saved pointers at top (become cleared rows) */
-		for (r = 0; r < count; r++)
-			term->screen_rows[top + r] = saved_rows[r];
-
+		if (rows_to_move > 0) {
+			for (r = rows_to_move - 1; r >= 0; r--)
+				memmove(term->screen_rows[top + count +
+				    r],
+				    term->screen_rows[top + r],
+				    term->active_cols *
+				    sizeof(TermCell));
 #ifdef FLYNN_DBLWIDTH
-		/* Rotate line_attr[] values (plain array, not pointers) */
-		{
-			unsigned char saved_la[TERM_ROWS];
-			for (r = 0; r < count; r++)
-				saved_la[r] =
-				    term->line_attr[bottom - count + 1 + r];
-			for (r = rows_to_move - 1; r >= 0; r--)
-				term->line_attr[top + count + r] =
-				    term->line_attr[top + r];
-			for (r = 0; r < count; r++)
-				term->line_attr[top + r] = saved_la[r];
-		}
+			memmove(&term->line_attr[top + count],
+			    &term->line_attr[top],
+			    rows_to_move);
 #endif
+		}
 
-		/* Rotate color row pointers in parallel */
-		if (term->has_color && term->screen_color) {
-			CellColor *saved_cr[TERM_ROWS];
-			for (r = 0; r < count; r++)
-				saved_cr[r] =
-				    term->screen_color_rows[
-				    bottom - count + 1 + r];
+		/* Scroll color arrays in parallel */
+		if (term->has_color && term->screen_color &&
+		    rows_to_move > 0) {
 			for (r = rows_to_move - 1; r >= 0; r--)
-				term->screen_color_rows[top + count + r] =
-				    term->screen_color_rows[top + r];
-			for (r = 0; r < count; r++)
-				term->screen_color_rows[top + r] =
-				    saved_cr[r];
+				memmove(
+				    term->screen_color_rows[
+				    top + count + r],
+				    term->screen_color_rows[
+				    top + r],
+				    term->active_cols *
+				    sizeof(CellColor));
 		}
 	}
 
-	/* Clear newly exposed lines at top (word-at-a-time fill) */
-	{
-		unsigned short fill = ((unsigned short)' ' << 8) |
-		    ATTR_NORMAL;
-		for (r = top; r < top + count; r++) {
-			unsigned short *p =
-			    (unsigned short *)term->screen_rows[r];
-			for (c = 0; c < term->active_cols; c++)
-				*p++ = fill;
-#ifdef FLYNN_DBLWIDTH
-			term->line_attr[r] = LINE_ATTR_NORMAL;
-#endif
+	/* Clear newly exposed lines at top */
+	for (r = top; r < top + count; r++) {
+		TermCell *row_ptr = term->screen_rows[r];
+		for (c = 0; c < term->active_cols; c++) {
+			row_ptr[c].ch = ' ';
+			row_ptr[c].attr = ATTR_NORMAL;
 		}
+#ifdef FLYNN_DBLWIDTH
+		term->line_attr[r] = LINE_ATTR_NORMAL;
+#endif
 
 		/* Clear color for exposed lines */
 		if (term->has_color && term->screen_color) {
-			for (r = top; r < top + count; r++) {
-				memset(term->screen_color_rows[r],
-				    COLOR_DEFAULT,
-				    term->active_cols *
-				    sizeof(CellColor));
-			}
+			memset(term->screen_color_rows[r],
+			    COLOR_DEFAULT,
+			    term->active_cols *
+			    sizeof(CellColor));
 		}
 	}
 
@@ -2587,41 +2542,76 @@ term_finish_osc(Terminal *term)
 				i++;
 			}
 			/* Check for ";?" suffix = query */
-#ifdef FLYNN_COLOR
 			if (i < term->osc_len &&
 			    term->osc_buf[i] == ';' &&
 			    i + 1 < term->osc_len &&
 			    term->osc_buf[i + 1] == '?' &&
 			    idx >= 0 && idx <= 255) {
-				RGBColor rgb;
-
-				color_get_rgb((unsigned char)idx,
-				    &rgb);
-				term->response_len = snprintf(
-				    term->response,
-				    sizeof(term->response),
-				    "\033]4;%d;rgb:%04x/%04x/"
-				    "%04x\033\\",
-				    idx,
-				    (unsigned)rgb.red,
-				    (unsigned)rgb.green,
-				    (unsigned)rgb.blue);
-				if (term->response_len >= (short)sizeof(term->response))
-					term->response_len = sizeof(term->response) - 1;
-				term_flush_response(term);
-			}
+#ifdef FLYNN_THEMES
+				if (idx < 16) {
+					const TerminalTheme *th =
+					    theme_current();
+					term->response_len = snprintf(
+					    term->response,
+					    sizeof(term->response),
+					    "\033]4;%d;rgb:%04x/"
+					    "%04x/%04x\033\\",
+					    idx,
+					    (unsigned)th->ansi[idx].r * 257,
+					    (unsigned)th->ansi[idx].g * 257,
+					    (unsigned)th->ansi[idx].b * 257);
+					if (term->response_len >= (short)sizeof(term->response))
+						term->response_len = sizeof(term->response) - 1;
+					term_flush_response(term);
+				} else
 #endif
+#ifdef FLYNN_COLOR
+				{
+					RGBColor rgb;
+
+					color_get_rgb(
+					    (unsigned char)idx, &rgb);
+					term->response_len = snprintf(
+					    term->response,
+					    sizeof(term->response),
+					    "\033]4;%d;rgb:%04x/"
+					    "%04x/%04x\033\\",
+					    idx,
+					    (unsigned)rgb.red,
+					    (unsigned)rgb.green,
+					    (unsigned)rgb.blue);
+					if (term->response_len >= (short)sizeof(term->response))
+						term->response_len = sizeof(term->response) - 1;
+					term_flush_response(term);
+				}
+#else
+				{
+					(void)idx; /* no color support */
+				}
+#endif
+			}
 			/* Set (non-"?" payload): silently ignore */
 		}
 		break;
 	case 10:
 		/*
 		 * OSC 10 - query/set default foreground color
-		 * Query: "?" → reply with rgb
-		 * Monochrome default: fg = black (0000/0000/0000)
-		 * Dark mode: fg = white (ffff/ffff/ffff)
+		 * Query: "?" → reply with theme default_fg rgb
 		 */
 		if (term->osc_len == 1 && term->osc_buf[0] == '?') {
+#ifdef FLYNN_THEMES
+			{
+				const TerminalTheme *th = theme_current();
+				term->response_len = snprintf(
+				    term->response,
+				    sizeof(term->response),
+				    "\033]10;rgb:%04x/%04x/"
+				    "%04x\033\\",
+				    (unsigned)th->default_fg.r * 257,
+				    (unsigned)th->default_fg.g * 257,
+				    (unsigned)th->default_fg.b * 257);
+			}
+#else
 			if (term->dark_mode)
 				term->response_len = snprintf(
 				    term->response,
@@ -2634,6 +2624,7 @@ term_finish_osc(Terminal *term)
 				    sizeof(term->response),
 				    "\033]10;rgb:0000/0000/"
 				    "0000\033\\");
+#endif
 			if (term->response_len >= (short)sizeof(term->response))
 				term->response_len = sizeof(term->response) - 1;
 			term_flush_response(term);
@@ -2643,11 +2634,22 @@ term_finish_osc(Terminal *term)
 	case 11:
 		/*
 		 * OSC 11 - query/set default background color
-		 * Query: "?" → reply with rgb
-		 * Monochrome default: bg = white (ffff/ffff/ffff)
-		 * Dark mode: bg = black (0000/0000/0000)
+		 * Query: "?" → reply with theme default_bg rgb
 		 */
 		if (term->osc_len == 1 && term->osc_buf[0] == '?') {
+#ifdef FLYNN_THEMES
+			{
+				const TerminalTheme *th = theme_current();
+				term->response_len = snprintf(
+				    term->response,
+				    sizeof(term->response),
+				    "\033]11;rgb:%04x/%04x/"
+				    "%04x\033\\",
+				    (unsigned)th->default_bg.r * 257,
+				    (unsigned)th->default_bg.g * 257,
+				    (unsigned)th->default_bg.b * 257);
+			}
+#else
 			if (term->dark_mode)
 				term->response_len = snprintf(
 				    term->response,
@@ -2660,6 +2662,7 @@ term_finish_osc(Terminal *term)
 				    sizeof(term->response),
 				    "\033]11;rgb:ffff/ffff/"
 				    "ffff\033\\");
+#endif
 			if (term->response_len >= (short)sizeof(term->response))
 				term->response_len = sizeof(term->response) - 1;
 			term_flush_response(term);

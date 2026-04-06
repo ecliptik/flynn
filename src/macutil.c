@@ -13,6 +13,7 @@
 #include <stdarg.h>
 
 #include "macutil.h"
+#include "color.h"
 
 void
 c2pstr(Str255 dst, const char *src)
@@ -86,6 +87,16 @@ dlg_get_text(DialogPtr dlg, short item, char *buf, short buflen)
 void
 clear_window_bg(WindowPtr win, Boolean dark_mode)
 {
+#ifdef FLYNN_COLOR
+	if (dark_mode && g_has_color_qd) {
+		RGBColor black_c = {0, 0, 0};
+		RGBColor white_c = {0xFFFF, 0xFFFF, 0xFFFF};
+		RGBBackColor(&black_c);
+		EraseRect(&win->portRect);
+		RGBBackColor(&white_c);
+		return;
+	}
+#endif
 	if (dark_mode)
 		PaintRect(&win->portRect);
 	else

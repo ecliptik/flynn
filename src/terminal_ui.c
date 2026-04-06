@@ -35,6 +35,7 @@
 #include "settings.h"
 #include "color.h"
 #include "glyphs.h"
+#include "theme.h"
 
 /*
  * Set foreground/background color by palette index using RGBForeColor/
@@ -57,6 +58,11 @@ set_fg_color(unsigned char index)
 	cached_fg_idx = (short)index;
 	color_get_rgb(index, &rgb);
 	RGBForeColor(&rgb);
+#ifdef FLYNN_THEMES
+	/* Invalidate theme fg cache — it doesn't know we
+	 * changed the QD foreground behind its back */
+	theme_reset_cache();
+#endif
 }
 
 static void
@@ -68,6 +74,9 @@ set_bg_color(unsigned char index)
 	cached_bg_idx = (short)index;
 	color_get_rgb(index, &rgb);
 	RGBBackColor(&rgb);
+#ifdef FLYNN_THEMES
+	theme_reset_cache();
+#endif
 }
 #else
 #define set_fg_color(i)  ((void)0)
@@ -115,6 +124,8 @@ static GWorldPtr	g_color_gworld;
 static short		g_color_off_cols;
 static short		g_color_off_rows;
 static WindowPtr	g_color_off_win;
+
+static short	g_color_gworld_fresh;	/* 1 = just allocated, force full blit */
 
 /* Shadow buffer for row-level change detection (Phase 3) */
 static TermCell	g_shadow[TERM_ROWS][TERM_COLS];
@@ -329,20 +340,29 @@ color_offscreen_alloc(WindowPtr win, short cols, short rows)
 
 	LockPixels(GetGWorldPixMap(g_color_gworld));
 
-	/* Erase new GWorld so no garbage shows through on partial
-	 * blits (NewGWorld content is undefined).  Use dark mode
-	 * background color when active to match terminal bg. */
+	/* Erase new GWorld with theme background so non-dirty rows
+	 * have the correct bg color.  g_color_gworld_fresh flag
+	 * forces a full blit on the next draw to push the entire
+	 * GWorld (including background) to the window. */
 	{
 		CGrafPtr saved_gw;
 		GDHandle saved_gd;
 		GetGWorld(&saved_gw, &saved_gd);
 		SetGWorld((CGrafPtr)g_color_gworld, 0L);
+#ifdef FLYNN_THEMES
+		theme_set_default_bg(&theme_current()->default_bg);
+#ifdef FLYNN_COLOR
+		cached_bg_idx = -1;
+#endif
+#else
 		if (g_dark_mode) {
 			RGBColor black_rgb = {0, 0, 0};
 			RGBBackColor(&black_rgb);
 		}
+#endif
 		EraseRect(&bounds);
-		if (g_dark_mode) {
+		/* Restore white BackColor for subsequent EraseRect calls */
+		{
 			RGBColor white_rgb =
 			    {0xFFFF, 0xFFFF, 0xFFFF};
 			RGBBackColor(&white_rgb);
@@ -353,6 +373,7 @@ color_offscreen_alloc(WindowPtr win, short cols, short rows)
 	g_color_off_cols = cols;
 	g_color_off_rows = rows;
 	g_color_off_win = win;
+	g_color_gworld_fresh = 1;
 
 	return 1;
 }
@@ -686,12 +707,20 @@ term_ui_set_font(WindowPtr win, short font_id, short font_size)
 
 /*
  * term_ui_set_dark_mode - enable/disable dark mode rendering
+ *
+ * When FLYNN_THEMES is active, dark mode is derived from the current
+ * theme's is_dark flag.  The 'enabled' parameter is still accepted
+ * for backward compatibility (mono toggle).
  */
 #ifdef FLYNN_DARK_MODE
 void
 term_ui_set_dark_mode(short enabled)
 {
+#ifdef FLYNN_THEMES
+	g_dark_mode = theme_is_dark();
+#else
 	g_dark_mode = enabled;
+#endif
 #ifdef FLYNN_OFFSCREEN
 	g_shadow_valid = 0;
 #endif
@@ -726,6 +755,9 @@ term_ui_draw(WindowPtr win, Terminal *term)
 #ifdef FLYNN_COLOR
 	cached_fg_idx = -1;
 	cached_bg_idx = -1;
+#endif
+#ifdef FLYNN_THEMES
+	theme_reset_cache();
 #endif
 
 	/* Step 1: Erase cursor XOR artifact on REAL screen.
@@ -902,8 +934,14 @@ term_ui_draw(WindowPtr win, Terminal *term)
 
 	/* Color offscreen: redirect to GWorld on color systems.
 	 * EraseRect + draw_row calls go to the invisible GWorld;
-	 * CopyBits blits to screen after the dirty row loop. */
-	if (g_has_color_qd && any_dirty) {
+	 * CopyBits blits to screen after the dirty row loop.
+	 * Disabled for non-white-bg themes: BeginUpdate fills the
+	 * update region with white (wContent default), and partial
+	 * CopyBits leaves white holes in non-dirty rows.  Direct-
+	 * to-window drawing avoids this.  Only the default Light
+	 * theme (white bg) uses GWorld for flicker-free rendering. */
+	if (g_has_color_qd && any_dirty &&
+	    !g_dark_mode && !theme_is_color()) {
 		use_color_offscreen = color_offscreen_alloc(win,
 		    term->active_cols, term->active_rows);
 		if (use_color_offscreen) {
@@ -970,13 +1008,17 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		    LEFT_MARGIN + term->active_cols * g_cell_width,
 		    row_bottom(row));
 
-		if (g_has_color_qd && g_dark_mode) {
-			/* Color dark mode: erase with black background */
-			set_bg_color(0);
-			EraseRect(&r);
-		} else if (g_has_color_qd) {
-			/* Color light mode: erase with white background */
-			set_bg_color(15);
+		if (g_has_color_qd) {
+			/* Color mode: erase with theme background */
+#ifdef FLYNN_THEMES
+			theme_set_default_bg(
+			    &theme_current()->default_bg);
+#ifdef FLYNN_COLOR
+			cached_bg_idx = -1;
+#endif
+#else
+			set_bg_color(g_dark_mode ? 0 : 15);
+#endif
 			EraseRect(&r);
 #ifdef FLYNN_OFFSCREEN
 		} else if (use_offscreen) {
@@ -992,8 +1034,17 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		}
 
 		/* Set default fg color before drawing row */
-		if (g_has_color_qd)
+		if (g_has_color_qd) {
+#ifdef FLYNN_THEMES
+			theme_set_default_fg(
+			    &theme_current()->default_fg);
+#ifdef FLYNN_COLOR
+			cached_fg_idx = -1;
+#endif
+#else
 			set_fg_color(g_dark_mode ? 15 : 0);
+#endif
+		}
 
 		/* Skip draw_row for blank rows on mono — EraseRect already cleared */
 		if (!g_has_color_qd) {
@@ -1056,7 +1107,15 @@ do_draw:
 				offscreen_fill_rect(&gap_r, 0xFF);
 			} else if (use_color_offscreen &&
 			    g_dark_mode) {
+#ifdef FLYNN_THEMES
+				theme_set_default_bg(
+				    &theme_current()->default_bg);
+#ifdef FLYNN_COLOR
+				cached_bg_idx = -1;
+#endif
+#else
 				set_bg_color(0);
+#endif
 				EraseRect(&gap_r);
 			} else
 #endif
@@ -1169,6 +1228,16 @@ do_draw:
 				dirty_count++;
 		}
 
+		/* Dark/colored themes: always full blit to prevent
+		 * white holes from Window Manager's BeginUpdate
+		 * erase (wContent defaults to white).  Cost is one
+		 * extra full-screen CopyBits per draw — negligible
+		 * vs the trap overhead already in the render loop. */
+		if (g_dark_mode || g_color_gworld_fresh) {
+			dirty_count = 999;
+			g_color_gworld_fresh = 0;
+		}
+
 		if (dirty_count >= 20) {
 			/* Full blit */
 			Rect content_r;
@@ -1223,6 +1292,12 @@ do_draw:
 	    term->cursor_visible)
 		draw_cursor(term, 1);
 	} /* end had_scroll scope */
+
+#ifdef FLYNN_THEMES
+	/* Restore port to black/white after themed drawing to prevent
+	 * theme colors from leaking into menus, title bars, dialogs */
+	theme_restore_colors();
+#endif
 }
 
 /*
@@ -2187,21 +2262,32 @@ draw_row(Terminal *term, short row)
 		 */
 		{
 			unsigned char eff_fg, eff_bg;
+#ifdef FLYNN_THEMES
+			short fg_is_default = 0;
+			short bg_is_default = 0;
+#endif
 
 			if (use_color) {
 				/*
 				 * Resolve effective fg/bg for
 				 * rendering.  COLOR_DEFAULT resolves
-				 * to fg=black(0)/bg=white(15) in
-				 * normal mode, swapped in dark mode.
+				 * to theme default or black/white.
 				 */
 				eff_fg = run_fg;
 				eff_bg = run_bg;
 
-				if (eff_fg == COLOR_DEFAULT)
+				if (eff_fg == COLOR_DEFAULT) {
 					eff_fg = g_dark_mode ? 15 : 0;
-				if (eff_bg == COLOR_DEFAULT)
+#ifdef FLYNN_THEMES
+					fg_is_default = 1;
+#endif
+				}
+				if (eff_bg == COLOR_DEFAULT) {
 					eff_bg = g_dark_mode ? 0 : 15;
+#ifdef FLYNN_THEMES
+					bg_is_default = 1;
+#endif
+				}
 
 				/*
 				 * Bold-to-bright promotion: standard
@@ -2211,28 +2297,58 @@ draw_row(Terminal *term, short row)
 				 * this, bold+dark colors are invisible
 				 * on matching backgrounds.
 				 */
+#ifdef FLYNN_THEMES
 				if ((run_attr & ATTR_BOLD) &&
-				    eff_fg < 8)
+				    fg_is_default &&
+				    theme_current()->bold_color.r |
+				    theme_current()->bold_color.g |
+				    theme_current()->bold_color.b) {
+					/* Theme has bold_color override
+					 * for default-colored bold text */
+					fg_is_default = 2;
+				} else
+#endif
+				if ((run_attr & ATTR_BOLD) &&
+				    eff_fg < 8) {
 					eff_fg += 8;
+#ifdef FLYNN_THEMES
+					fg_is_default = 0;
+#endif
+				}
 
 				if (run_attr & ATTR_INVERSE) {
 					unsigned char tmp = eff_fg;
 					eff_fg = eff_bg;
 					eff_bg = tmp;
+#ifdef FLYNN_THEMES
+					{
+						short tmp_d = fg_is_default;
+						fg_is_default = bg_is_default;
+						bg_is_default = tmp_d;
+					}
+#endif
 				}
 
 				/* Draw bg when it differs from erase
-				 * color (dark=black, normal=white) */
+				 * color (theme default bg) */
 				{
+#ifdef FLYNN_THEMES
+					if (!bg_is_default) {
+#else
 					unsigned char erase_bg =
 					    g_dark_mode ? 0 : 15;
 					if (eff_bg != erase_bg) {
+#endif
 						Rect bg_r;
 						SetRect(&bg_r,
 						    run_x, row_y,
 						    run_x + run_w,
 						    row_bottom(row));
+#ifdef FLYNN_THEMES
 						set_bg_color(eff_bg);
+#else
+						set_bg_color(eff_bg);
+#endif
 						EraseRect(&bg_r);
 					}
 				}
@@ -2240,6 +2356,21 @@ draw_row(Terminal *term, short row)
 				/* Set fg for pen-based paths
 				 * (line drawing, braille, glyphs).
 				 * Text fg set AFTER TextFace below. */
+#ifdef FLYNN_THEMES
+				if (fg_is_default == 2) {
+					theme_set_default_fg(
+					    &theme_current()->bold_color);
+#ifdef FLYNN_COLOR
+					cached_fg_idx = -1;
+#endif
+				} else if (fg_is_default) {
+					theme_set_default_fg(
+					    &theme_current()->default_fg);
+#ifdef FLYNN_COLOR
+					cached_fg_idx = -1;
+#endif
+				} else
+#endif
 				set_fg_color(eff_fg);
 				g_eff_fg = eff_fg;
 				g_eff_bg = eff_bg;
@@ -2386,10 +2517,15 @@ draw_row(Terminal *term, short row)
 			/*
 			 * Set text fg AFTER TextFace — on Color
 			 * QuickDraw, TextFace resets the port's
-			 * foreground color.
+			 * foreground color.  Invalidate cache
+			 * since TextFace changed QD state.
 			 */
-			if (use_color)
+			if (use_color) {
+#ifdef FLYNN_COLOR
+				cached_fg_idx = -1;
+#endif
 				set_fg_color(eff_fg);
+			}
 
 #ifdef FLYNN_OFFSCREEN
 			/*
@@ -2557,8 +2693,17 @@ draw_row(Terminal *term, short row)
 
 	/* Restore default colors once at end of row */
 	if (color_dirty) {
+#ifdef FLYNN_THEMES
+		theme_set_default_fg(&theme_current()->default_fg);
+		theme_set_default_bg(&theme_current()->default_bg);
+#ifdef FLYNN_COLOR
+		cached_fg_idx = -1;
+		cached_bg_idx = -1;
+#endif
+#else
 		set_fg_color(g_dark_mode ? 15 : 0);
 		set_bg_color(g_dark_mode ? 0 : 15);
+#endif
 	}
 
 	/* Restore normal face only if it was changed */
@@ -5082,12 +5227,15 @@ draw_status_bar(WindowPtr win, Session *s)
 	}
 #endif
 
-	/* Background fill — always white regardless of dark mode
+	/* Background fill — always white regardless of theme
 	 * (status bar is chrome, not content; matches Geomys HIG) */
 	SetRect(&bar_r, 0, bar_top, bar_right, win->portRect.bottom);
 #ifdef FLYNN_COLOR
-	if (g_has_color_qd)
-		set_bg_color(15);
+	if (g_has_color_qd) {
+		RGBColor white_rgb = { 0xFFFF, 0xFFFF, 0xFFFF };
+		RGBBackColor(&white_rgb);
+		cached_bg_idx = -1;
+	}
 #endif
 	if (g_dark_mode && !g_has_color_qd) {
 		/* Mono dark: invert to get white background */

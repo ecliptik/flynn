@@ -52,7 +52,8 @@
 #define PREFS_SIZE_HIER      2   /* Size submenu trigger */
 #define PREFS_TTYPE_HIER     3   /* Terminal Type submenu trigger */
 /* separator = 4 */
-#define PREFS_DARK_ID        5
+#define PREFS_THEME_HIER     5   /* Theme submenu trigger */
+#define PREFS_DARK_ID        5   /* legacy alias */
 #define PREFS_STATUS_BAR_ID  6
 /* separator = 7 */
 #define PREFS_BKSP_DEL_ID    8
@@ -97,6 +98,23 @@
 /* separator = 3 (added dynamically when bookmarks exist) */
 #define FAV_FIRST_BM         4   /* first bookmark entry */
 #endif
+
+/* Theme submenu (MENU 138) */
+#define THEME_MENU_ID              138
+
+#define THEME_ITEM_LIGHT           1
+#define THEME_ITEM_DARK            2
+/* item 3 is separator */
+#define THEME_ITEM_SOLARIZED_LIGHT 4
+#define THEME_ITEM_SOLARIZED_DARK  5
+#define THEME_ITEM_TOKYO_LIGHT     6
+#define THEME_ITEM_TOKYO_DARK      7
+#define THEME_ITEM_GREEN_SCREEN    8
+#define THEME_ITEM_CLASSIC         9
+#define THEME_ITEM_PLATINUM        10
+
+#define THEME_ITEM_FIRST           1
+#define THEME_ITEM_LAST            10
 
 /* Window menu */
 #define WINDOW_MENU_ID      133

@@ -39,6 +39,11 @@ typedef struct Session {
 	short		cell_height;
 	short		cell_baseline;
 
+	/* Per-session preferences (override global prefs) */
+	unsigned char	theme_id;
+	unsigned char	backspace_bs;
+	unsigned char	local_echo;
+
 	/* Keystroke send buffer */
 	char		key_send_buf[256];
 	short		key_send_len;
@@ -88,6 +93,10 @@ void session_init_from_prefs(Session *s);
 /* Save/restore per-session font metrics to/from globals */
 void session_save_font(Session *s);
 void session_load_font(Session *s);
+
+/* Save/restore per-session settings (theme, backspace, echo) */
+void session_save_settings(Session *s);
+void session_load_settings(Session *s);
 
 /* Change active session's font and resize window */
 void do_font_change(short font_id, short font_size);

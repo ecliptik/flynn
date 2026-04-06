@@ -64,7 +64,7 @@ resource 'MENU' (131, "Options") {
 		"Size", noIcon, noKey, noMark, plain;
 		"Terminal Type", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Dark Mode On", noIcon, noKey, noMark, plain;
+		"Theme", noIcon, noKey, noMark, plain;
 		"Show Status Bar", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Backspace Sends DEL", noIcon, noKey, noMark, plain;
@@ -113,6 +113,22 @@ resource 'MENU' (136, "Favorites") {
 		"Manage Favorites\311", noIcon, "B", noMark, plain;
 		"Add Favorite\311", noIcon, "D", noMark, plain
 		/* Separator + bookmark entries added dynamically */
+	}
+};
+
+resource 'MENU' (138, "Theme") {
+	138, textMenuProc, allEnabled, enabled, "Theme",
+	{
+		"Light", noIcon, noKey, noMark, plain;
+		"Dark", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Solarized Light", noIcon, noKey, noMark, plain;
+		"Solarized Dark", noIcon, noKey, noMark, plain;
+		"Tokyo Light", noIcon, noKey, noMark, plain;
+		"Tokyo Dark", noIcon, noKey, noMark, plain;
+		"Green Screen", noIcon, noKey, noMark, plain;
+		"Classic", noIcon, noKey, noMark, plain;
+		"Platinum", noIcon, noKey, noMark, plain
 	}
 };
 

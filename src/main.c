@@ -37,6 +37,7 @@
 #include "finger.h"
 #include "logging.h"
 #include "printing.h"
+#include "theme.h"
 
 /* Globals */
 Boolean running = true;
@@ -255,6 +256,7 @@ main(void)
 
 	/* Load prefs and fast init before showing window */
 	prefs_load(&prefs);
+	theme_init(prefs.theme_id);
 	term_ui_set_dark_mode(prefs.dark_mode);
 
 	/* Launch directly into connect dialog (before heavy init).
@@ -370,6 +372,16 @@ session_handle_disconnect(Session *sess)
 		memcpy(sess->terminal.screen, sess->terminal.snap_screen,
 		    sizeof(sess->terminal.screen));
 		terminal_normalize_rows(&sess->terminal);
+		/* Restore saved color data */
+		if (sess->terminal.snap_has_color &&
+		    sess->terminal.snap_color &&
+		    sess->terminal.has_color &&
+		    sess->terminal.screen_color) {
+			memcpy(sess->terminal.screen_color,
+			    sess->terminal.snap_color,
+			    (long)TERM_ROWS * TERM_COLS *
+			    sizeof(CellColor));
+		}
 	}
 	sess->terminal.snap_valid = 0;
 
@@ -789,9 +801,10 @@ main_event_loop(void)
 				    sess->conn.pending_data == 0)
 					continue;
 
-				/* Load this session's UI + font state */
+				/* Load this session's UI + font + theme */
 				term_ui_load_state(&sess->ui);
 				session_load_font(sess);
+				session_load_settings(sess);
 
 				{
 					short drain;
@@ -877,6 +890,7 @@ main_event_loop(void)
 			if (active_session) {
 				term_ui_load_state(&active_session->ui);
 				session_load_font(active_session);
+				session_load_settings(active_session);
 			}
 
 			if (event.where.h != last_mouse_pt.h ||
@@ -1108,15 +1122,7 @@ handle_mouse_down(EventRecord *event)
 						break;
 				}
 				term_ui_load_state(&sess->ui);
-				if (sess == active_session)
-					active_session = 0L;
-				session_destroy(sess);
-				/* Update active to new front window */
-				if (!active_session) {
-					WindowPtr front = FrontWindow();
-					active_session =
-					    session_from_window(front);
-				}
+				session_destroy_and_fixup(sess);
 				update_menus();
 			}
 		}
@@ -1200,12 +1206,16 @@ handle_mouse_down(EventRecord *event)
 		if (win != FrontWindow()) {
 			SelectWindow(win);
 			if (sess) {
-				if (active_session)
+				if (active_session) {
 					term_ui_save_state(
 					    &active_session->ui);
+					session_save_settings(
+					    active_session);
+				}
 				active_session = sess;
 				term_ui_load_state(&sess->ui);
 				session_load_font(sess);
+				session_load_settings(sess);
 			}
 			update_menus();
 		} else if (sess) {
@@ -1282,6 +1292,7 @@ handle_update(EventRecord *event)
 	if (sess) {
 		term_ui_load_state(&sess->ui);
 		session_load_font(sess);
+		session_load_settings(sess);
 
 		if (sess->conn.state == CONN_STATE_CONNECTED &&
 		    sess->terminal.window_title[0])
@@ -1305,6 +1316,7 @@ handle_update(EventRecord *event)
 			 * fully populated — partial dirty leaves
 			 * white holes that corrupt future fast-path
 			 * blits. */
+			clear_window_bg(win, theme_is_dark());
 			term_ui_invalidate_offscreen();
 			term_dirty_all(&sess->terminal);
 			term_ui_draw(sess->window,
@@ -1326,13 +1338,25 @@ handle_update(EventRecord *event)
 		Rect clip_r;
 		RgnHandle save_clip;
 
+		/* Restore port to standard black/white before drawing
+		 * system controls — themed backColor leaks into
+		 * scrollbar and grow box rendering otherwise. */
+#ifdef FLYNN_COLOR
+		if (g_has_color_qd) {
+			RGBColor black_c = {0, 0, 0};
+			RGBColor white_c = {0xFFFF, 0xFFFF, 0xFFFF};
+			RGBForeColor(&black_c);
+			RGBBackColor(&white_c);
+		}
+#endif
+
 		/* Erase entire scroll bar + grow box column */
 		SetRect(&clip_r,
 		    win->portRect.right - SCROLLBAR_WIDTH,
 		    0,
 		    win->portRect.right,
 		    win->portRect.bottom);
-		if (prefs.dark_mode)
+		if (sess && theme_is_dark())
 			PaintRect(&clip_r);
 		else
 			EraseRect(&clip_r);
@@ -1369,13 +1393,16 @@ handle_activate(EventRecord *event)
 
 	if (event->modifiers & activeFlag) {
 		if (sess) {
-			/* Save outgoing session's UI state (selection, cursor) */
-			if (active_session)
+			/* Save outgoing session's UI + settings state */
+			if (active_session) {
 				term_ui_save_state(&active_session->ui);
+				session_save_settings(active_session);
+			}
 			active_session = sess;
-			/* Load incoming session's UI + font state */
+			/* Load incoming session's UI + font + settings */
 			term_ui_load_state(&sess->ui);
 			session_load_font(sess);
+			session_load_settings(sess);
 			update_menus();
 #if FLYNN_SCROLLBACK_LINES > 0
 			/* Activate scroll bar */

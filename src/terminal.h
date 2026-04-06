@@ -181,6 +181,7 @@ typedef struct {
 	unsigned char	cur_bg;		/* current bg (COLOR_DEFAULT = default) */
 	unsigned char	pre_dim_fg;	/* saved fg before SGR 2 dim */
 	unsigned char	dark_mode;	/* mirror of prefs.dark_mode for OSC queries */
+	unsigned char	theme_id;	/* mirror of prefs.theme_id for OSC queries */
 
 	/* Saved cursor (ESC 7 / ESC 8) */
 	short		saved_row;
@@ -253,6 +254,8 @@ typedef struct {
 
 	/* Disconnect recovery snapshot (13,200 bytes) */
 	TermCell	snap_screen[TERM_ROWS][TERM_COLS];
+	short		snap_has_color;	/* snap includes color data */
+	CellColor	*snap_color;	/* lazy-allocated color snapshot */
 } Terminal;
 
 /* Initialize terminal to default state */

@@ -56,6 +56,17 @@ prefs_defaults(FlynnPrefs *prefs)
 	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 	prefs->win_x = 2;
 	prefs->win_y = 40;
+	prefs->theme_id = 0;		/* Light theme */
+	/* New bookmark fields default to -1 (use global) via memset(0)
+	 * override: set explicitly for clarity */
+	{
+		short i;
+		for (i = 0; i < MAX_BOOKMARKS; i++) {
+			prefs->bookmarks[i].bm_theme_id = -1;
+			prefs->bookmarks[i].bm_backspace_bs = -1;
+			prefs->bookmarks[i].bm_local_echo = -1;
+		}
+	}
 }
 
 void
@@ -352,6 +363,133 @@ prefs_load(FlynnPrefs *prefs)
 		prefs->version = PREFS_VERSION;
 		prefs_save(prefs);
 		return;
+	}
+
+	if (prefs->version == 15) {
+		/* v15→v16 migration: add theme_id.
+		 * Derive from existing dark_mode setting. */
+		prefs->theme_id = prefs->dark_mode ? 1 : 0;
+		prefs->version = 16;
+	}
+
+	if (prefs->version == 16) {
+		/* v16→v17 migration: add per-bookmark
+		 * theme/backspace/echo fields.
+		 * Bookmark struct grew by 3 bytes per entry
+		 * (20 bookmarks = 60 bytes shift), so we must
+		 * re-read from v16 binary layout. */
+		struct V16Bookmark {
+			char		name[32];
+			char		host[128];
+			unsigned short	port;
+			char		username[64];
+			short		terminal_type;
+			short		font_id;
+			short		font_size;
+		};
+		struct V16Prefs {
+			short		version;
+			char		host[256];
+			short		port;
+			short		bookmark_count;
+			struct V16Bookmark bookmarks[MAX_BOOKMARKS];
+			short		font_id;
+			short		font_size;
+			short		terminal_type;
+			unsigned char	dark_mode;
+			unsigned char	backspace_bs;
+			char		dns_server[16];
+			char		username[64];
+			short		recent[MAX_RECENT];
+			short		recent_count;
+			unsigned char	local_echo;
+			unsigned char	show_status_bar;
+			short		bookmark_protocol[MAX_BOOKMARKS];
+			char		finger_host[128];
+			char		finger_user[64];
+			unsigned char	bookmark_verbose[MAX_BOOKMARKS];
+			short		win_x, win_y;
+			unsigned char	theme_id;
+		};
+		{
+			struct V16Prefs old;
+			short i, bc;
+
+			memcpy(&old, prefs,
+			    sizeof(struct V16Prefs));
+			prefs_defaults(prefs);
+
+			memcpy(prefs->host, old.host,
+			    sizeof(old.host));
+			prefs->port = old.port;
+			bc = old.bookmark_count;
+			if (bc < 0) bc = 0;
+			if (bc > MAX_BOOKMARKS)
+				bc = MAX_BOOKMARKS;
+			prefs->bookmark_count = bc;
+
+			for (i = 0; i < bc; i++) {
+				memcpy(prefs->bookmarks[i].name,
+				    old.bookmarks[i].name, 32);
+				memcpy(prefs->bookmarks[i].host,
+				    old.bookmarks[i].host, 128);
+				prefs->bookmarks[i].port =
+				    old.bookmarks[i].port;
+				memcpy(
+				    prefs->bookmarks[i].username,
+				    old.bookmarks[i].username, 64);
+				prefs->bookmarks[i].terminal_type =
+				    old.bookmarks[i].terminal_type;
+				prefs->bookmarks[i].font_id =
+				    old.bookmarks[i].font_id;
+				prefs->bookmarks[i].font_size =
+				    old.bookmarks[i].font_size;
+				prefs->bookmarks[i].bm_theme_id =
+				    -1;
+				prefs->bookmarks[i].bm_backspace_bs
+				    = -1;
+				prefs->bookmarks[i].bm_local_echo =
+				    -1;
+			}
+
+			prefs->font_id = old.font_id;
+			prefs->font_size = old.font_size;
+			prefs->terminal_type = old.terminal_type;
+			prefs->dark_mode = old.dark_mode;
+			prefs->backspace_bs = old.backspace_bs;
+			memcpy(prefs->dns_server,
+			    old.dns_server,
+			    sizeof(old.dns_server));
+			memcpy(prefs->username, old.username,
+			    sizeof(old.username));
+			memcpy(prefs->recent, old.recent,
+			    sizeof(old.recent));
+			prefs->recent_count = old.recent_count;
+			prefs->local_echo = old.local_echo;
+			prefs->show_status_bar =
+			    old.show_status_bar;
+
+			for (i = 0; i < MAX_BOOKMARKS; i++) {
+				prefs->bookmark_protocol[i] =
+				    old.bookmark_protocol[i];
+				prefs->bookmark_verbose[i] =
+				    old.bookmark_verbose[i];
+			}
+
+			memcpy(prefs->finger_host,
+			    old.finger_host,
+			    sizeof(old.finger_host));
+			memcpy(prefs->finger_user,
+			    old.finger_user,
+			    sizeof(old.finger_user));
+			prefs->win_x = old.win_x;
+			prefs->win_y = old.win_y;
+			prefs->theme_id = old.theme_id;
+
+			prefs->version = PREFS_VERSION;
+			prefs_save(prefs);
+			return;
+		}
 	}
 
 	if (prefs->version != PREFS_VERSION)

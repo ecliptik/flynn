@@ -29,6 +29,7 @@
 #include "sysutil.h"
 #include "finger.h"
 #include "menus.h"
+#include "theme.h"
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -252,12 +253,46 @@ session_post_connect(Session *s, short ttype, short bm_index,
 	prefs.port = s->conn.port;
 	prefs.terminal_type = ttype;
 	prefs.backspace_bs = (ttype == 4) ? 1 : 0;
+	prefs.local_echo = (ttype == 4) ? 1 : 0;
+	s->backspace_bs = prefs.backspace_bs;
+	s->local_echo = prefs.local_echo;
 	prefs_save(&prefs);
 
 	/* Track bookmark */
 	if (bm_index >= 0) {
 		add_recent_bookmark(bm_index);
 		s->bookmark_index = bm_index;
+
+		/* Apply per-bookmark overrides if set */
+		{
+			Bookmark *bm =
+			    &prefs.bookmarks[bm_index];
+			if (bm->bm_backspace_bs >= 0) {
+				s->backspace_bs =
+				    bm->bm_backspace_bs;
+				prefs.backspace_bs =
+				    s->backspace_bs;
+			}
+			if (bm->bm_local_echo >= 0) {
+				s->local_echo =
+				    bm->bm_local_echo;
+				prefs.local_echo =
+				    s->local_echo;
+			}
+#ifdef FLYNN_THEMES
+			if (bm->bm_theme_id >= 0) {
+				s->theme_id =
+				    bm->bm_theme_id;
+				s->terminal.theme_id =
+				    bm->bm_theme_id;
+				theme_set(bm->bm_theme_id);
+				term_ui_set_dark_mode(
+				    theme_is_dark());
+				s->terminal.dark_mode =
+				    theme_is_dark();
+			}
+#endif
+		}
 	}
 
 	/* Auto-send username */

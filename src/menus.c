@@ -32,11 +32,15 @@
 #include "color.h"
 #include "logging.h"
 #include "printing.h"
+#include "theme.h"
 
 /* Menu handles (private to this module) */
 static MenuHandle apple_menu, file_menu, edit_menu, prefs_menu, ctrl_menu;
 static MenuHandle window_menu;
 static MenuHandle font_submenu, size_submenu, ttype_submenu;
+#ifdef FLYNN_THEMES
+static MenuHandle theme_submenu;
+#endif
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -95,6 +99,15 @@ init_menus(void)
 	ttype_submenu = GetMenu(TTYPE_MENU_ID);
 	if (ttype_submenu)
 		InsertMenu(ttype_submenu, -1);
+	/* Load and insert Theme hierarchical submenu (color only) */
+#ifdef FLYNN_THEMES
+	if (g_has_color_qd) {
+		theme_submenu = GetMenu(THEME_MENU_ID);
+		if (theme_submenu)
+			InsertMenu(theme_submenu, -1);
+	}
+#endif
+
 	/* Set hierarchical menu markers (0x1B = hMenuCmd) */
 	if (prefs_menu) {
 		SetItemCmd(prefs_menu, PREFS_FONT_HIER, 0x1B);
@@ -106,7 +119,41 @@ init_menus(void)
 		SetItemCmd(prefs_menu, PREFS_TTYPE_HIER, 0x1B);
 		SetItemMark(prefs_menu, PREFS_TTYPE_HIER,
 		    TTYPE_MENU_ID);
+#ifdef FLYNN_THEMES
+		/* On color systems: Theme hierarchical submenu.
+		 * On mono: plain "Dark Mode On/Off" toggle. */
+		if (g_has_color_qd && theme_submenu) {
+			SetItemCmd(prefs_menu, PREFS_THEME_HIER,
+			    0x1B);
+			SetItemMark(prefs_menu, PREFS_THEME_HIER,
+			    THEME_MENU_ID);
+		} else {
+			SetMenuItemText(prefs_menu, PREFS_THEME_HIER,
+			    prefs.dark_mode ?
+			    "\pDark Mode Off" : "\pDark Mode On");
+		}
+#endif
 	}
+
+#ifdef FLYNN_THEMES
+	/* Set initial theme checkmark (color systems only) */
+	if (g_has_color_qd && theme_submenu) {
+		short t, check_item;
+
+		for (t = THEME_ITEM_FIRST; t <= THEME_ITEM_LAST; t++)
+			CheckItem(theme_submenu, t, false);
+
+		/* Map theme_id to menu item (separator at item 3
+		 * offsets color themes by +2) */
+		if (prefs.theme_id < THEME_COUNT_MONO)
+			check_item = prefs.theme_id + 1;
+		else
+			check_item = prefs.theme_id + 2;
+		if (check_item >= THEME_ITEM_FIRST &&
+		    check_item <= THEME_ITEM_LAST)
+			CheckItem(theme_submenu, check_item, true);
+	}
+#endif
 #ifndef FLYNN_FAVORITES
 	/* Hide Favorites menu when feature is disabled */
 	DeleteMenu(FAVORITES_MENU_ID);
@@ -388,19 +435,51 @@ update_prefs_menu(void)
 			    ttype == ttype_from_menu[i]);
 	}
 
-	/* Options menu verb toggles (Geomys HIG style) */
-#ifdef FLYNN_DARK_MODE
+	/* Theme: submenu checkmarks on color, toggle text on mono */
+#ifdef FLYNN_THEMES
+	if (g_has_color_qd && theme_submenu) {
+		short t, check_item, cur;
+
+		cur = active_session ?
+		    active_session->theme_id : theme_get();
+		for (t = THEME_ITEM_FIRST; t <= THEME_ITEM_LAST; t++)
+			CheckItem(theme_submenu, t, false);
+		if (cur < THEME_COUNT_MONO)
+			check_item = cur + 1;
+		else
+			check_item = cur + 2;
+		if (check_item >= THEME_ITEM_FIRST &&
+		    check_item <= THEME_ITEM_LAST)
+			CheckItem(theme_submenu, check_item, true);
+	} else {
+		SetMenuItemText(prefs_menu, PREFS_THEME_HIER,
+		    theme_is_dark() ?
+		    "\pDark Mode Off" : "\pDark Mode On");
+	}
+#elif defined(FLYNN_DARK_MODE)
 	SetMenuItemText(prefs_menu, PREFS_DARK_ID,
 	    prefs.dark_mode ? "\pDark Mode Off" : "\pDark Mode On");
 #else
 	DisableItem(prefs_menu, PREFS_DARK_ID);
 #endif
-	SetMenuItemText(prefs_menu, PREFS_BKSP_DEL_ID,
-	    prefs.backspace_bs ?
-	    "\pBackspace Sends DEL" : "\pBackspace Sends BS");
-	SetMenuItemText(prefs_menu, PREFS_LOCAL_ECHO_ID,
-	    prefs.local_echo ?
-	    "\pLocal Echo Off" : "\pLocal Echo On");
+	{
+		unsigned char bs_val, echo_val;
+
+		bs_val = active_session ?
+		    active_session->backspace_bs :
+		    prefs.backspace_bs;
+		echo_val = active_session ?
+		    active_session->local_echo :
+		    prefs.local_echo;
+		SetMenuItemText(prefs_menu, PREFS_BKSP_DEL_ID,
+		    bs_val ?
+		    "\pBackspace Sends DEL" :
+		    "\pBackspace Sends BS");
+		SetMenuItemText(prefs_menu, PREFS_LOCAL_ECHO_ID,
+		    echo_val ?
+		    "\pLocal Echo Off" :
+		    "\pLocal Echo On");
+	}
 #ifdef FLYNN_STATUS_BAR
 	SetMenuItemText(prefs_menu, PREFS_STATUS_BAR_ID,
 	    prefs.show_status_bar ?
@@ -450,9 +529,7 @@ handle_file_menu(short item)
 			}
 			term_ui_load_state(
 			    &active_session->ui);
-			session_destroy(active_session);
-			active_session =
-			    session_from_window(FrontWindow());
+			session_destroy_and_fixup(active_session);
 			update_menus();
 		}
 		break;
@@ -650,6 +727,10 @@ handle_ttype_submenu(short item)
 	/* Sync backspace and local echo to match terminal type */
 	prefs.backspace_bs = (ttype == 4) ? 1 : 0;
 	prefs.local_echo = (ttype == 4) ? 1 : 0;
+	if (active_session) {
+		active_session->backspace_bs = prefs.backspace_bs;
+		active_session->local_echo = prefs.local_echo;
+	}
 	prefs_save(&prefs);
 	update_prefs_menu();
 	if (active_session &&
@@ -663,11 +744,144 @@ handle_ttype_submenu(short item)
 	}
 }
 
+#ifdef FLYNN_THEMES
+static void
+handle_theme_menu(short item)
+{
+	short new_theme;
+	GrafPtr save;
+
+	/* Map menu item to theme index.
+	 * Items 1-2 → index 0-1 (Light, Dark).
+	 * Item 3 is separator.
+	 * Items 4-10 → index 2-8 (color themes). */
+	if (item <= THEME_ITEM_DARK)
+		new_theme = item - 1;
+	else if (item >= THEME_ITEM_SOLARIZED_LIGHT)
+		new_theme = item - 2;
+	else
+		return;	/* separator */
+
+	if (!active_session)
+		return;
+
+	if (new_theme == active_session->theme_id)
+		return;	/* no change */
+
+	theme_set(new_theme);
+	term_ui_set_dark_mode(theme_is_dark());
+
+	/* Update active session */
+	active_session->theme_id = (unsigned char)new_theme;
+	active_session->terminal.dark_mode = theme_is_dark();
+	active_session->terminal.theme_id = (unsigned char)new_theme;
+
+	/* Update prefs as defaults for new sessions */
+	prefs.theme_id = (unsigned char)new_theme;
+	prefs.dark_mode = theme_is_dark() ? 1 : 0;
+	prefs_save(&prefs);
+
+	/* Update checkmarks */
+	if (theme_submenu) {
+		short t;
+		for (t = THEME_ITEM_FIRST; t <= THEME_ITEM_LAST; t++)
+			CheckItem(theme_submenu, t, t == item);
+	}
+
+	/* Redraw active window only */
+	GetPort(&save);
+	SetPort(active_session->window);
+#ifdef FLYNN_COLOR
+	/* Set port backColor so Window Manager uses theme
+	 * bg on subsequent BeginUpdate erase */
+	if (g_has_color_qd) {
+		if (theme_is_dark()) {
+			RGBColor black = {0, 0, 0};
+			RGBBackColor(&black);
+		} else {
+			RGBColor white = {0xFFFF, 0xFFFF, 0xFFFF};
+			RGBBackColor(&white);
+		}
+	}
+#endif
+	clear_window_bg(active_session->window, theme_is_dark());
+	term_ui_invalidate_offscreen();
+	session_load_font(active_session);
+	term_dirty_all(&active_session->terminal);
+	term_ui_draw(active_session->window, &active_session->terminal);
+	if (prefs.show_status_bar)
+		draw_status_bar(active_session->window, active_session);
+
+	/* Redraw scrollbar column and grow box —
+	 * clear_window_bg overwrites them */
+	{
+		Rect sb_r;
+		RgnHandle sc;
+#ifdef FLYNN_COLOR
+		if (g_has_color_qd) {
+			RGBColor blk = {0, 0, 0};
+			RGBColor wht =
+			    {0xFFFF, 0xFFFF, 0xFFFF};
+			RGBForeColor(&blk);
+			RGBBackColor(&wht);
+		}
+#endif
+		SetRect(&sb_r,
+		    active_session->window->portRect.right -
+		    SCROLLBAR_WIDTH, 0,
+		    active_session->window->portRect.right,
+		    active_session->window->portRect.bottom);
+		EraseRect(&sb_r);
+		sc = NewRgn();
+		GetClip(sc);
+		SetRect(&sb_r,
+		    active_session->window->portRect.right -
+		    SCROLLBAR_WIDTH,
+		    active_session->window->portRect.bottom -
+		    SCROLLBAR_WIDTH,
+		    active_session->window->portRect.right,
+		    active_session->window->portRect.bottom);
+		ClipRect(&sb_r);
+		DrawGrowIcon(active_session->window);
+		SetClip(sc);
+		DisposeRgn(sc);
+#if FLYNN_SCROLLBACK_LINES > 0
+		if (active_session->scrollbar)
+			Draw1Control(active_session->scrollbar);
+#endif
+	}
+	SetPort(save);
+
+#ifdef FLYNN_FAVORITES
+	/* Auto-save to originating bookmark */
+	if (active_session->bookmark_index >= 0 &&
+	    active_session->bookmark_index <
+	    prefs.bookmark_count) {
+		prefs.bookmarks[
+		    active_session->bookmark_index
+		    ].bm_theme_id = new_theme;
+		prefs_save(&prefs);
+	}
+#endif
+
+	update_prefs_menu();
+}
+#endif
+
 static void
 handle_prefs_menu(short item)
 {
 	switch (item) {
-#ifdef FLYNN_DARK_MODE
+#ifdef FLYNN_THEMES
+	case PREFS_THEME_HIER:
+		/* Mono: plain toggle between Light/Dark themes */
+		if (!g_has_color_qd) {
+			short new_id = theme_is_dark() ?
+			    THEME_LIGHT : THEME_DARK;
+			handle_theme_menu(new_id + 1); /* +1: menu item */
+		}
+		break;
+#elif defined(FLYNN_DARK_MODE)
 	case PREFS_DARK_ID:
 		prefs.dark_mode = !prefs.dark_mode;
 		term_ui_set_dark_mode(prefs.dark_mode);
@@ -686,8 +900,6 @@ handle_prefs_menu(short item)
 				SetPort(sess->window);
 				sess->terminal.dark_mode =
 				    prefs.dark_mode;
-				/* Offscreen handles the transition —
-				 * no clear_window_bg flash */
 				term_ui_invalidate_offscreen();
 				session_load_font(sess);
 				term_dirty_all(&sess->terminal);
@@ -702,12 +914,44 @@ handle_prefs_menu(short item)
 		break;
 #endif
 	case PREFS_BKSP_DEL_ID:
-		prefs.backspace_bs = !prefs.backspace_bs;
+		if (active_session)
+			active_session->backspace_bs =
+			    !active_session->backspace_bs;
+		prefs.backspace_bs = active_session ?
+		    active_session->backspace_bs :
+		    !prefs.backspace_bs;
+#ifdef FLYNN_FAVORITES
+		if (active_session &&
+		    active_session->bookmark_index >= 0 &&
+		    active_session->bookmark_index <
+		    prefs.bookmark_count) {
+			prefs.bookmarks[
+			    active_session->bookmark_index
+			    ].bm_backspace_bs =
+			    active_session->backspace_bs;
+		}
+#endif
 		prefs_save(&prefs);
 		update_prefs_menu();
 		break;
 	case PREFS_LOCAL_ECHO_ID:
-		prefs.local_echo = !prefs.local_echo;
+		if (active_session)
+			active_session->local_echo =
+			    !active_session->local_echo;
+		prefs.local_echo = active_session ?
+		    active_session->local_echo :
+		    !prefs.local_echo;
+#ifdef FLYNN_FAVORITES
+		if (active_session &&
+		    active_session->bookmark_index >= 0 &&
+		    active_session->bookmark_index <
+		    prefs.bookmark_count) {
+			prefs.bookmarks[
+			    active_session->bookmark_index
+			    ].bm_local_echo =
+			    active_session->local_echo;
+		}
+#endif
 		prefs_save(&prefs);
 		update_prefs_menu();
 		break;
@@ -755,12 +999,16 @@ handle_window_menu(short item)
 			continue;
 		if (count == win_idx) {
 			SelectWindow(ws->window);
-			if (active_session)
+			if (active_session) {
 				term_ui_save_state(
 				    &active_session->ui);
+				session_save_settings(
+				    active_session);
+			}
 			active_session = ws;
 			term_ui_load_state(&ws->ui);
 			session_load_font(ws);
+			session_load_settings(ws);
 			break;
 		}
 		count++;
@@ -802,6 +1050,11 @@ handle_menu(long menu_id)
 	case TTYPE_MENU_ID:
 		handle_ttype_submenu(item);
 		break;
+#ifdef FLYNN_THEMES
+	case THEME_MENU_ID:
+		handle_theme_menu(item);
+		break;
+#endif
 #ifdef FLYNN_FAVORITES
 	case FAVORITES_MENU_ID:
 		favorites_menu_click(item);

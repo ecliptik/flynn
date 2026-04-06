@@ -15,6 +15,9 @@
 #include <Quickdraw.h>
 #include <Multiverse.h>
 #include "color.h"
+#ifdef FLYNN_THEMES
+#include "theme.h"
+#endif
 
 /* Global color detection flag */
 unsigned char g_has_color_qd = 0;
@@ -81,10 +84,24 @@ color_get_rgb(unsigned char index, RGBColor *rgb)
 	unsigned char r, g, b;
 
 	if (index < 16) {
-		/* ANSI colors: table lookup */
+#ifdef FLYNN_THEMES
+		/* Theme-aware ANSI palette: use active theme's ansi[] */
+		const TerminalTheme *th = theme_current();
+		if (th) {
+			r = th->ansi[index].r;
+			g = th->ansi[index].g;
+			b = th->ansi[index].b;
+		} else {
+			r = ansi_palette[index][0];
+			g = ansi_palette[index][1];
+			b = ansi_palette[index][2];
+		}
+#else
+		/* ANSI colors: static table lookup */
 		r = ansi_palette[index][0];
 		g = ansi_palette[index][1];
 		b = ansi_palette[index][2];
+#endif
 	} else if (index < 232) {
 		/* 6x6x6 color cube: index = 16 + 36*R + 6*G + B
 		 * Use subtraction loops instead of division —

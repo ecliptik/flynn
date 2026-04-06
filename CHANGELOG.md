@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- Theme engine: 9 built-in themes (Light, Dark, Solarized Light/Dark, Tokyo Light/Dark, Green Screen, Classic, Platinum) with 4 optional themes (Dracula, Monokai, Nord, Gruvbox)
+- Per-window settings: theme, terminal type, backspace, and local echo are independent per session
+- Per-bookmark theme/backspace/local echo persistence (saved alongside existing per-bookmark font/terminal type)
+- New sessions inherit active session's theme and input settings (falls back to prefs on first launch)
+- Theme submenu under Options menu on color systems (System 7+), simple Dark Mode On/Off toggle on mono (System 6)
+- docs/THEMES.md: developer guide for creating custom themes
 - Session logging (Cmd+L): continuous output logging to text file with ANSI escape sequence filtering, CR deduplication, and sensitive data warning in log header
 - Print support (Cmd+P): Page Setup and Print via Printing Manager with paginated output, Geneva 9pt header/footer, Monaco 9pt terminal content, and ImageWriter spool printing
 - Telnet NOP keep-alive: sends IAC NOP after 120 seconds idle to prevent NAT/firewall drops
@@ -18,8 +24,13 @@ All notable changes to this project will be documented in this file.
 - Window position saved to preferences and restored on next launch
 
 ### Fixed
+- Color desync: reverted pointer-rotation scroll to memmove (fixes gray/wrong ANSI colors after scroll on System 7)
+- Dark theme white holes: skip color GWorld for non-white-bg themes, draw directly to window (avoids Window Manager BeginUpdate white fill)
+- Disconnect color preservation: snap_color buffer saves/restores CellColor data alongside TermCell content
+- Theme bleed-through on window close: all destroy paths use session_destroy_and_fixup to restore surviving session's theme
+- Per-session theme globals swapped in idle loop, update handler, and activate handler
+- Drawing code uses theme_is_dark() instead of prefs.dark_mode for per-session correctness
 - Cursor blink no longer fires during scrollback view (caused XOR artifact over scrollback content)
-- Color row pointers now rotate in sync with screen row pointers (fixes scrambled colors after scroll on System 7)
 - DNS response parser signed short overflow on crafted RDLEN values
 - OSC parameter accumulation signed short overflow (guard tightened)
 - Window title from OSC 0/2 now strips control characters (bytes < 0x20)
@@ -31,7 +42,7 @@ All notable changes to this project will be documented in this file.
 - Clicks in disconnected terminal sessions ignored (prevents stale color artifacts)
 
 ### Changed
-- Scroll rendering uses pointer rotation instead of memmove (94% less data moved per scroll)
+- Scroll rendering reverted to memmove (pointer rotation caused color desync on System 7; mono unaffected)
 - Smoother bulk output: smaller draw batches, shorter jump scroll deadline, reduced drain loop cap
 - Font and Size split into separate submenus (matching Geomys HIG)
 - New fonts: New York (System 6+), Helvetica, Times, Palatino (System 7 only, added at runtime)

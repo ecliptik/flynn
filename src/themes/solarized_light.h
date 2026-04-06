@@ -1,0 +1,38 @@
+/*
+ * themes/solarized_light.h - Solarized Light theme
+ * Warm cream background with muted palette.
+ * Requires Color QuickDraw.
+ */
+
+static const TerminalTheme theme_solarized_light = {
+	"Solarized Light",  /* name */
+	1,                  /* is_color */
+	0,                  /* is_dark */
+
+	/* ANSI palette (canonical Solarized terminal, cube-snapped) */
+	{
+		{ 0x00, 0x33, 0x33 },  /*  0: base02 */
+		{ 0xCC, 0x33, 0x33 },  /*  1: red */
+		{ 0x66, 0x99, 0x00 },  /*  2: green */
+		{ 0x99, 0x99, 0x00 },  /*  3: yellow */
+		{ 0x33, 0x99, 0xCC },  /*  4: blue */
+		{ 0xCC, 0x33, 0xCC },  /*  5: magenta */
+		{ 0x33, 0x99, 0x99 },  /*  6: cyan */
+		{ 0xCC, 0xCC, 0x99 },  /*  7: base2 */
+		{ 0x00, 0x33, 0x33 },  /*  8: base03 */
+		{ 0xCC, 0x66, 0x00 },  /*  9: orange */
+		{ 0x33, 0x66, 0x33 },  /* 10: base01 */
+		{ 0x66, 0x66, 0x66 },  /* 11: base00 */
+		{ 0x66, 0x66, 0x99 },  /* 12: base0 */
+		{ 0x66, 0x66, 0xCC },  /* 13: violet */
+		{ 0x99, 0x99, 0x99 },  /* 14: base1 */
+		{ 0xFF, 0xFF, 0xCC },  /* 15: base3 */
+	},
+
+	{ 0x66, 0x66, 0x99 },  /* default_fg: base0 */
+	{ 0xFF, 0xFF, 0xCC },  /* default_bg: base3 */
+	{ 0x66, 0x66, 0x99 },  /* cursor_color: base0 */
+	{ 0x33, 0x99, 0xCC },  /* sel_bg: blue */
+	{ 0xFF, 0xFF, 0xCC },  /* sel_fg: base3 */
+	{ 0x33, 0x33, 0x33 },  /* bold_color */
+};
