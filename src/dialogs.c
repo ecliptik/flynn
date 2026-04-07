@@ -11,6 +11,8 @@
 #include <Dialogs.h>
 #include <Memory.h>
 #include <ToolUtils.h>
+#include <Resources.h>
+#include <Gestalt.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -30,6 +32,7 @@
 #include "finger.h"
 #include "menus.h"
 #include "theme.h"
+#include "clipboard.h"
 
 /* External references to main.c globals */
 extern FlynnPrefs prefs;
@@ -46,6 +49,79 @@ static short g_connect_ttype;     /* terminal type selected in connect dialog */
 static MenuHandle g_bm_popup;
 static short g_bm_selected = -1;  /* bookmark index selected from popup */
 #endif /* FLYNN_FAVORITES */
+
+/* ---- HIG-appropriate modal dialog proc ---- */
+
+/*
+ * Return the correct window proc for modal dialogs:
+ *   System 6:  dBoxProc      (plain box, no title bar)
+ *   System 7+: movableDBoxProc (movable modal with title bar)
+ */
+short
+modal_dialog_proc(void)
+{
+	static short proc = -1;
+	long sysver;
+
+	if (proc < 0) {
+		proc = dBoxProc;
+		if (TrapAvailable(_GestaltDispatch) &&
+		    Gestalt(gestaltSystemVersion, &sysver) == noErr &&
+		    sysver >= 0x0700)
+			proc = movableDBoxProc;
+	}
+	return proc;
+}
+
+/*
+ * Load a modal dialog from a DLOG resource, patching the procID
+ * to match the running system's HIG convention.
+ * Resources are defined as dBoxProc (System 6 baseline); on System 7+
+ * the procID is patched to movableDBoxProc before creation.
+ */
+#define DLOG_PROCID_OFFSET 8  /* offset of procID in DLOG resource (after Rect) */
+
+DialogPtr
+get_modal_dialog(short dlog_id)
+{
+	Handle h;
+	short target;
+	DialogPtr dlg;
+
+	target = modal_dialog_proc();
+
+	h = GetResource('DLOG', dlog_id);
+	if (h && target != dBoxProc) {
+		HNoPurge(h);
+		HLock(h);
+		*(short *)(*h + DLOG_PROCID_OFFSET) = target;
+	}
+
+	dlg = GetNewDialog(dlog_id, 0L, (WindowPtr)-1L);
+
+	/* Restore resource so reloads get the original value */
+	if (h && target != dBoxProc) {
+		*(short *)(*h + DLOG_PROCID_OFFSET) = dBoxProc;
+		HUnlock(h);
+		HPurge(h);
+	}
+
+	/* Center the dialog on screen */
+	if (dlg) {
+		Rect scr = qd.screenBits.bounds;
+		Rect dlg_r = ((WindowPtr)dlg)->portRect;
+		short w = dlg_r.right - dlg_r.left;
+		short h_px = dlg_r.bottom - dlg_r.top;
+		short left = scr.left + (scr.right - scr.left - w) / 2;
+		short top = scr.top + 20 +
+		    (scr.bottom - scr.top - 20 - h_px) / 3;
+
+		MoveWindow((WindowPtr)dlg, left, top, false);
+		ShowWindow((WindowPtr)dlg);
+	}
+
+	return dlg;
+}
 
 /* ---- Status window UI (moved from connection.c) ---- */
 
@@ -149,13 +225,91 @@ setup_default_button_outline(DialogPtr dlg, short outline_item)
 	    (Handle)draw_default_button, &item_rect);
 }
 
+/* ---- Shared event handling for movable modal dialogs ---- */
+
+/*
+ * Handle events that ModalDialog doesn't process correctly for
+ * movableDBoxProc dialogs on System 7:
+ *
+ *   mouseDown/inDrag — Some System 7 ROMs don't have ModalDialog
+ *     handle title-bar dragging for movable modals.  Clicking the
+ *     title bar flashes the menu bar instead.  We intercept inDrag
+ *     and call DragWindow explicitly.
+ *
+ *   updateEvt — When the user drags a movable modal, background
+ *     windows are exposed and need redrawing.  We blit from the
+ *     offscreen buffer (fast path) or clear to background color.
+ *
+ * Returns true if the event was consumed (caller should return true
+ * from the filter proc), false if unhandled.
+ */
+Boolean
+modal_filter_event(DialogPtr dlg, EventRecord *evt)
+{
+	/* Handle dragging of movableDBoxProc dialogs.
+	 * Some System 7 ROMs don't have ModalDialog handle
+	 * inDrag for movable modals — do it explicitly. */
+	if (evt->what == mouseDown) {
+		WindowPtr click_win;
+		short part = FindWindow(evt->where, &click_win);
+
+		if (part == inDrag && click_win == (WindowPtr)dlg) {
+			Rect limit = qd.screenBits.bounds;
+			InsetRect(&limit, 4, 4);
+			DragWindow(click_win, evt->where, &limit);
+			return true;
+		}
+		return false;
+	}
+
+	/* Handle updateEvt for windows behind the modal */
+	if (evt->what == updateEvt) {
+		WindowPtr win = (WindowPtr)evt->message;
+		GrafPtr save;
+		Session *sess;
+
+		if (win == (WindowPtr)dlg)
+			return false;
+
+		GetPort(&save);
+		SetPort(win);
+		BeginUpdate(win);
+
+		if (win == clipboard_window_ptr()) {
+			clipboard_window_update(win);
+		} else {
+			sess = session_from_window(win);
+			if (sess) {
+				session_load_font(sess);
+				if (term_ui_has_offscreen(win,
+				    sess->terminal.active_cols,
+				    sess->terminal.active_rows))
+					term_ui_blit_offscreen(win);
+				else
+					clear_window_bg(win,
+					    theme_is_dark());
+			} else {
+				clear_window_bg(win, theme_is_dark());
+			}
+		}
+
+		EndUpdate(win);
+		SetPort(save);
+		return true;
+	}
+
+	return false;
+}
+
 /* ---- Standard dialog filter ---- */
 
 /* Simple dialog filter for Return=OK, Cmd+.=Cancel */
 pascal Boolean
 std_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 {
-	(void)dlg;
+	if (modal_filter_event(dlg, evt))
+		return true;
+
 	if (evt->what == keyDown) {
 		char key = evt->message & charCodeMask;
 		if (key == '\r' || key == '\n' || key == 0x03) {
@@ -204,7 +358,7 @@ do_about(void)
 	Rect item_rect;
 	Str255 pstr;
 
-	dlg = GetNewDialog(DLOG_ABOUT_ID, 0L, (WindowPtr)-1L);
+	dlg = get_modal_dialog(DLOG_ABOUT_ID);
 	if (!dlg)
 		return;
 
@@ -413,6 +567,9 @@ show_ttype_popup(DialogPtr dlg, short item_num,
 static pascal Boolean
 connect_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 {
+	if (modal_filter_event(dlg, evt))
+		return true;
+
 	/* Return/Enter key maps to Connect button */
 	if (evt->what == keyDown) {
 		char key = evt->message & charCodeMask;
@@ -642,8 +799,7 @@ do_connect(void)
 		dlg_port = DEFAULT_PORT;
 		dlg_user[0] = '\0';
 
-		dlg = GetNewDialog(DLOG_CONNECT_ID, 0L,
-		    (WindowPtr)-1L);
+		dlg = get_modal_dialog(DLOG_CONNECT_ID);
 		if (!dlg) {
 			SysBeep(10);
 			update_menus();
@@ -947,6 +1103,9 @@ do_connect_bookmark(short index)
 static pascal Boolean
 dns_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 {
+	if (modal_filter_event(dlg, evt))
+		return true;
+
 	if (evt->what == keyDown) {
 		char key = evt->message & charCodeMask;
 		/* Return/Enter = OK */
@@ -977,7 +1136,7 @@ do_dns_server_dialog(void)
 	char ip_cstr[16];
 	unsigned long ip;
 
-	dlg = GetNewDialog(DLOG_DNS_ID, 0L, (WindowPtr)-1L);
+	dlg = get_modal_dialog(DLOG_DNS_ID);
 	if (!dlg) {
 		SysBeep(10);
 		return;
@@ -1096,6 +1255,9 @@ find_has_last_search(void)
 static pascal Boolean
 find_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 {
+	if (modal_filter_event(dlg, evt))
+		return true;
+
 	if (evt->what == keyDown) {
 		char key = evt->message & charCodeMask;
 
@@ -1181,7 +1343,7 @@ do_find(void)
 	if (!s)
 		return;
 
-	dlg = GetNewDialog(DLOG_FIND_ID, 0L, (WindowPtr)-1L);
+	dlg = get_modal_dialog(DLOG_FIND_ID);
 	if (!dlg) {
 		SysBeep(10);
 		return;

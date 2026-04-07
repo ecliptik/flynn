@@ -238,6 +238,9 @@ bme_set_echo_title(DialogPtr dlg, signed char val)
 static pascal Boolean
 bme_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 {
+	if (modal_filter_event(dlg, evt))
+		return true;
+
 	if (evt->what == keyDown) {
 		char key = evt->message & charCodeMask;
 		/* Return/Enter = OK */
@@ -637,7 +640,7 @@ bm_edit_dialog(Bookmark *bm, Boolean is_new, short bm_idx)
 
 	(void)is_new;
 
-	dlg = GetNewDialog(DLOG_FAV_EDIT_ID, 0L, (WindowPtr)-1L);
+	dlg = get_modal_dialog(DLOG_FAV_EDIT_ID);
 	if (!dlg)
 		return false;
 
@@ -911,6 +914,9 @@ fav_list_set_selection(short row)
 static pascal Boolean
 fav_dlg_filter(DialogPtr dlg, EventRecord *event, short *item)
 {
+	if (modal_filter_event(dlg, event))
+		return true;
+
 	/* Cmd+. maps to Done button */
 	if (event->what == keyDown) {
 		char key = event->message & charCodeMask;
@@ -998,7 +1004,7 @@ favorites_manage(void)
 	Boolean changed = false;
 	short selection;
 
-	dlg = GetNewDialog(DLOG_FAVORITES_ID, 0L, (WindowPtr)-1L);
+	dlg = get_modal_dialog(DLOG_FAVORITES_ID);
 	if (!dlg)
 		return;
 

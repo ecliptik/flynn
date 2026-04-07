@@ -106,6 +106,16 @@ void do_connect_bookmark(short index);
 #define do_connect_bookmark(i)    ((void)0)
 #endif
 
+/* HIG-appropriate modal dialog proc (dBoxProc on Sys6, movableDBoxProc on Sys7) */
+short modal_dialog_proc(void);
+
+/* Load a modal dialog with system-appropriate proc type */
+DialogPtr get_modal_dialog(short dlog_id);
+
+/* Handle events for movable modal dialogs: title-bar drag and
+ * background window redraw.  Returns true if event was consumed. */
+Boolean modal_filter_event(DialogPtr dlg, EventRecord *evt);
+
 /* Show the About dialog */
 void do_about(void);
 

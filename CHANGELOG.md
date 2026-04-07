@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- HIG-appropriate modal dialogs: dBoxProc on System 6, movableDBoxProc on System 7 (draggable title bar)
+- All modal dialogs centered on screen (horizontal center, upper-third vertical)
+- Background window redraw when dragging movable modals on System 7
 - Edit Favorite dialog: redesigned with title bar (noGrowDocProc), split Font/Size popups, Theme/Backspace/Echo settings per favorite
 - Manage Favorites dialog: title bar added for consistency (noGrowDocProc)
 - Status bar shows Backspace (BS/DEL) and Local Echo (Echo On/Off) indicators

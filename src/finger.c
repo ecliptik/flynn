@@ -75,6 +75,9 @@ finger_process_data(Terminal *term, unsigned char *src,
 static pascal Boolean
 finger_dlg_filter(DialogPtr dlg, EventRecord *evt, short *item)
 {
+	if (modal_filter_event(dlg, evt))
+		return true;
+
 	if (evt->what == keyDown) {
 		char key = evt->message & charCodeMask;
 
@@ -323,8 +326,7 @@ do_finger(void)
 	Rect item_rect;
 	Session *s;
 
-	dlg = GetNewDialog(DLOG_FINGER_ID, 0L,
-	    (WindowPtr)-1L);
+	dlg = get_modal_dialog(DLOG_FINGER_ID);
 	if (!dlg) {
 		SysBeep(10);
 		return;

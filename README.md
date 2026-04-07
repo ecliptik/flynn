@@ -84,6 +84,7 @@ Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archi
 - **Page Setup and Print** (Cmd+P) with Printing Manager support
 - **Find in Scrollback** (Cmd+F / Cmd+G), Show Clipboard, Reset Terminal
 - **Persistent settings**, window position, and telnet:// URL handling
+- **Movable modal dialogs** on System 7 (centered, draggable, background redraw)
 - **MultiFinder, Apple Events, and Notification Manager support**
 
 ## Keyboard Shortcuts

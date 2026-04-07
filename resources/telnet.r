@@ -161,7 +161,7 @@ resource 'MENU' (132, "Control") {
 resource 'DLOG' (129, "Connect") {
 	{60, 80, 250, 420},
 	dBoxProc,
-	visible,
+	invisible,
 	noGoAway,
 	0x0,
 	129,
@@ -229,7 +229,7 @@ resource 'DITL' (129, "Connect") {
 resource 'DLOG' (130, "About Flynn") {
 	{70, 100, 240, 400},
 	dBoxProc,
-	visible,
+	invisible,
 	noGoAway,
 	0x0,
 	130,
@@ -310,7 +310,7 @@ resource 'DITL' (128, "Alert") {
 resource 'DLOG' (131, "Favorites") {
 	{40, 60, 300, 430},
 	noGrowDocProc,
-	visible,
+	invisible,
 	noGoAway,
 	0x0,
 	131,
@@ -366,7 +366,7 @@ resource 'DITL' (131, "Favorites") {
 resource 'DLOG' (132, "Edit Favorite") {
 	{42, 65, 318, 445},
 	noGrowDocProc,
-	visible,
+	invisible,
 	noGoAway,
 	0x0,
 	132,
@@ -486,7 +486,7 @@ resource 'DITL' (132, "Edit Favorite") {
 resource 'DLOG' (133, "DNS Server") {
 	{80, 100, 200, 400},
 	dBoxProc,
-	visible,
+	invisible,
 	noGoAway,
 	0x0,
 	133,
@@ -526,7 +526,7 @@ resource 'DITL' (133, "DNS Server") {
 resource 'DLOG' (137, "Finger") {
 	{80, 100, 220, 400},
 	dBoxProc,
-	visible,
+	invisible,
 	noGoAway,
 	0x0,
 	137,
@@ -574,7 +574,7 @@ resource 'DITL' (137, "Finger") {
 resource 'DLOG' (138, "Find") {
 	{100, 120, 180, 400},
 	dBoxProc,
-	visible,
+	invisible,
 	noGoAway,
 	0x0,
 	138,
