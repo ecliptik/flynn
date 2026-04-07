@@ -280,15 +280,15 @@ The build produces three artifacts in the `build/` directory:
 - **Flynn.dsk** — 800K floppy disk image (bootable, includes About Flynn)
 - **Flynn.hqx** — BinHex archive (for email/BBS distribution, requires `macutils`)
 
-Versioned copies include the preset name (e.g., `Flynn-1.9.8.bin` for full,
-`Flynn-Lite-1.9.8.bin` for lite, `Flynn-Minimal-1.9.8.bin` for minimal).
+Versioned copies include the preset name (e.g., `Flynn-1.10.0.bin` for full,
+`Flynn-Lite-1.10.0.bin` for lite, `Flynn-Minimal-1.10.0.bin` for minimal).
 
 ## Build Summary
 
 After building, a summary shows the configuration:
 
 ```
-Build complete (v1.9.8, full preset):
+Build complete (v1.10.0, full preset):
   Sessions: 4, Scrollback: 192 lines
   Features: finger glyphs cp437 clipboard savefile logging printing favorites
             darkmode altscreen offscreen statusbar cursorstyles tabstops color dblwidth

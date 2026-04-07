@@ -37,34 +37,45 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 
 ## Testing
 
-### Emulator: Snow (Primary)
-
-[Snow](https://snowemu.com/) v1.3.1, a Rust-based classic Mac emulator with low-level hardware emulation. See `docs/TESTING.md` for complete guide.
+Emulator infrastructure lives in `/home/claude/emulators/`. See its docs for full details:
+- `docs/TESTING.md` — build-deploy-test workflows for both emulators
+- `docs/SNOW.md` — Snow emulator config, networking, keyboard
+- `docs/SNOW-GUI-AUTOMATION.md` — X11/XTEST coordinate system and automation techniques
 
 **IMPORTANT: Do NOT launch Snow, deploy to disk images, or run any automated testing unless the user explicitly asks. All testing and QA is done by the human driving the session. Only build and deploy when asked and ready to test.**
 
-- **Binary**: `tools/snow/snowemu` (local copy, gitignored)
-- **Workspace**: `diskimages/flynn.snoww` (Mac Plus, 1.5x scale)
-- **HDD image**: `diskimages/snow-sys608.img` (90MB SCSI, System 6.0.8 installed)
-- **ROM**: `roms/68k/128k/Macintosh Plus/1986-03 - 4D1F8172 - MacPlus v3.ROM`
-- **Floppies**: `tools/floppies/*.img` (System 6.0.8 set, 800K each)
+### Emulator: Snow (System 6 — Primary)
+
+- **Launch**: `DISPLAY=:0 /home/claude/emulators/snow/snowemu /home/claude/emulators/snow/flynn.snoww &`
 - **Keyboard**: Right ALT = Command key (`map_cmd_ralt: true`)
-- **Networking**: DaynaPORT SCSI/Link Ethernet emulation, NAT mode (10.0.0.0/8)
-- **File sharing**: BlueSCSI Toolbox protocol (`Tools > File Sharing`)
-- **Launch**: `DISPLAY=:0 tools/snow/snowemu diskimages/flynn.snoww &`
+- **Networking**: DaynaPORT SCSI/Link, NAT mode. Host services reachable at `192.168.7.167` (NOT the 10.0.0.1 gateway)
+- **Deploy**: `./scripts/deploy.sh --target snow --auto-open` handles kill → build → copy → relaunch
 
-### GUI Automation
+### Emulator: Basilisk II (System 7 — Secondary)
 
-Snow can be fully automated via X11 for unattended testing. See `docs/SNOW-GUI-AUTOMATION.md` for the complete guide. **Only run automated GUI tests when the user explicitly requests it.**
+- **Launch**: `/home/claude/emulators/basilisk/launch.sh`
+- **Deploy**: `./scripts/deploy.sh --target basilisk` (copies to ExtFS shared dir — no Basilisk restart needed, just reopen the app inside the emulator)
+- **System 6 incompatible** — Basilisk II cannot run System 6. All 512KB ROMs force 32-bit addressing. Use Snow for System 6 testing.
 
-- **Window manager**: WindowMaker (`wmaker`) — KDE lacks `_NET_ACTIVE_WINDOW` support
-- **Click method**: `xdotool mousedown 1 && sleep 0.05 && xdotool mouseup 1` (NOT `xdotool click`)
-- **Screenshots**: `DISPLAY=:0 scrot screenshot.png` (do NOT use `import -window root` — it permanently breaks Snow mouse input)
-- **Coordinates**: Screenshot pixel coords = X11 screen coords (1:1 at 1280x800)
+### Emulator Rules (Critical — Violations Cause Data Corruption)
 
-### Basilisk II (Deprecated)
-
-Basilisk II was tested extensively but has critical incompatibilities with System 6.0.8. All 512KB ROMs force 32-bit addressing, which System 6 doesn't support, and synthetic mouse events don't register in its X11 event loop. See `docs/TESTING.md` for details.
+- **Never update a disk image while Snow is running** — the image is memory-mapped; corruption will result. Always `pkill -f snowemu; sleep 1` first.
+- **Never run multiple Snow instances** or Snow and Basilisk II simultaneously — they share the X11 display.
+- **Never hard-kill Basilisk II repeatedly** — corrupts the disk image and `sheep_net` kernel module. Quit from inside the emulator (Special > Shut Down) when possible. If you must kill externally, do it once and reset before relaunching:
+  ```bash
+  sudo rmmod sheep_net && sudo modprobe sheep_net
+  cp ~/GlobalTalk\ System\ 761\ HD.hda /home/claude/emulators/disks/system7.hda
+  ```
+- **Use `scrot` for screenshots, NEVER ImageMagick `import`** — `import` grabs the X pointer and permanently breaks Snow mouse input.
+  ```bash
+  DISPLAY=:0 scrot -u /tmp/screenshot.png    # Focused window only
+  ```
+- **GUI automation requires XTEST incremental motion** — `xdotool mousemove` and `XWarpPointer` do NOT work with Snow. Use the canonical library: `/home/claude/emulators/scripts/snow_automation.py`. For clicks: `xdotool mousedown 1 && sleep 0.05 && xdotool mouseup 1` (NOT `xdotool click`).
+- **Mac Plus M0110 keyboard has no Escape or Control keys.** Snow faithfully emulates this — X11 Escape/Control keysyms are ignored.
+  - Escape: Cmd+. (Right Alt + period)
+  - Ctrl+letter: Option+letter (Left Alt + letter)
+- **Window manager**: Must be WindowMaker (`wmaker`) — KDE Plasma lacks `_NET_ACTIVE_WINDOW` support.
+- Always set `DISPLAY=:0` when launching Snow or Basilisk II
 
 ### Test Target
 

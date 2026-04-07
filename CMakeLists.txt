@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.9)
-project(Flynn VERSION 1.9.8)
+project(Flynn VERSION 1.10.0)
 
 # --- Feature flags with defaults ---
 option(FLYNN_FINGER        "Enable Finger protocol"            ON)

@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.10.0] - 2026-04-07
 
 ### Added
 - HIG-appropriate modal dialogs: dBoxProc on System 6, movableDBoxProc on System 7 (draggable title bar)
