@@ -980,13 +980,16 @@ handle_prefs_menu(short item)
 		prefs_save(&prefs);
 		update_prefs_menu();
 		/* Resize ALL session windows to add/remove
-		 * status bar area — not just the active one */
+		 * status bar area — not just the active one.
+		 * Load each session's theme so the redraw inside
+		 * do_window_resize uses the correct colors. */
 		for (si = 0; si < MAX_SESSIONS; si++) {
 			Session *sess = session_get(si);
 			short win_w, win_h;
 			if (!sess)
 				continue;
 			session_load_font(sess);
+			session_load_settings(sess);
 			win_w = LEFT_MARGIN * 2 +
 			    sess->terminal.active_cols *
 			    g_cell_width + SCROLLBAR_WIDTH;
@@ -994,6 +997,11 @@ handle_prefs_menu(short item)
 			    sess->terminal.active_rows *
 			    g_cell_height;
 			do_window_resize(sess, win_w, win_h);
+		}
+		/* Restore active session's theme */
+		if (active_session) {
+			session_load_font(active_session);
+			session_load_settings(active_session);
 		}
 		break;
 	}

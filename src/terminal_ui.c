@@ -5409,8 +5409,8 @@ draw_status_bar(WindowPtr win, Session *s)
 				    s->terminal.active_rows,
 				    s->conn.host);
 		} else {
-			ttype_to_str(prefs.terminal_type, ttype,
-			    sizeof(ttype));
+			ttype_to_str(s->telnet.preferred_ttype,
+			    ttype, sizeof(ttype));
 			if (s->conn.state ==
 			    CONN_STATE_CONNECTED) {
 				snprintf(status, sizeof(status),

@@ -201,9 +201,17 @@ compute_size() {
     local sessions=$FLYNN_MAX_SESSIONS
     local scrollback_kb=$(( (FLYNN_SCROLLBACK * 132 * 2 + 1023) / 1024 ))
 
-    # Per-session cost
+    # Per-session cost (TermCell buffers are inline in Session struct)
     local session_kb=$(( 13 + 13 + 13 + scrollback_kb ))
     [ "$FLYNN_ALT_SCREEN" = "ON" ] && session_kb=$(( session_kb + 13 ))
+
+    # Color per-session cost: CellColor arrays allocated via NewPtr
+    # on System 7 (screen_color: always, sb_color: lazy on scroll)
+    if [ "$FLYNN_COLOR" = "ON" ]; then
+        session_kb=$(( session_kb + 13 ))                  # screen_color (always)
+        session_kb=$(( session_kb + scrollback_kb ))        # sb_color (lazy but common)
+        [ "$FLYNN_ALT_SCREEN" = "ON" ] && session_kb=$(( session_kb + 13 ))  # alt_color
+    fi
 
     # Shared costs
     local shared=0
@@ -220,16 +228,22 @@ compute_size() {
     [ "$FLYNN_DBLWIDTH" = "ON" ] && shared=$(( shared + 1 ))
     [ "$FLYNN_STATUS_BAR" = "ON" ] && shared=$(( shared + 1 ))
 
+    # Color GWorld offscreen: ~130KB for 80x24 default window at 8bpp
+    if [ "$FLYNN_COLOR" = "ON" ] && [ "$FLYNN_OFFSCREEN" = "ON" ]; then
+        shared=$(( shared + 130 ))
+    fi
+
     # Total with 30% headroom
     local computed=$(( base + shared + session_kb * sessions ))
     SIZE_PREFERRED=$(( computed * 130 / 100 ))
     SIZE_MINIMUM=$(( SIZE_PREFERRED - 64 ))
 
-    # Clamp
+    # Clamp (color builds need larger partitions for CellColor
+    # arrays + GWorld; safe on System 7 Macs with 4MB+ RAM)
     [ $SIZE_PREFERRED -lt 256 ] && SIZE_PREFERRED=256 || true
     [ $SIZE_MINIMUM -lt 192 ] && SIZE_MINIMUM=192 || true
-    [ $SIZE_PREFERRED -gt 1024 ] && SIZE_PREFERRED=1024 || true
-    [ $SIZE_MINIMUM -gt 960 ] && SIZE_MINIMUM=960 || true
+    [ $SIZE_PREFERRED -gt 1536 ] && SIZE_PREFERRED=1536 || true
+    [ $SIZE_MINIMUM -gt 1472 ] && SIZE_MINIMUM=1472 || true
 }
 
 compute_size

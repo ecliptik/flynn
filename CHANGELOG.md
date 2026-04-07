@@ -30,6 +30,11 @@ All notable changes to this project will be documented in this file.
 - Window position saved to preferences and restored on next launch
 
 ### Fixed
+- Multi-session status bar toggle applied wrong theme: resize loop loaded per-session font but not per-session theme, so all windows were redrawn with the active session's theme (System 7 color only)
+- Grow box (size box) not redrawn on window activate/deactivate: DrawGrowIcon was missing from handle_activate, so cascaded windows whose grow box was never obscured showed a stale/empty grow box after switching (both mono and color)
+- Window port backColor not synced with theme on session switch: PaintBehind filled exposed regions with stale white/black instead of the session's theme background (System 7 color only)
+- Status bar showed global terminal type instead of per-session type: all sessions displayed prefs.terminal_type rather than their own negotiated ttype
+- Out of memory on 3rd session with color themes: SIZE resource calculation did not account for per-session CellColor arrays (screen_color, alt_color, sb_color) or the shared GWorld offscreen buffer; increased from 772KB to 1336KB preferred partition for the full color preset (System 6 mono builds unaffected)
 - Color selection not highlighting empty cells beyond text: selected runs of plain spaces were skipped in the color rendering path, causing multi-row selections to only highlight characters (System 7 only; mono unaffected)
 - Selection highlighting not following content during scroll: selection coordinates were screen-relative but not adjusted when scroll_offset changed, so the highlight stayed in place while content scrolled underneath (both mono and color)
 - Light theme white-on-white after theme switch: cursor_blink left themed ForeColor (white from Dark) in window port, corrupting CopyBits color mapping; reset port colors before CopyBits and restore after cursor_blink

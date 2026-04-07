@@ -470,6 +470,25 @@ session_load_settings(Session *s)
 		theme_reset_cache();
 		term_ui_repaint_offscreen();
 	}
+
+	/* Sync window port backColor with theme so PaintBehind
+	 * (called by Window Manager when exposing regions) fills
+	 * with the correct color instead of stale white/black. */
+#ifdef FLYNN_COLOR
+	if (g_has_color_qd && s->window) {
+		GrafPtr save;
+		GetPort(&save);
+		SetPort(s->window);
+		if (theme_is_dark()) {
+			RGBColor black_c = {0, 0, 0};
+			RGBBackColor(&black_c);
+		} else {
+			RGBColor white_c = {0xFFFF, 0xFFFF, 0xFFFF};
+			RGBBackColor(&white_c);
+		}
+		SetPort(save);
+	}
+#endif
 }
 
 void

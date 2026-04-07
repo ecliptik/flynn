@@ -1418,12 +1418,81 @@ handle_activate(EventRecord *event)
 				    sess->terminal.sb_count > 0 ?
 				    0 : 255);
 #endif
+			/* Draw active grow box icon (cross-hatch).
+			 * The grow box is in the content region —
+			 * the Window Manager only redraws the frame
+			 * on activation, not the grow icon.  The
+			 * update event may not cover the grow box
+			 * if it was already visible (cascaded windows). */
+			{
+				GrafPtr save_p;
+				Rect gb_r;
+				RgnHandle sc;
+#ifdef FLYNN_COLOR
+				if (g_has_color_qd) {
+					RGBColor blk = {0, 0, 0};
+					RGBColor wht =
+					    {0xFFFF, 0xFFFF, 0xFFFF};
+					RGBForeColor(&blk);
+					RGBBackColor(&wht);
+				}
+#endif
+				GetPort(&save_p);
+				SetPort(win);
+				sc = NewRgn();
+				GetClip(sc);
+				SetRect(&gb_r,
+				    win->portRect.right -
+				    SCROLLBAR_WIDTH,
+				    win->portRect.bottom -
+				    SCROLLBAR_WIDTH,
+				    win->portRect.right + 1,
+				    win->portRect.bottom + 1);
+				ClipRect(&gb_r);
+				DrawGrowIcon(win);
+				SetClip(sc);
+				DisposeRgn(sc);
+				SetPort(save_p);
+			}
 		}
 	} else {
+		if (sess) {
 #if FLYNN_SCROLLBACK_LINES > 0
-		/* Deactivate scroll bar */
-		if (sess && sess->scrollbar)
-			HiliteControl(sess->scrollbar, 255);
+			/* Deactivate scroll bar */
+			if (sess->scrollbar)
+				HiliteControl(sess->scrollbar, 255);
 #endif
+			/* Redraw grow box as inactive (borders only) */
+			{
+				GrafPtr save_p;
+				Rect gb_r;
+				RgnHandle sc;
+#ifdef FLYNN_COLOR
+				if (g_has_color_qd) {
+					RGBColor blk = {0, 0, 0};
+					RGBColor wht =
+					    {0xFFFF, 0xFFFF, 0xFFFF};
+					RGBForeColor(&blk);
+					RGBBackColor(&wht);
+				}
+#endif
+				GetPort(&save_p);
+				SetPort(win);
+				sc = NewRgn();
+				GetClip(sc);
+				SetRect(&gb_r,
+				    win->portRect.right -
+				    SCROLLBAR_WIDTH,
+				    win->portRect.bottom -
+				    SCROLLBAR_WIDTH,
+				    win->portRect.right + 1,
+				    win->portRect.bottom + 1);
+				ClipRect(&gb_r);
+				DrawGrowIcon(win);
+				SetClip(sc);
+				DisposeRgn(sc);
+				SetPort(save_p);
+			}
+		}
 	}
 }
