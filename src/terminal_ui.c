@@ -2125,8 +2125,16 @@ draw_row(Terminal *term, short row)
 #ifdef FLYNN_CLIPBOARD
 	if (sel.active) {
 		short sr, sc, er, ec;
+		short scroll_delta;
 
 		sel_normalize(&sr, &sc, &er, &ec);
+
+		/* Adjust selection rows for scroll offset change
+		 * since selection was made */
+		scroll_delta = term->scroll_offset - sel.scroll_offset;
+		sr += scroll_delta;
+		er += scroll_delta;
+
 		/* Skip zero-width selections (single click, no drag) */
 		if ((sr != er || sc != ec) &&
 		    row >= sr && row <= er) {
@@ -2244,10 +2252,11 @@ draw_row(Terminal *term, short row)
 				col++;
 			}
 
-			/* Skip plain spaces unless they have bg */
+			/* Skip plain spaces unless they have bg
+			 * or are selected */
 			if (run_attr == ATTR_NORMAL &&
 			    run_bg == COLOR_DEFAULT &&
-			    !has_non_space)
+			    !has_non_space && !run_in_sel)
 				continue;
 		} else {
 			/* Mono path: collect run by attr only */
@@ -5210,6 +5219,15 @@ term_ui_sel_active(void)
 }
 
 /*
+ * term_ui_sel_scroll_offset - return scroll_offset when selection was made
+ */
+short
+term_ui_sel_scroll_offset(void)
+{
+	return sel.scroll_offset;
+}
+
+/*
  * term_ui_sel_get_range - get normalized selection range
  */
 void
@@ -5284,6 +5302,14 @@ term_ui_sel_dirty_all(Terminal *term)
 		return;
 
 	sel_normalize(&sr, &sc, &er, &ec);
+
+	/* Adjust for scroll offset change since selection */
+	{
+		short scroll_delta = term->scroll_offset -
+		    sel.scroll_offset;
+		sr += scroll_delta;
+		er += scroll_delta;
+	}
 
 	if (sr < 0) sr = 0;
 	if (er >= term->active_rows) er = term->active_rows - 1;

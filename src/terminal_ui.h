@@ -88,6 +88,7 @@ void  term_ui_sel_extend(short row, short col, Terminal *term);
 void  term_ui_sel_clear(void);
 void  term_ui_sel_finalize(void);
 short term_ui_sel_active(void);
+short term_ui_sel_scroll_offset(void);
 void  term_ui_sel_get_range(short *start_row, short *start_col,
 	    short *end_row, short *end_col);
 short term_ui_sel_check_double_click(unsigned long when, short row, short col);

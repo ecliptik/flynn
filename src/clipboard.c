@@ -50,8 +50,16 @@ do_copy(void)
 	{
 		short sr, sc, er, ec;
 		short c_start, c_end;
+		short scroll_delta;
 
 		term_ui_sel_get_range(&sr, &sc, &er, &ec);
+
+		/* Adjust selection rows if user scrolled since
+		 * making the selection */
+		scroll_delta = s->terminal.scroll_offset -
+		    term_ui_sel_scroll_offset();
+		sr += scroll_delta;
+		er += scroll_delta;
 
 		len = 0;
 		for (row = sr; row <= er; row++) {

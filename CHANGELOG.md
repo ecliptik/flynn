@@ -27,6 +27,8 @@ All notable changes to this project will be documented in this file.
 - Window position saved to preferences and restored on next launch
 
 ### Fixed
+- Color selection not highlighting empty cells beyond text: selected runs of plain spaces were skipped in the color rendering path, causing multi-row selections to only highlight characters (System 7 only; mono unaffected)
+- Selection highlighting not following content during scroll: selection coordinates were screen-relative but not adjusted when scroll_offset changed, so the highlight stayed in place while content scrolled underneath (both mono and color)
 - Light theme white-on-white after theme switch: cursor_blink left themed ForeColor (white from Dark) in window port, corrupting CopyBits color mapping; reset port colors before CopyBits and restore after cursor_blink
 - Stale pixels on surviving window after multi-session close: DisposeWindow only updates previously-obscured region; added InvalRect on full portRect in session_destroy_and_fixup
 - Out of memory on repeated theme switching: GWorld free/realloc cycle (~137KB) fragmented heap; added term_ui_repaint_offscreen() that invalidates content without freeing buffers
