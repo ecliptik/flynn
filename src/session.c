@@ -471,24 +471,14 @@ session_load_settings(Session *s)
 		term_ui_repaint_offscreen();
 	}
 
-	/* Sync window port backColor with theme so PaintBehind
-	 * (called by Window Manager when exposing regions) fills
-	 * with the correct color instead of stale white/black. */
-#ifdef FLYNN_COLOR
-	if (g_has_color_qd && s->window) {
-		GrafPtr save;
-		GetPort(&save);
-		SetPort(s->window);
-		if (theme_is_dark()) {
-			RGBColor black_c = {0, 0, 0};
-			RGBBackColor(&black_c);
-		} else {
-			RGBColor white_c = {0xFFFF, 0xFFFF, 0xFFFF};
-			RGBBackColor(&white_c);
-		}
-		SetPort(save);
-	}
-#endif
+	/* Note: we intentionally do NOT set the window port's
+	 * RGBBackColor here.  Persistently setting backColor to
+	 * black for dark themes poisons all subsequent Alert/Dialog
+	 * calls — the Dialog Manager inherits the active port's
+	 * colors on System 7, rendering dialog content invisible
+	 * (white text on white background).  Instead, themed
+	 * backColor is set transiently during drawing (term_ui_draw
+	 * and clear_window_bg handle this per-draw). */
 }
 
 void
