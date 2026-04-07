@@ -106,6 +106,7 @@ typedef struct {
 	unsigned char	parse_state;
 	short		num_params;
 	short		params[TERM_MAX_PARAMS];
+	unsigned char	is_colon[TERM_MAX_PARAMS]; /* 1 if preceded by colon (sub-param) */
 	unsigned char	intermediate;	/* intermediate byte (e.g. '?' or '#') */
 
 	/* Auto-wrap state */

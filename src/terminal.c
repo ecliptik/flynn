@@ -1474,6 +1474,7 @@ term_process_esc(Terminal *term, unsigned char ch)
 		term->num_params = 0;
 		term->intermediate = 0;
 		term->params[0] = 0;
+		term->is_colon[0] = 0;
 		return;
 
 	case '7':
@@ -1662,17 +1663,19 @@ term_process_csi(Terminal *term, unsigned char ch)
 	if (ch == ';' || ch == ':') {
 		/*
 		 * Parameter separator.  Semicolons separate parameters;
-		 * colons separate sub-parameters (SGR 38:2:R:G:B,
-		 * SGR 4:3, etc.).  We treat both the same way --
-		 * slightly wrong for sub-params but prevents aborting
-		 * on modern color/underline sequences.
+		 * colons separate sub-parameters (SGR 4:3, 38:2:R:G:B).
+		 * Both advance to next param slot; is_colon[] tracks
+		 * which separator was used so the SGR handler can
+		 * distinguish e.g. "4:0" (underline off) from "4;0".
 		 */
 		if (term->parse_state == PARSE_CSI) {
 			/* Implicit first param = 0 */
 			term->num_params = 1;
 			term->params[0] = 0;
+			term->is_colon[0] = 0;
 		}
 		if (term->num_params < TERM_MAX_PARAMS) {
+			term->is_colon[term->num_params] = (ch == ':');
 			term->params[term->num_params] = 0;
 			term->num_params++;
 		}
@@ -2063,7 +2066,11 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 		break;
 
 	case 'm':
-		/* SGR - set graphic rendition */
+		/* SGR - set graphic rendition.
+		 * Skip private-mode sequences (ESC[>4m = xterm
+		 * modifyOtherKeys, NOT underline). */
+		if (term->intermediate)
+			break;
 		if (term->num_params == 0) {
 			/* ESC[m with no params means reset */
 			term_set_attr(term, 0);
@@ -2110,6 +2117,23 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 					}
 					continue;
 				}
+				if (term->params[i] == 4 &&
+				    i + 1 < term->num_params &&
+				    term->is_colon[i + 1]) {
+					/* Underline style sub-param:
+					 * 4:0=off, 4:1=single, 4:2=double,
+					 * 4:3=curly, 4:4=dotted, 4:5=dashed.
+					 * Consume sub-param so it doesn't get
+					 * processed as a separate SGR code. */
+					if (term->params[i + 1] == 0)
+						term->cur_attr &=
+						    ~ATTR_UNDERLINE;
+					else
+						term->cur_attr |=
+						    ATTR_UNDERLINE;
+					i++;
+					continue;
+				}
 				if (term->params[i] == 58) {
 					/* Underline color: skip */
 					if (i + 1 < term->num_params &&
@@ -2121,6 +2145,11 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 					continue;
 				}
 				term_set_attr(term, term->params[i]);
+				/* Skip any trailing colon sub-params
+				 * so they aren't misread as SGR codes */
+				while (i + 1 < term->num_params &&
+				    term->is_colon[i + 1])
+					i++;
 			}
 		}
 		break;

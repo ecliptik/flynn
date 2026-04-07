@@ -11,3 +11,4 @@
 
 ## Bugs
 - [ ] Connecting dialog not centered on window/desktop (visible on Basilisk II / System 7)
+- [ ] Multi-session window drag leaves white ghost: dragging front window over dark-mode back window leaves unredrawn white rectangle where front window previously sat. Repro: session 1 ANSI-BBS dark mode, session 2 xterm light mode (resized smaller), drag session 2 — exposed region of session 1 stays white (PaintBehind fill never overwritten). Likely updateEvt not firing or offscreen/BeginUpdate interaction. Fix: try explicit InvalRect on background windows after DragWindow.
