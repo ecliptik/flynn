@@ -37,7 +37,7 @@ Pre-built binaries are available on the [Releases](https://codeberg.org/ecliptik
 | **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.hqx) |
 | **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.hqx) |
 
-Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). No build toolchain required — just download and run. See [docs/BUILD.md](docs/BUILD.md) for custom builds.
+Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
 ## Requirements
 
@@ -68,7 +68,7 @@ Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archi
 - **System 6.0.8 through 7.5.5** — MacTCP and Open Transport compatibility
 - **System 7 enhancements**: movable modal dialogs, Apple Events, telnet:// URL handling
 - **Persistent settings**, window position, and Preferences folder support
-- **Page Setup and Print** via Printing Manager
+- Aligned with [Apple Human Interface Guidelines](https://archive.org/details/apple-human-interface-guidelines-1992)
 
 ## Keyboard Shortcuts
 
