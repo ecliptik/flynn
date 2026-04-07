@@ -2,7 +2,7 @@
 
 A Telnet and Finger client for classic 68000 Macintosh systems, from the Mac Plus and up. Supports monochrome on System 6 and 256 colors on System 7. Works with MacTCP and Open Transport's MacTCP compatibility layer. Cross-compiled on Linux using [Retro68](https://github.com/autc04/Retro68).
 
-This project was 100% vibe coded using [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+This project was 100% built agentically using [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 <p align="center">
 <a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> · <a href="#building">Building</a> · <a href="#testing">Testing</a> · <a href="#acknowledgments">Acknowledgments</a> · <a href="#license">License</a>
