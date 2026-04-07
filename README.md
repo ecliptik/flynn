@@ -33,9 +33,9 @@ Pre-built binaries are available on the [Releases](https://codeberg.org/ecliptik
 
 | Edition | Description | Memory | Download |
 |---------|-------------|--------|----------|
-| **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.hqx) |
-| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~340KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.hqx) |
-| **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.hqx) |
+| **Flynn** | All features — 4 sessions, 256-color themes, scrollback | ~768KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.hqx) |
+| **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.hqx) |
+| **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.hqx) |
 
 Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). No build toolchain required — just download and run. See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
@@ -145,11 +145,11 @@ Then build Flynn:
 
 Flynn supports fully customizable builds. Three presets cover common configurations:
 
-| Preset | Sessions | Scrollback | Features | Memory |
-|--------|----------|------------|----------|----------------|
-| `minimal` | 1 | none | clipboard, alt screen only | ~256KB |
-| `lite` | 1 | 96 lines | everything except color | ~340KB |
-| `full` | 4 | 192 lines | everything | ~768KB |
+| Preset | Sessions | Features | Memory |
+|--------|----------|----------|--------|
+| `full` | 4 | all features | ~768KB |
+| `lite` | 1 | core features | ~340KB |
+| `minimal` | 1 | only essentials | ~256KB |
 
 The default build uses the **full** preset. Select a preset with `--preset`:
 
