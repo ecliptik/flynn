@@ -184,8 +184,12 @@ session_destroy(Session *s)
 		DisposePtr((Ptr)s->terminal.alt_color);
 	if (s->terminal.sb_color)
 		DisposePtr((Ptr)s->terminal.sb_color);
+
+	/* Free snapshot handles */
+	if (s->terminal.snap_screen)
+		DisposeHandle(s->terminal.snap_screen);
 	if (s->terminal.snap_color)
-		DisposePtr((Ptr)s->terminal.snap_color);
+		DisposeHandle(s->terminal.snap_color);
 
 #if FLYNN_SCROLLBACK_LINES > 0
 	if (s->scrollbar)
@@ -301,6 +305,22 @@ session_destroy_and_fixup(Session *s)
 		if (active_session) {
 			session_load_font(active_session);
 			session_load_settings(active_session);
+
+			/* Force full redraw of surviving window.
+			 * DisposeWindow only generates an update for
+			 * the previously-obscured region — with
+			 * cascaded windows, the left/top edge of the
+			 * surviving window was never hidden, so those
+			 * pixels go stale without a full invalidate. */
+			{
+				GrafPtr save;
+
+				GetPort(&save);
+				SetPort(active_session->window);
+				InvalRect(
+				    &active_session->window->portRect);
+				SetPort(save);
+			}
 		}
 	}
 }
@@ -448,7 +468,7 @@ session_load_settings(Session *s)
 		term_ui_set_dark_mode(theme_is_dark());
 		s->terminal.dark_mode = theme_is_dark();
 		theme_reset_cache();
-		term_ui_invalidate_offscreen();
+		term_ui_repaint_offscreen();
 	}
 }
 

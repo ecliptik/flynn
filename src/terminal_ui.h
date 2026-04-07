@@ -120,6 +120,7 @@ void term_ui_set_dark_mode(short enabled);
 short term_ui_has_offscreen(WindowPtr win, short cols, short rows);
 void  term_ui_blit_offscreen(WindowPtr win);
 void  term_ui_invalidate_offscreen(void);
+void  term_ui_repaint_offscreen(void);
 short term_ui_scroll_offscreen(WindowPtr win, short direction,
 	    short active_rows);
 void  term_ui_cleanup(void);
@@ -127,6 +128,7 @@ void  term_ui_cleanup(void);
 #define term_ui_has_offscreen(w, c, r)       0
 #define term_ui_blit_offscreen(w)            ((void)0)
 #define term_ui_invalidate_offscreen()       ((void)0)
+#define term_ui_repaint_offscreen()          ((void)0)
 #define term_ui_scroll_offscreen(w, d, r)    (-1)
 #define term_ui_cleanup()                    ((void)0)
 #endif

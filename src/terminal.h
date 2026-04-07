@@ -217,8 +217,16 @@ typedef struct {
 	unsigned char	utf8_expect;	/* total bytes expected (2, 3, or 4) */
 	unsigned char	last_was_emoji;	/* absorb following modifiers */
 
-	/* Screen snapshot for disconnect recovery (saved on full clear) */
+	/* Screen snapshot for disconnect recovery (saved on full clear).
+	 * Handle-based: allocated on demand, freed after restore.
+	 * Sized to active_cols x active_rows at snapshot time. */
 	short		snap_valid;	/* 1 if snap_screen has data */
+	Handle		snap_screen;	/* TermCell snapshot (NULL when unused) */
+	Handle		snap_color;	/* CellColor snapshot (NULL when unused) */
+	short		snap_cols;	/* active_cols when snapshot was taken */
+	short		snap_rows;	/* active_rows when snapshot was taken */
+	short		snap_has_color;	/* snap includes color data */
+	unsigned char	snap_ready;	/* gates alloc (0 during terminal_init) */
 
 	/* --- Color arrays: dynamically allocated on System 7 only --- */
 	CellColor	*screen_color;	/* NULL on System 6 */
@@ -252,10 +260,6 @@ typedef struct {
 	TermCell	scrollback[TERM_SCROLLBACK_LINES][TERM_COLS];
 #endif
 
-	/* Disconnect recovery snapshot (13,200 bytes) */
-	TermCell	snap_screen[TERM_ROWS][TERM_COLS];
-	short		snap_has_color;	/* snap includes color data */
-	CellColor	*snap_color;	/* lazy-allocated color snapshot */
 } Terminal;
 
 /* Initialize terminal to default state */

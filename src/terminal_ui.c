@@ -621,6 +621,20 @@ term_ui_invalidate_offscreen(void)
 }
 
 /*
+ * term_ui_repaint_offscreen - invalidate content without freeing buffers
+ *
+ * Used for theme switches where dimensions are unchanged but colors
+ * differ.  Avoids the ~137KB GWorld free/realloc cycle that fragments
+ * the heap on repeated theme changes.
+ */
+void
+term_ui_repaint_offscreen(void)
+{
+	g_shadow_valid = 0;
+	g_color_gworld_fresh = 1;
+}
+
+/*
  * term_ui_cleanup - free all offscreen buffers on app quit
  */
 void
@@ -1217,6 +1231,20 @@ do_draw:
 
 		SetGWorld(saved_gw, saved_gd);
 		SetPort(win);
+
+		/* Reset destination port colors for correct CopyBits
+		 * color mapping.  cursor_blink may leave themed fg
+		 * (e.g. white from Dark theme) in the window port
+		 * between draw passes.  Apple IM: "set fg to black
+		 * and bg to white before calling CopyBits." */
+#ifdef FLYNN_COLOR
+		if (g_has_color_qd) {
+			RGBColor blk = {0, 0, 0};
+			RGBColor wht = {0xFFFF, 0xFFFF, 0xFFFF};
+			RGBForeColor(&blk);
+			RGBBackColor(&wht);
+		}
+#endif
 
 		pm = GetGWorldPixMap(g_color_gworld);
 		content_right = win->portRect.right - SCROLLBAR_WIDTH;
@@ -2540,19 +2568,19 @@ draw_row(Terminal *term, short row)
 				if (face != last_face) {
 					TextFace(face);
 					last_face = face;
+#ifdef FLYNN_COLOR
+					if (use_color)
+						cached_fg_idx = -1;
+#endif
 				}
 			}
 
 			/*
 			 * Set text fg AFTER TextFace — on Color
 			 * QuickDraw, TextFace resets the port's
-			 * foreground color.  Invalidate cache
-			 * since TextFace changed QD state.
+			 * foreground color.
 			 */
 			if (use_color) {
-#ifdef FLYNN_COLOR
-				cached_fg_idx = -1;
-#endif
 #ifdef FLYNN_THEMES
 				if (run_in_sel && g_has_color_qd)
 					theme_set_default_fg(
@@ -4992,6 +5020,14 @@ term_ui_cursor_blink(WindowPtr win, Terminal *term)
 		cursor_prev_col = ccol;
 	}
 
+#ifdef FLYNN_THEMES
+	/* Restore port to black fg / white bg so cursor_blink
+	 * doesn't leave themed colors (e.g. Dark theme's white
+	 * fg) in the window port.  CopyBits uses the destination
+	 * port's fg/bg for color mapping — stale colors here
+	 * cause white-on-white rendering after theme switches. */
+	theme_restore_colors();
+#endif
 	SetPort(old_port);
 }
 

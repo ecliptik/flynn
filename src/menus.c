@@ -812,7 +812,7 @@ handle_theme_menu(short item)
 	}
 #endif
 	clear_window_bg(active_session->window, theme_is_dark());
-	term_ui_invalidate_offscreen();
+	term_ui_repaint_offscreen();
 	session_load_font(active_session);
 	term_dirty_all(&active_session->terminal);
 	term_ui_draw(active_session->window, &active_session->terminal);
@@ -907,7 +907,7 @@ handle_prefs_menu(short item)
 				SetPort(sess->window);
 				sess->terminal.dark_mode =
 				    prefs.dark_mode;
-				term_ui_invalidate_offscreen();
+				term_ui_repaint_offscreen();
 				session_load_font(sess);
 				term_dirty_all(&sess->terminal);
 				term_ui_draw(sess->window,

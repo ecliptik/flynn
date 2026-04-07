@@ -27,6 +27,10 @@ All notable changes to this project will be documented in this file.
 - Window position saved to preferences and restored on next launch
 
 ### Fixed
+- Light theme white-on-white after theme switch: cursor_blink left themed ForeColor (white from Dark) in window port, corrupting CopyBits color mapping; reset port colors before CopyBits and restore after cursor_blink
+- Stale pixels on surviving window after multi-session close: DisposeWindow only updates previously-obscured region; added InvalRect on full portRect in session_destroy_and_fixup
+- Out of memory on repeated theme switching: GWorld free/realloc cycle (~137KB) fragmented heap; added term_ui_repaint_offscreen() that invalidates content without freeing buffers
+- drain_one() always returned 0 (no data): session_process_data zeroed read_len before the return-value check; track had_data separately
 - favorites_add() sentinel bug: bm_theme_id/bm_backspace_bs/bm_local_echo initialized to 0 (wrong value) instead of -1 (use global default) via memset; now captures actual session values
 - Backspace popup in Edit Favorite: `^H` and `^?` were parsed as Menu Manager metacharacters by AppendMenu, graying out items; fixed with SetMenuItemText
 - Status bar not updating on Backspace/Local Echo toggle from Options menu
@@ -73,6 +77,10 @@ All notable changes to this project will be documented in this file.
 - Removed dead code: TelnetState.sb_opt, favorites_init_menu(), redundant telnet_init zeroing
 - Build flag: -fomit-frame-pointer frees A6 register on 68000
 - Inline TERM_DIRTY_ROW macro saves JSR/RTS overhead per dirty-row mark
+- Gate cached_fg_idx invalidation on actual TextFace change (saves ~24us/trap on color systems)
+- Factor drain_one()/check_keepalive() helpers in event loop (~55 lines deduped)
+- Deduplicate term_put_cp437 cell-write logic via term_put_char (~25 lines removed)
+- Convert snap_screen/snap_color from inline array/Ptr to Handle, sized to active dimensions (3.8KB at 80x24 vs 13.2KB at 132x50), freed immediately after disconnect restore
 
 ## [1.9.8] - 2026-03-31
 

@@ -368,22 +368,55 @@ session_handle_disconnect(Session *sess)
 	 * For ANSI (BBS), keep the current screen — we now drain TCP
 	 * data before closing, so goodbye screens are already rendered.
 	 * Use saved ttype since telnet_init() resets to global pref. */
-	if (sess->terminal.snap_valid && was_ttype != 4) {
-		memcpy(sess->terminal.screen, sess->terminal.snap_screen,
-		    sizeof(sess->terminal.screen));
+	if (sess->terminal.snap_valid && was_ttype != 4 &&
+	    sess->terminal.snap_screen) {
+		short snap_cols = sess->terminal.snap_cols;
+		short snap_rows = sess->terminal.snap_rows;
+		short r, cols;
+
+		/* Restore row-by-row: snapshot may differ from current
+		 * active dimensions if window was resized after snapshot */
+		cols = snap_cols < sess->terminal.active_cols ?
+		    snap_cols : sess->terminal.active_cols;
+		HLock(sess->terminal.snap_screen);
+		for (r = 0; r < snap_rows &&
+		    r < sess->terminal.active_rows; r++)
+			memcpy(sess->terminal.screen_rows[r],
+			    *sess->terminal.snap_screen +
+			    (long)r * snap_cols * sizeof(TermCell),
+			    cols * sizeof(TermCell));
+		HUnlock(sess->terminal.snap_screen);
 		terminal_normalize_rows(&sess->terminal);
+
 		/* Restore saved color data */
 		if (sess->terminal.snap_has_color &&
 		    sess->terminal.snap_color &&
 		    sess->terminal.has_color &&
 		    sess->terminal.screen_color) {
-			memcpy(sess->terminal.screen_color,
-			    sess->terminal.snap_color,
-			    (long)TERM_ROWS * TERM_COLS *
-			    sizeof(CellColor));
+			HLock(sess->terminal.snap_color);
+			for (r = 0; r < snap_rows &&
+			    r < sess->terminal.active_rows; r++)
+				memcpy(
+				    sess->terminal.screen_color_rows[r],
+				    *sess->terminal.snap_color +
+				    (long)r * snap_cols *
+				    sizeof(CellColor),
+				    cols * sizeof(CellColor));
+			HUnlock(sess->terminal.snap_color);
 		}
 	}
+
+	/* Free snapshot handles — no longer needed after restore */
 	sess->terminal.snap_valid = 0;
+	if (sess->terminal.snap_screen) {
+		DisposeHandle(sess->terminal.snap_screen);
+		sess->terminal.snap_screen = 0L;
+	}
+	if (sess->terminal.snap_color) {
+		DisposeHandle(sess->terminal.snap_color);
+		sess->terminal.snap_color = 0L;
+	}
+	sess->terminal.snap_has_color = 0;
 
 	/* Set title to show disconnected state */
 	if (sess->conn.host[0])
@@ -618,6 +651,56 @@ adjust_cursor(Point mouse_pt)
 	InitCursor();
 }
 
+/*
+ * drain_one - Run one iteration of the data drain loop for a session.
+ * Calls conn_idle, processes any received data, and detects disconnect.
+ * Returns: 1=data processed, 0=no data, -1=disconnected
+ */
+static short
+drain_one(Session *sess)
+{
+	short prev_state;
+	short had_data = 0;
+
+	prev_state = sess->conn.state;
+	conn_idle(&sess->conn);
+
+	/* Process any data read before checking for disconnect —
+	 * server may close after sending final data */
+	if (sess->conn.read_len > 0) {
+		session_process_data(sess);
+		had_data = 1;
+	}
+
+	if (prev_state == CONN_STATE_CONNECTED &&
+	    sess->conn.state == CONN_STATE_IDLE) {
+		session_handle_disconnect(sess);
+		return -1;
+	}
+
+	return had_data;
+}
+
+/*
+ * check_keepalive - Send IAC NOP if session has been idle > 120s (7200 ticks).
+ */
+static void
+check_keepalive(Session *sess)
+{
+	unsigned char nop_buf[4];
+	short nop_len = 0;
+
+	if (sess->conn.state != CONN_STATE_CONNECTED)
+		return;
+	if (sess->conn.last_send_tick <= 0)
+		return;
+	if ((TickCount() - sess->conn.last_send_tick) < 7200)
+		return;
+
+	telnet_send_nop(nop_buf, &nop_len);
+	conn_send(&sess->conn, (char *)nop_buf, nop_len);
+}
+
 static void
 main_event_loop(void)
 {
@@ -640,7 +723,6 @@ main_event_loop(void)
 		{
 			short si;
 			Session *sess;
-			short prev_state;
 			static unsigned short bg_tick = 0;
 			static Point last_mouse_pt = { -1, -1 };
 
@@ -651,26 +733,10 @@ main_event_loop(void)
 
 			/* Fast path: single session skips save/load cycling */
 			if (session_count() == 1 && active_session) {
-				short drain;
+				short drain, rc;
 				long draw_deadline = 0;
 
-				/* NOP keep-alive for single session */
-				if (active_session->conn.state ==
-				    CONN_STATE_CONNECTED &&
-				    active_session->conn
-				    .last_send_tick > 0 &&
-				    (TickCount() -
-				    active_session->conn
-				    .last_send_tick) >= 7200) {
-					unsigned char nop_buf[4];
-					short nop_len = 0;
-
-					telnet_send_nop(nop_buf,
-					    &nop_len);
-					conn_send(
-					    &active_session->conn,
-					    (char *)nop_buf, nop_len);
-				}
+				check_keepalive(active_session);
 
 				/* Jump scroll: suppress draws while
 				 * TCP data is still arriving.  Draw
@@ -679,32 +745,10 @@ main_event_loop(void)
 			drain_jump:
 				drain = 0;
 				do {
-					prev_state =
-					    active_session->conn.state;
-					conn_idle(&active_session->conn);
-
-					/* Process any data read before
-					 * checking for disconnect —
-					 * server may close after
-					 * sending final data */
-					if (active_session->conn
-					    .read_len > 0) {
-						session_process_data(
-						    active_session);
+					rc = drain_one(active_session);
+					if (rc == 1)
 						drain++;
-					}
-
-					if (prev_state ==
-					    CONN_STATE_CONNECTED &&
-					    active_session->conn.state ==
-					    CONN_STATE_IDLE) {
-						session_handle_disconnect(
-						    active_session);
-						break;
-					}
-
-					if (active_session->conn.read_len
-					    == 0)
+					if (rc != 1) /* no data or disconnect */
 						break;
 				} while (drain < 8);
 
@@ -755,28 +799,12 @@ main_event_loop(void)
 			bg_tick++;
 
 			/* NOP keep-alive: send IAC NOP on
-			 * connected sessions idle > 120s.
-			 * Cheap check every tick — only sends
-			 * when 7200 ticks have elapsed. */
+			 * connected sessions idle > 120s. */
 			for (si = 0; si < MAX_SESSIONS; si++) {
 				sess = session_get(si);
 				if (!sess)
 					continue;
-				if (sess->conn.state ==
-				    CONN_STATE_CONNECTED &&
-				    sess->conn.last_send_tick > 0 &&
-				    (TickCount() -
-				    sess->conn.last_send_tick)
-				    >= 7200) {
-					unsigned char nop_buf[4];
-					short nop_len = 0;
-
-					telnet_send_nop(nop_buf,
-					    &nop_len);
-					conn_send(&sess->conn,
-					    (char *)nop_buf,
-					    nop_len);
-				}
+				check_keepalive(sess);
 			}
 
 			for (si = 0; si < MAX_SESSIONS; si++) {
@@ -807,7 +835,7 @@ main_event_loop(void)
 				session_load_settings(sess);
 
 				{
-					short drain;
+					short drain, rc;
 					long draw_deadline = 0;
 
 					/* Jump scroll: suppress draws
@@ -817,31 +845,10 @@ main_event_loop(void)
 				drain_bg:
 					drain = 0;
 					do {
-						prev_state =
-						    sess->conn.state;
-						conn_idle(&sess->conn);
-
-						/* Process data before
-						 * disconnect check */
-						if (sess->conn
-						    .read_len > 0) {
-							session_process_data(
-							    sess);
+						rc = drain_one(sess);
+						if (rc == 1)
 							drain++;
-						}
-
-						if (prev_state ==
-						    CONN_STATE_CONNECTED
-						    && sess->conn.state
-						    ==
-						    CONN_STATE_IDLE) {
-							session_handle_disconnect(
-							    sess);
-							break;
-						}
-
-						if (sess->conn.read_len
-						    == 0)
+						if (rc != 1)
 							break;
 					} while (drain < 8);
 

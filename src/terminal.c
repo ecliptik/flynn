@@ -108,6 +108,19 @@ terminal_init(Terminal *term)
 	short saved_cols = term->active_cols;
 	short saved_rows = term->active_rows;
 
+	/* Free existing snapshot handles (terminal_reset path) */
+	if (term->snap_screen) {
+		DisposeHandle(term->snap_screen);
+		term->snap_screen = 0L;
+	}
+	if (term->snap_color) {
+		DisposeHandle(term->snap_color);
+		term->snap_color = 0L;
+	}
+	term->snap_valid = 0;
+	term->snap_has_color = 0;
+	term->snap_ready = 0;
+
 	/* Zero parser state and cursor fields (small, ~200 bytes) */
 	term->cur_row = 0;
 	term->cur_col = 0;
@@ -245,6 +258,9 @@ terminal_init(Terminal *term)
 	term_clear_region(term, 0, 0,
 	    term->active_rows - 1, term->active_cols - 1);
 	term_dirty_all(term);
+
+	/* Enable snapshot allocation now that init's clear is done */
+	term->snap_ready = 1;
 }
 
 /*
@@ -818,27 +834,79 @@ term_clear_region(Terminal *term, short r1, short c1, short r2, short c2)
 	 * Remote servers send clear-screen during logout before TCP
 	 * closes. The snapshot lets us restore content on disconnect.
 	 * Skip during alt screen (main screen saved in alt_screen).
+	 * snap_ready gates allocation during terminal_init()'s clear.
+	 * Sized to active dimensions to save ~9KB at 80x24 vs 132x50.
 	 */
 	if (r1 == 0 && c1 == 0 &&
 	    r2 >= term->active_rows - 1 &&
 	    c2 >= term->active_cols - 1 &&
-	    !term->alt_active) {
-		memcpy(term->snap_screen, term->screen,
-		    sizeof(term->screen));
-		/* Save color data alongside screen content */
-		if (term->has_color && term->screen_color) {
-			long sc_size = (long)TERM_ROWS * TERM_COLS *
-			    sizeof(CellColor);
-			if (!term->snap_color)
-				term->snap_color =
-				    (CellColor *)NewPtr(sc_size);
-			if (term->snap_color) {
-				memcpy(term->snap_color,
-				    term->screen_color, sc_size);
-				term->snap_has_color = 1;
+	    !term->alt_active && term->snap_ready) {
+		long snap_size = (long)term->active_rows *
+		    term->active_cols * sizeof(TermCell);
+
+		/* Reallocate if dimensions changed since last snapshot */
+		if (term->snap_screen &&
+		    (term->snap_cols != term->active_cols ||
+		    term->snap_rows != term->active_rows)) {
+			DisposeHandle(term->snap_screen);
+			term->snap_screen = 0L;
+		}
+		if (!term->snap_screen)
+			term->snap_screen = NewHandle(snap_size);
+
+		if (term->snap_screen) {
+			short r;
+
+			HLock(term->snap_screen);
+			/* Copy row-by-row: screen is TERM_COLS wide,
+			 * snapshot is active_cols wide */
+			for (r = 0; r < term->active_rows; r++)
+				memcpy(*term->snap_screen +
+				    (long)r * term->active_cols *
+				    sizeof(TermCell),
+				    term->screen_rows[r],
+				    term->active_cols *
+				    sizeof(TermCell));
+			HUnlock(term->snap_screen);
+
+			term->snap_cols = term->active_cols;
+			term->snap_rows = term->active_rows;
+			term->snap_valid = 1;
+
+			/* Save color data alongside screen content */
+			if (term->has_color && term->screen_color) {
+				long sc_size = (long)term->active_rows *
+				    term->active_cols *
+				    sizeof(CellColor);
+
+				if (term->snap_color &&
+				    (term->snap_cols != term->active_cols ||
+				    term->snap_rows != term->active_rows)) {
+					DisposeHandle(term->snap_color);
+					term->snap_color = 0L;
+				}
+				if (!term->snap_color)
+					term->snap_color =
+					    NewHandle(sc_size);
+				if (term->snap_color) {
+					HLock(term->snap_color);
+					for (r = 0; r < term->active_rows;
+					    r++)
+						memcpy(
+						    *term->snap_color +
+						    (long)r *
+						    term->active_cols *
+						    sizeof(CellColor),
+						    term->
+						    screen_color_rows[r],
+						    term->active_cols *
+						    sizeof(CellColor));
+					HUnlock(term->snap_color);
+					term->snap_has_color = 1;
+				}
 			}
 		}
-		term->snap_valid = 1;
+		/* If NewHandle failed, skip snapshot gracefully */
 	}
 
 	/*
@@ -1335,7 +1403,7 @@ term_put_cp437(Terminal *term, unsigned char byte)
 {
 #ifdef FLYNN_CP437
 	const CP437Entry *e;
-	unsigned char ch, attr;
+	unsigned char ch;
 
 	e = &cp437_table[byte];
 
@@ -1355,38 +1423,8 @@ term_put_cp437(Terminal *term, unsigned char byte)
 		break;
 	}
 
-	/* Store as normal text cell (reuse term_put_char logic) */
-	if (term->wrap_pending) {
-		if (term->autowrap) {
-			term->wrap_pending = 0;
-			term_carriage_return(term);
-			term_newline(term);
-		} else {
-			term->wrap_pending = 0;
-			term->cur_col = term->active_cols - 1;
-		}
-	}
-
-	attr = term->cur_attr;
-	if (term->cur_fg != COLOR_DEFAULT || term->cur_bg != COLOR_DEFAULT)
-		attr |= ATTR_HAS_COLOR;
-
-	term->screen_rows[term->cur_row][term->cur_col].ch = ch;
-	term->screen_rows[term->cur_row][term->cur_col].attr = attr;
-
-	if (term->has_color && term->screen_color) {
-		CellColor *cc = &term->screen_color_rows[
-		    term->cur_row][term->cur_col];
-		cc->fg = term->cur_fg;
-		cc->bg = term->cur_bg;
-	}
-
-	TERM_DIRTY_ROW(term, term->cur_row);
-
-	if (term->cur_col < term->active_cols - 1)
-		term->cur_col++;
-	else
-		term->wrap_pending = 1;
+	/* Store as normal text cell via term_put_char */
+	term_put_char(term, ch);
 #else /* !FLYNN_CP437 */
 	/* Fallback: treat printable ASCII as-is, else '?' */
 	if (byte >= 0x20 && byte < 0x7F)
