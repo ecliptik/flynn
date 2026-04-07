@@ -205,12 +205,10 @@ compute_size() {
     local session_kb=$(( 13 + 13 + 13 + scrollback_kb ))
     [ "$FLYNN_ALT_SCREEN" = "ON" ] && session_kb=$(( session_kb + 13 ))
 
-    # Color per-session cost: CellColor arrays allocated via NewPtr
-    # on System 7 (screen_color: always, sb_color: lazy on scroll)
+    # Color per-session cost: screen_color always allocated on System 7.
+    # sb_color and alt_color are lazy — covered by headroom.
     if [ "$FLYNN_COLOR" = "ON" ]; then
         session_kb=$(( session_kb + 13 ))                  # screen_color (always)
-        session_kb=$(( session_kb + scrollback_kb ))        # sb_color (lazy but common)
-        [ "$FLYNN_ALT_SCREEN" = "ON" ] && session_kb=$(( session_kb + 13 ))  # alt_color
     fi
 
     # Shared costs
@@ -238,8 +236,14 @@ compute_size() {
     SIZE_PREFERRED=$(( computed * 130 / 100 ))
     SIZE_MINIMUM=$(( SIZE_PREFERRED - 64 ))
 
-    # Clamp (color builds need larger partitions for CellColor
-    # arrays + GWorld; safe on System 7 Macs with 4MB+ RAM)
+    # Color builds: floor at 1024KB (CellColor arrays + GWorld
+    # need more than the formula's headroom alone provides)
+    if [ "$FLYNN_COLOR" = "ON" ] && [ $SIZE_PREFERRED -lt 1024 ]; then
+        SIZE_PREFERRED=1024
+        SIZE_MINIMUM=$(( SIZE_PREFERRED - 64 ))
+    fi
+
+    # Clamp
     [ $SIZE_PREFERRED -lt 256 ] && SIZE_PREFERRED=256 || true
     [ $SIZE_MINIMUM -lt 192 ] && SIZE_MINIMUM=192 || true
     [ $SIZE_PREFERRED -gt 1536 ] && SIZE_PREFERRED=1536 || true
