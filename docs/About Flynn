@@ -1,10 +1,8 @@
 =====================================================
-                      Flynn
-         Telnet and Finger Client for Macintosh
-                    Version 1.9.8
+Flynn
+Telnet and Finger Client for Macintosh
+Version 1.9.8
 =====================================================
-
-Connect your classic Macintosh to the modern world.
 
 
 About Flynn
@@ -19,7 +17,10 @@ terminal for interactive sessions with Linux, Unix,
 and other Telnet-capable servers, as well as Finger
 protocol queries (RFC 1288) for user information.
 
-Flynn emulates a VT220/xterm terminal with support for
+Flynn supports up to 4 simultaneous sessions in
+separate windows, each with its own terminal buffer,
+scrollback, font, theme, and connection state. It
+emulates a VT220/xterm terminal with support for
 full-screen applications like vi, nano, tmux, and
 Midnight Commander. It renders box-drawing characters,
 handles UTF-8 text, and provides all the keyboard
@@ -35,9 +36,10 @@ character set.
 
 On System 7 with Color QuickDraw, Flynn supports full
 256-color rendering (16 ANSI + 216 color cube + 24
-grayscale). Truecolor sequences are downgraded to the
-nearest 256-color match. Color support is automatic
-and has zero impact on System 6 monochrome systems.
+grayscale) with 11 built-in themes and Ghostty-format
+theme import. Truecolor sequences are downgraded to
+the nearest 256-color match. Color and theme support
+is automatic on color-capable hardware.
 
 
 System Requirements
@@ -127,7 +129,6 @@ Features
   - UTF-8 support for accented characters, curly
     quotes, em dashes, and other Unicode symbols
   - 256-color support on System 7 with Color QuickDraw
-    (automatic detection, zero impact on System 6)
   - CP437/ANSI-BBS mode for bulletin board systems
     (full 256-character CP437 rendering, sextant and
     fractional block characters for BBS ANSI art)
@@ -156,12 +157,23 @@ Features
     screen to a TEXT file via standard Save dialog
   - Recent bookmarks in File menu for quick access
   - Resizable window (drag the grow box to resize)
-  - Six font choices: Monaco 9, Monaco 12, Courier
-    10, Chicago 12, Geneva 9, Geneva 10
-  - Per-session font and terminal type overrides
-  - Terminal type: xterm, VT220, VT100, xterm-256color,
+  - Eight fonts: Monaco, Geneva, Chicago, Courier,
+    New York (all systems); Helvetica, Times,
+    Palatino (System 7 only) — in sizes 9, 10, 12, 14
+  - Terminal type: xterm, xterm-256color, VT100, VT220,
     ANSI-BBS
+  - 11 built-in color themes (Solarized, TokyoNight,
+    Amber CRT, System 7, Compact Mac, Dracula, Nord)
+    plus Ghostty-format theme import/export
+  - Per-session theme, font, and terminal type
   - Dark mode (white text on black background)
+  - Find in scrollback (Cmd+F) with Find Again (Cmd+G)
+  - Show Clipboard viewer (Cmd+K)
+  - Session logging to text file (Cmd+L)
+  - Page Setup and Print (Cmd+P)
+  - Reconnect (Cmd+R) after disconnect
+  - Telnet NOP keep-alive (120s idle timeout)
+  - Reset Terminal (Cmd+E) clears screen and parser
   - Custom DNS server configuration
   - Username auto-login
   - Backspace mode toggle: DEL (0x7F) for xterm/VT220,
@@ -185,14 +197,13 @@ Features
   - Bracketed paste mode
   - Apple HIG compliant dialogs (default button
     outlines, Cmd+. cancel, tab field cycling,
-    centered on screen, movable on System 7)
+    centered on screen)
   - All preferences saved across launches
-  - System 7 Preferences folder support
   - System 7 enhancements: movable modal dialogs,
-    modern save dialog, Apple Events support,
-    MultiFinder suspend/resume, background disconnect
-    notification, machine type in About dialog (all
-    conditional — System 6 behavior unchanged)
+    Preferences folder, modern save dialog, Apple
+    Events, MultiFinder suspend/resume, background
+    disconnect notification, machine type in About
+    dialog (all conditional — System 6 unchanged)
 
 
 Keyboard Shortcuts
@@ -205,13 +216,21 @@ and USB keyboards.
   Menu Commands
   ~~~~~~~~~~~~~
   Command-N       New session (new window if connected)
-  Command-F       Finger protocol query
   Command-W       Close active session window
+  Command-R       Reconnect to same host
+  Command-I       Finger protocol query
   Command-S       Save Contents to file
+  Command-L       Start/Stop session logging
+  Command-P       Print terminal content
   Command-B       Open Bookmark Manager
+  Command-D       Add current session as bookmark
   Command-A       Select All (entire terminal screen)
   Command-C       Copy selected text
   Command-V       Paste clipboard to connection
+  Command-F       Find in scrollback
+  Command-G       Find Again
+  Command-K       Show Clipboard viewer
+  Command-E       Reset Terminal
   Command-Q       Quit Flynn
 
   Scrollback
@@ -373,18 +392,19 @@ The Options menu uses hierarchical submenus for
 fonts, terminal type, and bookmarks, with
 additional items for networking and display mode.
 
-  Fonts (submenu)
-  ~~~~~~~~~~~~~~~
-  Monaco 9pt    80 columns x 24 rows (default)
-  Monaco 12pt   Larger text, fewer columns/rows
-  Courier 10pt  Classic fixed-width alternative
-  Chicago 12pt  The classic Mac system font
-  Geneva 9pt    Compact proportional font
-  Geneva 10pt   Slightly larger proportional font
+  Font (submenu)
+  ~~~~~~~~~~~~~~
+  Monaco, Geneva, Chicago, Courier, New York
+  (all systems); Helvetica, Times, Palatino
+  (added at runtime on System 7 only).
+
+  Size (submenu)
+  ~~~~~~~~~~~~~~
+  9, 10, 12, 14 — any font/size combination.
 
   The terminal grid is automatically recomputed when
-  you change font, and the server is notified of
-  the new window size if connected.
+  you change font or size, and the server is notified
+  of the new window size if connected.
 
   Note: Proportional fonts (Chicago, Geneva) use
   per-character positioning to maintain alignment

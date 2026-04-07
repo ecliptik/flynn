@@ -5,7 +5,7 @@ A Telnet and Finger client for classic 68000 Macintosh systems, from the Mac Plu
 This project was 100% built agentically using [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 <p align="center">
-<a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> · <a href="#building">Building</a> · <a href="#testing">Testing</a> · <a href="#acknowledgments">Acknowledgments</a> · <a href="#license">License</a>
+<a href="#download">Download</a> · <a href="#features">Features</a> · <a href="#keyboard-shortcuts">Keyboard Shortcuts</a> · <a href="#themes">Themes</a> · <a href="#building">Building</a> · <a href="#testing">Testing</a> · <a href="#acknowledgments">Acknowledgments</a> · <a href="#license">License</a>
 </p>
 
 ### System 6
@@ -34,7 +34,7 @@ Pre-built binaries are available on the [Releases](https://codeberg.org/ecliptik
 | Edition | Description | Memory | Download |
 |---------|-------------|--------|----------|
 | **Flynn** | Full build — 4 sessions, all features including 256-color | ~768KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.hqx) |
-| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~384KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.hqx) |
+| **Flynn Lite** | Recommended for Mac Plus — 1 session, most features | ~340KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.hqx) |
 | **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped | ~256KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.hqx) |
 
 Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). No build toolchain required — just download and run. See [docs/BUILD.md](docs/BUILD.md) for custom builds.
@@ -43,49 +43,32 @@ Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archi
 
 - Macintosh Plus or later (4MB RAM, 68000 CPU)
 - System 6.0.8 or System 7 with MacTCP or Open Transport
-- ~119KB disk space, ~72KB RAM per session (mono) / ~123KB (color)
+- ~154KB disk space, ~73KB RAM per session (mono) / ~123KB (color)
 
 ## Features
 
-**Terminal Emulation**
-- **VT100/VT220/xterm/xterm-256color/ANSI-BBS terminal emulation** with CP437 rendering
-- **256-color support** on System 7 with Color QuickDraw (zero System 6 impact)
-- **SGR attributes**: bold, italic, underline, dim, strikethrough, blink, inverse
-- **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns** (180 primitives + 57 sextants + 18 emoji)
-- **OSC support**: window title, palette and color queries
+**Telnet & Finger**
+- **Telnet client** with full IAC negotiation, VT100/VT220/xterm terminal emulation, ANSI-BBS mode with CP437 rendering, and OSC sequences (window title, palette/color queries)
+- **Finger client** (RFC 1288) with user queries, verbose mode, and forwarding
+- **Up to 4 simultaneous sessions** in resizable windows with 192-line scrollback
+- **Bookmarks** with per-bookmark protocol, font, terminal type, and theme
 
-**Display & Windowing**
-- **Multiple sessions** (up to 4 simultaneous windows)
-- **Resizable window and scrollback** (80x24 up to 132x50, 192-line scrollback)
-- **Status bar** showing terminal size, protocol, and connection info
-- **8 fonts** (Monaco, Geneva, Chicago, Courier, New York; Helvetica, Times, Palatino on System 7) with independent size selection (9, 10, 12, 14)
-- **11 built-in color themes** (Solarized Light/Dark, TokyoNight Day/Night, Amber CRT, System 7, Compact Mac, Dracula, Nord) plus Light and Dark mono themes, with per-window independence
-- **Theme import/export** in [Ghostty](https://ghostty.org) format — import any Ghostty theme file, auto-snapped to the Mac 256-color palette
+**Display**
+- **256-color support** on System 7 with Color QuickDraw
+- **11 built-in color themes** plus [Ghostty](https://ghostty.org)-format theme import/export
+- **UTF-8 with box-drawing, Unicode glyphs, emoji, and Braille patterns**
+- **8 fonts** (Monaco, Geneva, Chicago, Courier, New York, Helvetica, Times, Palatino) in 4 sizes
 
-**Input & Interaction**
-- **Mouse text selection with copy/paste**
-- **Bracketed paste mode**
-- **M0110 keyboard support**
-- **Double-buffered rendering**
-- **Keystroke buffering**
-- **Local echo** for BBS sessions (WONT ECHO servers)
-- **Backspace DEL/BS toggle**
+**Input**
+- **M0110 keyboard support** — full mappings for Escape, Control, and function keys
+- **Mouse text selection** with copy, paste, Select All, and bracketed paste mode
+- **Find in Scrollback** (Cmd+F / Cmd+G) and session logging (Cmd+L)
 
-**Finger Protocol (RFC 1288)**
-- **Finger client** (File > Finger..., Cmd+I)
-- **User and host queries** with optional verbose (/W) flag
-- **Finger forwarding** (user@host@gateway auto-split)
-- **Remembers last host/user** across launches
-
-**Session Management**
-- **Bookmarks** with per-bookmark protocol, font, and terminal type
-- **Reconnect** (Cmd+R) and keep-alive (NOP every 120s)
-- **Session logging** to text file (Cmd+L) with ANSI escape filtering
-- **Page Setup and Print** (Cmd+P) with Printing Manager support
-- **Find in Scrollback** (Cmd+F / Cmd+G), Show Clipboard, Reset Terminal
-- **Persistent settings**, window position, and telnet:// URL handling
-- **Movable modal dialogs** on System 7 (centered, draggable, background redraw)
-- **MultiFinder, Apple Events, and Notification Manager support**
+**System Integration**
+- **System 6.0.8 through 7.5.5** — MacTCP and Open Transport compatibility
+- **System 7 enhancements**: movable modal dialogs, Apple Events, telnet:// URL handling
+- **Persistent settings**, window position, and Preferences folder support
+- **Page Setup and Print** via Printing Manager
 
 ## Keyboard Shortcuts
 
@@ -108,6 +91,8 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | F1-F10 | Cmd+1..0 | For M0110 keyboards without function keys |
 | Find | Cmd+F | Search scrollback and screen |
 | Find Again | Cmd+G | Repeat last search |
+| Show Clipboard | Cmd+K | Show clipboard viewer window |
+| Reset Terminal | Cmd+E | Clear screen and reset parser state |
 | Bookmarks | Cmd+B | Open bookmark manager |
 | Add Favorite | Cmd+D | Save current session as bookmark |
 | Finger | Cmd+I | Finger protocol query |
@@ -118,6 +103,26 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | Save Contents | Cmd+S | Save scrollback and screen to text file |
 | Close Window | Cmd+W | Close active session window |
 | Quit | Cmd+Q | Quit Flynn |
+
+## Themes
+
+Flynn ships with 11 built-in themes selectable from Options > Theme:
+
+| Theme | Type | Description |
+|-------|------|-------------|
+| [Light](src/themes/light.h) | Mono | Black on white, default. Works on all systems. |
+| [Dark](src/themes/dark.h) | Mono | White on black. Works on all systems. |
+| [Solarized Light](src/themes/solarized_light.h) / [Dark](src/themes/solarized_dark.h) | Color | Ethan Schoonover's Solarized palette. |
+| [TokyoNight Day](src/themes/tokyo_light.h) / [TokyoNight](src/themes/tokyo_dark.h) | Color | Based on the Tokyo Night color scheme. |
+| [Amber CRT](src/themes/amber_crt.h) | Color | Amber phosphor CRT aesthetic. |
+| [System 7](src/themes/system7.h) | Color | Macintosh System 7 CLUT palette. |
+| [Compact Mac](src/themes/compact_mac.h) | Color | P7 phosphor warmth (Mac Plus/SE/Classic). |
+| [Dracula](src/themes/dracula.h) | Color | Dark purple-accented palette. |
+| [Nord](src/themes/nord.h) | Color | Arctic blue-tinted palette. |
+
+Mono themes work on all systems including the Mac Plus. Color themes require a Mac II or later with Color QuickDraw (detected automatically at runtime). Up to 4 additional custom themes can be imported from [Ghostty](https://ghostty.org)-format files (Options > Theme > Import Theme).
+
+To create custom themes or learn how the theme engine works, see the full [Theme Guide](docs/THEMES.md).
 
 ## Building
 
@@ -143,7 +148,7 @@ Flynn supports fully customizable builds. Three presets cover common configurati
 | Preset | Sessions | Scrollback | Features | Memory |
 |--------|----------|------------|----------|----------------|
 | `minimal` | 1 | none | clipboard, alt screen only | ~256KB |
-| `lite` | 1 | 96 lines | everything except color | ~384KB |
+| `lite` | 1 | 96 lines | everything except color | ~340KB |
 | `full` | 4 | 192 lines | everything | ~768KB |
 
 The default build uses the **full** preset. Select a preset with `--preset`:
