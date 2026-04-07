@@ -367,6 +367,10 @@ update_window_menu(void)
 		AppendMenu(window_menu, "\p ");
 		item = CountMItems(window_menu);
 		SetMenuItemText(window_menu, item, title);
+		/* Cmd+0 through Cmd+9 for first 10 windows */
+		if (item - WIN_MENU_FIRST_WIN < 10)
+			SetItemCmd(window_menu, item,
+			    '0' + (item - WIN_MENU_FIRST_WIN));
 		if (s == active_session)
 			CheckItem(window_menu, item, true);
 	}

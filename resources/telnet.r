@@ -53,7 +53,7 @@ resource 'MENU' (130, "Edit") {
 		"-", noIcon, noKey, noMark, plain;
 		"Clear Scrollback", noIcon, noKey, noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Show Clipboard", noIcon, noKey, noMark, plain
+		"Show Clipboard", noIcon, "K", noMark, plain
 	}
 };
 
@@ -153,7 +153,7 @@ resource 'MENU' (132, "Control") {
 		"Send Break", noIcon, noKey, noMark, plain;
 		"Send Escape", noIcon, ".", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Reset Terminal", noIcon, noKey, noMark, plain
+		"Reset Terminal", noIcon, "E", noMark, plain
 	}
 };
 
