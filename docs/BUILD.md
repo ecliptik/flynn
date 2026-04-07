@@ -77,7 +77,7 @@ Recommended for Macintosh Plus and other compact Macs running System 6. Released
 | Double-width    | ON     |
 | Color           | OFF (no Color QuickDraw on Plus) |
 
-### full (~768KB partition, ~119KB binary) — DEFAULT
+### full (~1336KB partition, ~158KB binary) — DEFAULT
 
 Everything enabled. This is what you get with a plain `./scripts/build.sh` with no
 arguments. For System 7 machines with Color QuickDraw and plenty of RAM. Released as
@@ -292,7 +292,7 @@ Build complete (v1.9.8, full preset):
   Sessions: 4, Scrollback: 192 lines
   Features: finger glyphs cp437 clipboard savefile logging printing favorites
             darkmode altscreen offscreen statusbar cursorstyles tabstops color dblwidth
-  SIZE: 768KB preferred / 704KB minimum
+  SIZE: 1336KB preferred / 1272KB minimum
 ```
 
 ## Examples

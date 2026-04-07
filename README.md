@@ -33,7 +33,7 @@ Pre-built binaries are available on the [Releases](https://codeberg.org/ecliptik
 
 | Edition | Description | Memory | Download |
 |---------|-------------|--------|----------|
-| **Flynn** | All features — 4 sessions, 256-color themes, scrollback | ~768KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.hqx) |
+| **Flynn** | All features — 4 sessions, 256-color themes, scrollback | ~1336KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-1.9.8.hqx) |
 | **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Lite-1.9.8.hqx) |
 | **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.9.8/Flynn-Minimal-1.9.8.hqx) |
 
@@ -147,7 +147,7 @@ Flynn supports fully customizable builds. Three presets cover common configurati
 
 | Preset | Sessions | Features | Memory |
 |--------|----------|----------|--------|
-| `full` | 4 | all features | ~768KB |
+| `full` | 4 | all features | ~1336KB |
 | `lite` | 1 | core features | ~340KB |
 | `minimal` | 1 | only essentials | ~256KB |
 
