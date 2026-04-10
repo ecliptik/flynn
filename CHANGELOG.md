@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- Cross-application clipboard broken under System 6 MultiFinder: the `app4Evt` handler ignored `convertClipboardFlag`, so Flynn never called `LoadScrap`/`UnloadScrap` on suspend/resume. Text copied in other apps was invisible to Flynn's paste and Show Clipboard, and text copied in Flynn never reached other apps.
+
 ## [1.10.0] - 2026-04-07
 
 ### Added
