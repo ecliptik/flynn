@@ -226,10 +226,14 @@ update_readme_downloads() {
         return 0
     fi
 
-    # Replace version in Codeberg release download URLs
-    # Matches: /releases/download/vX.Y.Z/Flynn...-X.Y.Z.ext
     if grep -q "releases/download/v" "$readme"; then
+        # Rewrite version in existing Codeberg download URLs.
+        # Matches: /releases/download/vX.Y.Z/Flynn...-X.Y.Z.ext
         sed -i -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/([A-Za-z-]*)-[0-9]+\.[0-9]+\.[0-9]+\.|releases/download/${tag}/\1-${ver}.|g" "$readme"
+        # For each row carrying an .hqx link but no .sit link, append a .sit
+        # link pointing at the same versioned URL with a swapped extension.
+        # The /[.sit]/! address makes this idempotent on re-run.
+        sed -i -E '/\[\.sit\]/! s|\[\.hqx\]\(([^)]+)\.hqx\)|[.hqx](\1.hqx) \xc2\xb7 [.sit](\1.sit)|g' "$readme"
         echo "  Updated README.md download links to $tag"
     else
         echo "  Warning: No download links found in README.md"
