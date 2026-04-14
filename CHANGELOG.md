@@ -4,8 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Stuffit 1.5.1 archives (`.sit`) now generated as a distribution artifact alongside `.dsk` and `.hqx`, containing Flynn and About Flynn. Expand with StuffIt Expander on the Mac.
+
 ### Fixed
 - Cross-application clipboard broken under System 6 MultiFinder: the `app4Evt` handler ignored `convertClipboardFlag`, so Flynn never called `LoadScrap`/`UnloadScrap` on suspend/resume. Text copied in other apps was invisible to Flynn's paste and Show Clipboard, and text copied in Flynn never reached other apps.
+- MacBinary headers for `Flynn.bin` now carry the build's creation/modification date instead of the epoch, so Finder no longer shows deployed copies as "Fri Jan 1 1904".
 
 ## [1.10.0] - 2026-04-07
 
