@@ -35,9 +35,9 @@ collect_artifacts() {
     local build_dir="$SCRIPT_DIR/build"
     RELEASE_FILES=()
     for artifact in \
-        "Flynn-${ver}.dsk" "Flynn-${ver}.hqx" \
-        "Flynn-Lite-${ver}.dsk" "Flynn-Lite-${ver}.hqx" \
-        "Flynn-Minimal-${ver}.dsk" "Flynn-Minimal-${ver}.hqx"; do
+        "Flynn-${ver}.dsk" "Flynn-${ver}.hqx" "Flynn-${ver}.sit" \
+        "Flynn-Lite-${ver}.dsk" "Flynn-Lite-${ver}.hqx" "Flynn-Lite-${ver}.sit" \
+        "Flynn-Minimal-${ver}.dsk" "Flynn-Minimal-${ver}.hqx" "Flynn-Minimal-${ver}.sit"; do
         [ -f "$build_dir/$artifact" ] && RELEASE_FILES+=("$build_dir/$artifact")
     done
 }
@@ -267,7 +267,7 @@ do_release() {
 
     if [ ${#RELEASE_FILES[@]} -eq 0 ]; then
         echo "Warning: No artifacts found for $ver"
-        echo "  Expected: Flynn-${ver}.dsk/.hqx, Flynn-Lite-${ver}.dsk/.hqx, Flynn-Minimal-${ver}.dsk/.hqx"
+        echo "  Expected: Flynn-${ver}.dsk/.hqx/.sit, Flynn-Lite-${ver}.dsk/.hqx/.sit, Flynn-Minimal-${ver}.dsk/.hqx/.sit"
     else
         echo "  Artifacts: ${#RELEASE_FILES[@]} files"
         for f in "${RELEASE_FILES[@]}"; do echo "    $(basename "$f")"; done

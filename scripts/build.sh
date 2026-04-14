@@ -6,6 +6,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLCHAIN="$SCRIPT_DIR/Retro68-build/toolchain/m68k-apple-macos/cmake/retro68.toolchain.cmake"
 BUILD_DIR="$SCRIPT_DIR/build"
 
+# Creator code — 4-char Mac OSType identifying this app. Change when
+# porting this script to another project (e.g. Geomys).
+CREATOR_CODE="FLYN"
+
+# Shared Mac tooling (sit archiver, macbinary_split.py) lives outside
+# the repo so it can be reused across Flynn, Geomys, etc.
+EMULATORS_DIR="${EMULATORS_DIR:-$HOME/emulators}"
+SIT_BIN="$EMULATORS_DIR/tools/sit/sit"
+MACBIN_SPLIT="$EMULATORS_DIR/scripts/macbinary_split.py"
+
 # --- Feature flag defaults (= full preset) ---
 FLYNN_MAX_SESSIONS=4
 FLYNN_SCROLLBACK=192
@@ -317,20 +327,29 @@ cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=MinSi
     -DFLYNN_TAB_STOPS="$FLYNN_TAB_STOPS"
 make "${MAKE_ARGS[@]}"
 
-# Fix creator code in MacBinary header (Retro68 sets '????' instead of 'FLYN')
-# Then recalculate MacBinary II CRC-16 (XMODEM) over header bytes 0-123
-printf 'FLYN' | dd of="$BUILD_DIR/Flynn.bin" bs=1 seek=69 count=4 conv=notrunc 2>/dev/null
+# Fix MacBinary header: Retro68 writes '????' as creator and leaves ctime/mtime
+# zero (epoch 1904 in Finder). Patch creator to $CREATOR_CODE, stamp both dates
+# with current build time (expressed as Mac local time, the format HFS expects),
+# then recalculate the MacBinary II CRC-16 (XMODEM) over header bytes 0-123.
+printf '%s' "$CREATOR_CODE" | dd of="$BUILD_DIR/Flynn.bin" bs=1 seek=69 count=4 conv=notrunc 2>/dev/null
 python3 -c "
-import struct
+import struct, time, calendar
+MAC_EPOCH = 2082844800  # seconds between 1904-01-01 and 1970-01-01
+# Mac dates are stored as 'seconds since 1904-01-01 local time'. Convert
+# current wall clock by treating the local struct_time as if it were UTC.
+now_mac = calendar.timegm(time.localtime()) + MAC_EPOCH
 with open('$BUILD_DIR/Flynn.bin', 'r+b') as f:
     hdr = bytearray(f.read(128))
+    hdr[91:95] = struct.pack('>I', now_mac)   # creation date
+    hdr[95:99] = struct.pack('>I', now_mac)   # modification date
     crc = 0
     for b in hdr[:124]:
         crc ^= b << 8
         for _ in range(8):
             crc = ((crc << 1) ^ 0x1021 if crc & 0x8000 else crc << 1) & 0xFFFF
-    f.seek(124)
-    f.write(struct.pack('>H', crc))
+    hdr[124:126] = struct.pack('>H', crc)
+    f.seek(0)
+    f.write(bytes(hdr))
 "
 
 # Generate BinHex (.hqx) archive if macutils is available
@@ -351,12 +370,37 @@ fi
 # Post-process 800K floppy image: set creator code and add About Flynn
 if [ -f "$BUILD_DIR/Flynn.dsk" ]; then
     hmount "$BUILD_DIR/Flynn.dsk"
-    hattrib -t APPL -c FLYN :Flynn
+    hattrib -t APPL -c "$CREATOR_CODE" :Flynn
     if [ -f "$ABOUT_OUT" ]; then
         hcopy -r "$ABOUT_OUT" ":About Flynn"
         hattrib -t ttro -c ttxt ":About Flynn"
     fi
     humount
+fi
+
+# Generate Stuffit 1.5 archive (.sit) containing Flynn + About Flynn.
+# Requires shared tooling at ~/emulators/tools/sit and ~/emulators/scripts/.
+# Run `$EMULATORS_DIR/scripts/setup-sit.sh` once to bootstrap.
+if [ -x "$SIT_BIN" ] && [ -f "$MACBIN_SPLIT" ]; then
+    STAGE="$BUILD_DIR/.sit-staging"
+    rm -rf "$STAGE" && mkdir -p "$STAGE"
+    python3 "$MACBIN_SPLIT" split "$BUILD_DIR/Flynn.bin" "$STAGE/Flynn"
+    if [ -f "$ABOUT_OUT" ]; then
+        cp "$ABOUT_OUT" "$STAGE/About Flynn"
+        python3 "$MACBIN_SPLIT" make-info "$STAGE/About Flynn" ttro ttxt
+    fi
+    rm -f "$BUILD_DIR/Flynn.sit"
+    if (cd "$STAGE" && "$SIT_BIN" -o "$BUILD_DIR/Flynn.sit" Flynn "About Flynn" >/dev/null); then
+        echo "Stuffit archive created: Flynn.sit"
+    else
+        echo "Warning: sit failed, skipping .sit artifact"
+        rm -f "$BUILD_DIR/Flynn.sit"
+    fi
+    rm -rf "$STAGE"
+else
+    if [ ! -x "$SIT_BIN" ]; then
+        echo "Note: run $EMULATORS_DIR/scripts/setup-sit.sh once to enable .sit output"
+    fi
 fi
 
 # --- Determine file prefix from preset ---
@@ -375,6 +419,7 @@ esac
 cp "$BUILD_DIR/Flynn.bin" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.bin"
 cp "$BUILD_DIR/Flynn.dsk" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.dsk"
 [ -f "$BUILD_DIR/Flynn.hqx" ] && cp "$BUILD_DIR/Flynn.hqx" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.hqx"
+[ -f "$BUILD_DIR/Flynn.sit" ] && cp "$BUILD_DIR/Flynn.sit" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.sit"
 
 # --- Build summary ---
 ENABLED=""
@@ -419,7 +464,7 @@ echo "To deploy to HFS image:"
 echo "  hmount diskimages/snow-sys608.img"
 echo "  hmkdir :Flynn"
 echo "  hcopy -m build/Flynn.bin ':Flynn:Flynn'"
-echo "  hattrib -t APPL -c FLYN ':Flynn:Flynn'"
+echo "  hattrib -t APPL -c ${CREATOR_CODE} ':Flynn:Flynn'"
 echo "  hcopy -r 'build/About Flynn' ':Flynn:About Flynn'"
 echo "  hattrib -t ttro -c ttxt ':Flynn:About Flynn'"
 echo "  humount"
