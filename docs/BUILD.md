@@ -274,11 +274,15 @@ actual memory usage. Your actual usage will be lower.
 
 ## Build Output
 
-The build produces three artifacts in the `build/` directory:
+The build produces four artifacts in the `build/` directory:
 
 - **Flynn.bin** — MacBinary archive (for transfer via serial, network, or emulator)
 - **Flynn.dsk** — 800K floppy disk image (bootable, includes About Flynn)
 - **Flynn.hqx** — BinHex archive (for email/BBS distribution, requires `macutils`)
+- **Flynn.sit** — StuffIt 1.5.1 archive containing Flynn and About Flynn; expand
+  with StuffIt Expander on the Mac. Requires the shared `sit` tool at
+  `~/emulators/tools/sit` — run `~/emulators/scripts/setup-sit.sh` once to
+  bootstrap. Skipped with a note if the tooling isn't installed.
 
 Versioned copies include the preset name (e.g., `Flynn-1.10.0.bin` for full,
 `Flynn-Lite-1.10.0.bin` for lite, `Flynn-Minimal-1.10.0.bin` for minimal).

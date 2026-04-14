@@ -37,7 +37,7 @@ Pre-built binaries are available on the [Releases](https://codeberg.org/ecliptik
 | **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.0/Flynn-Lite-1.10.0.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.0/Flynn-Lite-1.10.0.hqx) |
 | **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.0/Flynn-Minimal-1.10.0.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.0/Flynn-Minimal-1.10.0.hqx) |
 
-Each edition is available as `.dsk` (800K floppy image) and `.hqx` (BinHex archive). See [docs/BUILD.md](docs/BUILD.md) for custom builds.
+Each edition is available as `.dsk` (800K floppy image), `.hqx` (BinHex archive), or `.sit` (StuffIt 1.5.1 archive). See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
 ## Requirements
 
