@@ -284,15 +284,15 @@ The build produces four artifacts in the `build/` directory:
   `~/emulators/tools/sit` — run `~/emulators/scripts/setup-sit.sh` once to
   bootstrap. Skipped with a note if the tooling isn't installed.
 
-Versioned copies include the preset name (e.g., `Flynn-1.10.0.bin` for full,
-`Flynn-Lite-1.10.0.bin` for lite, `Flynn-Minimal-1.10.0.bin` for minimal).
+Versioned copies include the preset name (e.g., `Flynn-1.10.1.bin` for full,
+`Flynn-Lite-1.10.1.bin` for lite, `Flynn-Minimal-1.10.1.bin` for minimal).
 
 ## Build Summary
 
 After building, a summary shows the configuration:
 
 ```
-Build complete (v1.10.0, full preset):
+Build complete (v1.10.1, full preset):
   Sessions: 4, Scrollback: 192 lines
   Features: finger glyphs cp437 clipboard savefile logging printing favorites
             darkmode altscreen offscreen statusbar cursorstyles tabstops color dblwidth

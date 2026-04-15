@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-04-14
+
 ### Added
 - Stuffit 1.5.1 archives (`.sit`) now generated as a distribution artifact alongside `.dsk` and `.hqx`, containing Flynn and About Flynn. Expand with StuffIt Expander on the Mac.
 
