@@ -13,8 +13,9 @@ cmake_install.cmake
 Makefile
 
 # Retro68 toolchain (built from source locally, not committed)
-Retro68/
-Retro68-build/
+# No trailing slash so this also matches symlinks to the toolchain
+Retro68
+Retro68-build
 
 # Tools - binary artifacts (kept locally, not committed)
 tools/snow/
