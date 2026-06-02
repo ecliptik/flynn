@@ -34,6 +34,13 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 - CMake flag: `-m68000` for Mac Plus compatibility
 - MacTCP.h is NOT in Retro68's Multiversal Interfaces — copied from wallops-146
 - Retro68 API quirks vs classic Toolbox: `qd.thePort` not `thePort`, `GetMenuHandle` not `GetMHandle`, `AppendResMenu` not `AddResMenu`, `LMGetApplLimit()` not `GetApplLimit`
+- All code is reviewed by Codex
+
+### Releases & Artifact Verification
+
+`scripts/release.sh vX.Y.Z` builds all 3 presets (`build.sh --clean --preset {full,lite,minimal}` → 9 artifacts: `.dsk`/`.hqx`/`.sit`) then tries to publish to Forgejo/Codeberg/GitHub; with no `FORGEJO_TOKEN`/`CODEBERG_TOKEN`/`gh auth` it skips publishing and leaves the artifacts in `build/` (ready for Macintosh Garden upload). The build stamps the version only if tag `vX.Y.Z` is at **HEAD** — bump `CMakeLists.txt`, `resources/telnet.r` (`"Flynn X.Y.Z"`), and `docs/About Flynn`, finalize CHANGELOG, then commit + tag before building.
+
+Verify artifacts host-side (no Mac): `.dsk` via `hmount` (valid HFS + app); `.hqx` via `hexbin` (decoded `.bin` differs only in MacBinary header dates — resource fork is byte-identical); `.sit` via `macunpack -f` (resource fork byte-identical). To confirm a `.sit` opens in real StuffIt, test in **Basilisk/System 7** (System 6 has no Expander) — stage it in `~/emulators/unix/` and tag its `.finf` type/creator `SIT!`.
 
 ## Testing
 
@@ -59,7 +66,7 @@ Emulator infrastructure lives in `/home/claude/emulators/`. See its docs for ful
 
 ### Emulator Rules (Critical — Violations Cause Data Corruption)
 
-- **Never update a disk image while Snow is running** — the image is memory-mapped; corruption will result. Always `pkill -f snowemu; sleep 1` first.
+- **Never update a disk image while Snow is running** — the image is memory-mapped; corruption will result. Stop Snow by **explicit PID and verify** first — `pkill -f snowemu` matches the calling shell's own command line (self-kill, spurious exit 144) and `pkill -x` is unreliable: `P=$(pgrep -x snowemu); [ -n "$P" ] && kill -9 $P; sleep 2; pgrep -x snowemu` (must be empty). A stale instance left running while you deploy yields two Snows + a disk modified under one → "?" boot floppy (HFS usually survives; verify with `hmount`/`hls`). Flynn has no `deploy.sh`: kill snow, `hmount system6.img`, `hdel :Flynn:Flynn`, `hcopy -m build/Flynn-<v>.bin :Flynn:Flynn`, `hattrib -t APPL -c FLYN`, `humount`, relaunch.
 - **Never run multiple Snow instances** or Snow and Basilisk II simultaneously — they share the X11 display.
 - **Never hard-kill Basilisk II repeatedly** — corrupts the disk image and `sheep_net` kernel module. Quit from inside the emulator (Special > Shut Down) when possible. If you must kill externally, do it once and reset before relaunching:
   ```bash
