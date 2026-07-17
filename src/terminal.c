@@ -351,7 +351,8 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 				}
 				/* Inline fast path: ASCII, no wrap, standard charset */
 				if (!term->wrap_pending &&
-				    term->charset_std) {
+				    term->charset_std &&
+				    !term->insert_mode) {
 					unsigned char a = term->cur_attr;
 					if (term->cur_fg != COLOR_DEFAULT ||
 					    term->cur_bg != COLOR_DEFAULT)
@@ -510,11 +511,12 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 					term->params[0] = 0;
 					term->num_params = 0;
 					term->intermediate = 0;
+					term->is_colon[0] = 0;
 				} else if (ch == 0x9D) {
 					/* OSC (8-bit C1) - same as ESC ] */
 					term->parse_state = PARSE_OSC;
 					term->osc_len = 0;
-					term->osc_param = 0;
+					term->osc_param = -1;
 				} else if (ch == 0x9C) {
 					/* ST (8-bit C1) - string terminator */
 				} else if (ch >= 0x80 && ch <= 0x9F) {
@@ -1535,7 +1537,7 @@ term_process_esc(Terminal *term, unsigned char ch)
 #ifdef FLYNN_TAB_STOPS
 		term->tab_stops[term->cur_col] = 1;
 #endif
-		return;
+		break;
 
 	case '=':
 		/* DECKPAM - application keypad mode */
@@ -2229,13 +2231,11 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			/* Secondary DA: respond as VT220 */
 			memcpy(term->response, "\033[>1;10;0c", 10);
 			term->response_len = 10;
-			term_flush_response(term);
 		} else if (term->intermediate == 0 ||
 		    term->intermediate == '?') {
 			/* Primary DA: respond as VT220 */
 			memcpy(term->response, "\033[?62;1;6c", 10);
 			term->response_len = 10;
-			term_flush_response(term);
 		}
 		break;
 
@@ -2347,12 +2347,10 @@ term_execute_csi(Terminal *term, unsigned char cmd)
 			    term->cur_row + 1, term->cur_col + 1);
 			if (term->response_len >= (short)sizeof(term->response))
 				term->response_len = sizeof(term->response) - 1;
-			term_flush_response(term);
 		} else if (p1 == 5) {
 			/* Status report: OK */
 			memcpy(term->response, "\033[0n", 4);
 			term->response_len = 4;
-			term_flush_response(term);
 		}
 		break;
 
@@ -3197,7 +3195,7 @@ terminal_find(Terminal *term, const char *text, short text_len,
 				cell = find_get_cell(term, row, col);
 				if (!cell)
 					goto next_fwd;
-				if (cell_to_char(cell) !=
+				if ((unsigned char)cell_to_char(cell) !=
 				    (unsigned char)text[0])
 					continue;
 				/* Check remaining characters */
@@ -3206,7 +3204,7 @@ terminal_find(Terminal *term, const char *text, short text_len,
 					    col + ti);
 					if (!cell)
 						break;
-					if (cell_to_char(cell) !=
+					if ((unsigned char)cell_to_char(cell) !=
 					    (unsigned char)text[ti])
 						break;
 				}
@@ -3229,7 +3227,7 @@ next_fwd:
 				cell = find_get_cell(term, row, col);
 				if (!cell)
 					goto next_bwd;
-				if (cell_to_char(cell) !=
+				if ((unsigned char)cell_to_char(cell) !=
 				    (unsigned char)text[0])
 					continue;
 				for (ti = 1; ti < text_len; ti++) {
@@ -3237,7 +3235,7 @@ next_fwd:
 					    col + ti);
 					if (!cell)
 						break;
-					if (cell_to_char(cell) !=
+					if ((unsigned char)cell_to_char(cell) !=
 					    (unsigned char)text[ti])
 						break;
 				}

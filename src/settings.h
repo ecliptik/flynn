@@ -61,4 +61,13 @@ void prefs_load(FlynnPrefs *prefs);
 /* Save preferences to "Flynn Preferences" file. */
 void prefs_save(FlynnPrefs *prefs);
 
+/* Initialise a prefs struct to factory defaults (see settings_migrate.c). */
+void prefs_defaults(FlynnPrefs *prefs);
+
+/* Convert a raw on-disk prefs image (len bytes) into the current layout.
+ * out must already be prefs_defaults()-initialised.  Returns 1 if the
+ * layout was migrated (re-save recommended), 0 otherwise.  Pure logic,
+ * no Toolbox -- unit-tested natively in tests/migration_test.c. */
+int prefs_migrate(const void *raw, long len, FlynnPrefs *out);
+
 #endif /* SETTINGS_H */

@@ -300,7 +300,9 @@ do_print(void)
 	GetPort(&savePort);
 	prPort = PrOpenDoc(g_hPrint, 0L, 0L);
 	if (PrError() != noErr) {
-		PrCloseDoc(prPort);
+		/* PrOpenDoc failed — the document was never opened, so
+		 * calling PrCloseDoc on prPort can fault in the driver.
+		 * Skip straight to PrClose and restore the port. */
 		PrClose();
 		SetPort(savePort);
 		return;

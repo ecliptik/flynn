@@ -87,6 +87,8 @@ buffer_key_send(Session *s, const char *data, short len)
 void
 flush_key_send(Session *s)
 {
+	if (!s)
+		return;
 	if (s->key_send_len > 0 && s->conn.state == CONN_STATE_CONNECTED) {
 		conn_send(&s->conn, s->key_send_buf, s->key_send_len);
 		s->key_send_len = 0;
@@ -166,36 +168,10 @@ handle_key_down(Session *s, EventRecord *event)
 			return;
 		}
 
-		/* Cmd+1..0 -> F1-F10 for M0110 keyboards (table-driven) */
-		if (s->conn.state == CONN_STATE_CONNECTED &&
-		    key >= '0' && key <= '9') {
-			/* Reuse special_key_map F-key entries via
-			 * lookup: F1=0x7A..F10=0x6D. Map digit to
-			 * same vkey the F-key table uses. */
-			static const unsigned char digit_to_fvkey[10] = {
-				0x6D,	/* '0' -> F10 */
-				0x7A,	/* '1' -> F1 */
-				0x78,	/* '2' -> F2 */
-				0x63,	/* '3' -> F3 */
-				0x76,	/* '4' -> F4 */
-				0x60,	/* '5' -> F5 */
-				0x61,	/* '6' -> F6 */
-				0x62,	/* '7' -> F7 */
-				0x64,	/* '8' -> F8 */
-				0x65,	/* '9' -> F9 */
-			};
-			short ki, fvk;
-
-			fvk = digit_to_fvkey[key - '0'];
-			for (ki = 0; ki < (short)NUM_SPECIAL_KEYS; ki++) {
-				if (special_key_map[ki].vkey == fvk) {
-					buffer_key_send(s,
-					    (char *)special_key_map[ki].seq,
-					    special_key_map[ki].len);
-					return;
-				}
-			}
-		}
+		/* Cmd+0..9 is reserved for the Window menu's session-
+		 * switch shortcuts (SetItemCmd in update_window_menu);
+		 * fall through to MenuKey.  F1-F12 remain available via
+		 * their function-key vkeys. */
 
 		update_menus();
 		handle_menu(MenuKey(key));

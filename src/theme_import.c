@@ -452,9 +452,11 @@ do_import_theme(void)
 	prefs.custom_themes[slot].in_use = 1;
 	prefs.custom_theme_count++;
 
-	/* Reload and activate */
+	/* Reload and activate.  A single prefs_save() at the end of the
+	 * auto-select block below persists the whole prefs struct
+	 * (custom_themes slot + count + theme_id + dark_mode), so no
+	 * intermediate save is needed here. */
 	theme_load_custom();
-	prefs_save(&prefs);
 	theme_rebuild_menu();
 
 	/* Auto-select the imported theme */
@@ -604,34 +606,48 @@ do_export_theme(void)
 	default_name[0] = (unsigned char)nlen;
 	memcpy(default_name + 1, th->name, nlen);
 
-	/* Format in Ghostty format */
+	/* Format in Ghostty format.  snprintf() returns the would-be
+	 * length, so len can run past the buffer; guard every append
+	 * (if len >= sizeof(buf), stop) so the size argument
+	 * sizeof(buf)-len never underflows the unsigned size_t. */
 	len = 0;
 	for (i = 0; i < 16; i++) {
+		if (len >= (short)sizeof(buf))
+			break;
 		len += snprintf(buf + len, sizeof(buf) - len,
 		    "palette = %d=#%02x%02x%02x\n",
 		    i,
 		    th->ansi[i].r, th->ansi[i].g, th->ansi[i].b);
 	}
-	len += snprintf(buf + len, sizeof(buf) - len,
-	    "background = #%02x%02x%02x\n",
-	    th->default_bg.r, th->default_bg.g, th->default_bg.b);
-	len += snprintf(buf + len, sizeof(buf) - len,
-	    "foreground = #%02x%02x%02x\n",
-	    th->default_fg.r, th->default_fg.g, th->default_fg.b);
-	len += snprintf(buf + len, sizeof(buf) - len,
-	    "cursor-color = #%02x%02x%02x\n",
-	    th->cursor_color.r, th->cursor_color.g,
-	    th->cursor_color.b);
+	if (len < (short)sizeof(buf))
+		len += snprintf(buf + len, sizeof(buf) - len,
+		    "background = #%02x%02x%02x\n",
+		    th->default_bg.r, th->default_bg.g, th->default_bg.b);
+	if (len < (short)sizeof(buf))
+		len += snprintf(buf + len, sizeof(buf) - len,
+		    "foreground = #%02x%02x%02x\n",
+		    th->default_fg.r, th->default_fg.g, th->default_fg.b);
+	if (len < (short)sizeof(buf))
+		len += snprintf(buf + len, sizeof(buf) - len,
+		    "cursor-color = #%02x%02x%02x\n",
+		    th->cursor_color.r, th->cursor_color.g,
+		    th->cursor_color.b);
 	/* cursor-text: use bg as default (text under cursor) */
-	len += snprintf(buf + len, sizeof(buf) - len,
-	    "cursor-text = #%02x%02x%02x\n",
-	    th->default_bg.r, th->default_bg.g, th->default_bg.b);
-	len += snprintf(buf + len, sizeof(buf) - len,
-	    "selection-background = #%02x%02x%02x\n",
-	    th->sel_bg.r, th->sel_bg.g, th->sel_bg.b);
-	len += snprintf(buf + len, sizeof(buf) - len,
-	    "selection-foreground = #%02x%02x%02x\n",
-	    th->sel_fg.r, th->sel_fg.g, th->sel_fg.b);
+	if (len < (short)sizeof(buf))
+		len += snprintf(buf + len, sizeof(buf) - len,
+		    "cursor-text = #%02x%02x%02x\n",
+		    th->default_bg.r, th->default_bg.g, th->default_bg.b);
+	if (len < (short)sizeof(buf))
+		len += snprintf(buf + len, sizeof(buf) - len,
+		    "selection-background = #%02x%02x%02x\n",
+		    th->sel_bg.r, th->sel_bg.g, th->sel_bg.b);
+	if (len < (short)sizeof(buf))
+		len += snprintf(buf + len, sizeof(buf) - len,
+		    "selection-foreground = #%02x%02x%02x\n",
+		    th->sel_fg.r, th->sel_fg.g, th->sel_fg.b);
+	/* Clamp for the FSWrite byte count below. */
+	if (len > (short)sizeof(buf) - 1)
+		len = (short)sizeof(buf) - 1;
 
 	if (use_standard_file()) {
 		StandardFileReply sf_reply;

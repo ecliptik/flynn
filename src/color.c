@@ -138,7 +138,7 @@ color_nearest_256(unsigned char r, unsigned char g, unsigned char b)
 	short cr, cg, cb;
 	short gi;
 	short cube_idx;
-	short cube_dist, gray_dist;
+	long cube_dist, gray_dist;
 	short gray_val;
 	unsigned char gray_idx;
 
@@ -165,9 +165,9 @@ color_nearest_256(unsigned char r, unsigned char g, unsigned char b)
 	cube_idx = 16 + 36 * cr + 6 * cg + cb;
 
 	/* Distance to cube color (squared, per-component) */
-	cube_dist = (r - cube_vals[cr]) * (r - cube_vals[cr]) +
-	    (g - cube_vals[cg]) * (g - cube_vals[cg]) +
-	    (b - cube_vals[cb]) * (b - cube_vals[cb]);
+	cube_dist = (long)(r - cube_vals[cr]) * (r - cube_vals[cr]) +
+	    (long)(g - cube_vals[cg]) * (g - cube_vals[cg]) +
+	    (long)(b - cube_vals[cb]) * (b - cube_vals[cb]);
 
 	/* Check grayscale ramp (indices 232-255: 8, 18, 28, ..., 238) */
 	gray_val = (r + g + b) / 3;
@@ -182,9 +182,9 @@ color_nearest_256(unsigned char r, unsigned char g, unsigned char b)
 	/* Distance to grayscale value */
 	{
 		short gv = 8 + gi * 10;
-		gray_dist = (r - gv) * (r - gv) +
-		    (g - gv) * (g - gv) +
-		    (b - gv) * (b - gv);
+		gray_dist = (long)(r - gv) * (r - gv) +
+		    (long)(g - gv) * (g - gv) +
+		    (long)(b - gv) * (b - gv);
 	}
 
 	return (gray_dist < cube_dist) ? gray_idx :

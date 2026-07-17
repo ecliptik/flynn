@@ -25,6 +25,9 @@
 /* External references to main.c globals */
 extern Session *active_session;
 
+/* Lazy log-flush helper (defined below with the output filter). */
+static void log_flush_for(short refNum);
+
 /*
  * format_timestamp - Write a human-readable timestamp into buf.
  * Uses GetDateTime + SecondsToDate for Toolbox date/time.
@@ -66,6 +69,14 @@ write_log_header(short refNum, Session *s)
 	    s->conn.host[0] ? s->conn.host : "(none)",
 	    s->conn.port);
 
+	/* snprintf returns the would-be length, which can exceed the
+	 * buffer for a long host — clamp so FSWrite never reads past
+	 * the NUL-terminated content and leaks stack bytes. */
+	if (len < 0)
+		return;
+	if (len > (short)sizeof(hdr) - 1)
+		len = (short)sizeof(hdr) - 1;
+
 	count = len;
 	FSWrite(refNum, &count, hdr);
 }
@@ -85,6 +96,12 @@ write_log_footer(short refNum)
 
 	len = snprintf(ftr, sizeof(ftr),
 	    "\r\rFlynn session log ended %s\r", ts);
+
+	/* Clamp would-be length to the buffer (see write_log_header). */
+	if (len < 0)
+		return;
+	if (len > (short)sizeof(ftr) - 1)
+		len = (short)sizeof(ftr) - 1;
 
 	count = len;
 	FSWrite(refNum, &count, ftr);
@@ -216,6 +233,7 @@ do_stop_logging(void)
 	refNum = s->log_refnum;
 	s->log_refnum = 0;
 
+	log_flush_for(refNum);
 	write_log_footer(refNum);
 	FSClose(refNum);
 	FlushVol(0L, 0);
@@ -233,18 +251,59 @@ do_stop_logging(void)
 #define LOG_OSC		3	/* ESC ] ... waiting for ST or BEL */
 #define LOG_OSC_ESC	4	/* ESC ] ... saw ESC (possible ST) */
 
+/*
+ * Filtered output is accumulated across log_write_data() calls and
+ * flushed lazily (half-full, ~1s elapsed, or on stop/disconnect) to
+ * avoid a blocking FSWrite per TCP segment on slow HFS/floppy media.
+ * The buffer is shared across sessions; flush_ref records which log
+ * file the buffered bytes belong to so a session switch flushes the
+ * previous file first.  A crash can lose the unflushed tail — logs
+ * are best-effort.
+ */
+static char          flush_buf[512];
+static short         flush_len = 0;
+static short         flush_ref = 0;   /* refNum flush_buf belongs to */
+static unsigned long flush_tick = 0;  /* TickCount at last flush */
+
+/* Write out any buffered bytes to their owning log file. */
+static void
+log_flush_buf(void)
+{
+	long count;
+
+	if (flush_len > 0 && flush_ref != 0) {
+		count = flush_len;
+		FSWrite(flush_ref, &count, flush_buf);
+		flush_len = 0;
+	}
+	flush_tick = TickCount();
+}
+
+/* Flush and detach if the buffer belongs to refNum (before FSClose). */
+static void
+log_flush_for(short refNum)
+{
+	if (flush_ref == refNum) {
+		log_flush_buf();
+		flush_ref = 0;
+	}
+}
+
 void
 log_write_data(Session *s, unsigned char *data, short len)
 {
-	static char filt_buf[512];
-	short i, out;
+	short i;
 	unsigned char ch;
-	long count;
 
 	if (!s || !s->log_refnum || len <= 0)
 		return;
 
-	out = 0;
+	/* Buffered data from another session must reach its own file
+	 * before we reuse the shared buffer. */
+	if (flush_len > 0 && flush_ref != s->log_refnum)
+		log_flush_buf();
+	flush_ref = s->log_refnum;
+
 	for (i = 0; i < len; i++) {
 		ch = data[i];
 
@@ -296,13 +355,10 @@ log_write_data(Session *s, unsigned char *data, short len)
 				    s->log_last_char == '\r')
 					break;
 				s->log_last_char = ch;
-				filt_buf[out++] = ch;
-				if (out >= (short)sizeof(filt_buf)) {
-					count = out;
-					FSWrite(s->log_refnum,
-					    &count, filt_buf);
-					out = 0;
-				}
+				flush_buf[flush_len++] = ch;
+				if (flush_len >=
+				    (short)sizeof(flush_buf))
+					log_flush_buf();
 			}
 			/* else control chars (0x00-0x1F except
 			 * CR/LF/TAB) are silently dropped */
@@ -310,11 +366,12 @@ log_write_data(Session *s, unsigned char *data, short len)
 		}
 	}
 
-	/* Flush remaining filtered data */
-	if (out > 0) {
-		count = out;
-		FSWrite(s->log_refnum, &count, filt_buf);
-	}
+	/* Lazy flush: only when over half full or ~1s (60 ticks)
+	 * has elapsed since the last flush.  The remainder is held
+	 * until the next call or stop/disconnect. */
+	if (flush_len > (short)(sizeof(flush_buf) / 2) ||
+	    (TickCount() - flush_tick) > 60)
+		log_flush_buf();
 }
 
 void
@@ -328,6 +385,7 @@ log_stop_if_active(Session *s)
 	refNum = s->log_refnum;
 	s->log_refnum = 0;
 
+	log_flush_for(refNum);
 	write_log_footer(refNum);
 	FSClose(refNum);
 	FlushVol(0L, 0);

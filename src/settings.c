@@ -11,7 +11,14 @@
 #include <string.h>
 #include "settings.h"
 #include "sysutil.h"
+#include "macutil.h"
 #include "tcp.h"
+
+/* prefs_defaults() and prefs_migrate() live in this Toolbox-free unit so
+ * the migration logic can be unit-tested natively (tests/migration_test.c).
+ * Including it here keeps it in the cross-compiled build with no CMake
+ * change. */
+#include "settings_migrate.c"
 
 #define PREFS_FILENAME	"\pFlynn Preferences"
 
@@ -25,7 +32,9 @@ prefs_get_location(short *vRefNum, long *dirID)
 {
 	long response;
 
-	if (Gestalt('fold', &response) == noErr) {
+	/* Gestalt is unavailable on early System 6; guard the trap. */
+	if (TrapAvailable(_GestaltDispatch) &&
+	    Gestalt('fold', &response) == noErr) {
 		OSErr err;
 		err = FindFolder(kOnSystemDisk, kPreferencesFolderType,
 		    true, vRefNum, dirID);
@@ -38,45 +47,18 @@ prefs_get_location(short *vRefNum, long *dirID)
 	return GetVol(0L, vRefNum);
 }
 
-static void
-prefs_defaults(FlynnPrefs *prefs)
-{
-	memset(prefs, 0, sizeof(FlynnPrefs));
-	prefs->version = PREFS_VERSION;
-	prefs->host[0] = '\0';
-	prefs->port = 23;
-	prefs->font_id = 4;	/* Monaco */
-	prefs->font_size = 9;
-	prefs->terminal_type = 0;	/* xterm */
-	prefs->dark_mode = 0;		/* light */
-	prefs->backspace_bs = 0;	/* DEL (0x7F) for xterm */
-	prefs->local_echo = 0;		/* off by default */
-	prefs->show_status_bar = 1;	/* on by default */
-	strncpy(prefs->dns_server, "1.1.1.1", sizeof(prefs->dns_server) - 1);
-	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
-	prefs->win_x = 2;
-	prefs->win_y = 40;
-	prefs->theme_id = 0;		/* Light theme */
-	/* New bookmark fields default to -1 (use global) via memset(0)
-	 * override: set explicitly for clarity */
-	{
-		short i;
-		for (i = 0; i < MAX_BOOKMARKS; i++) {
-			prefs->bookmarks[i].bm_theme_id = -1;
-			prefs->bookmarks[i].bm_backspace_bs = -1;
-			prefs->bookmarks[i].bm_local_echo = -1;
-		}
-	}
-}
+/* prefs_defaults() is defined in settings_migrate.c (included above). */
 
 void
 prefs_load(FlynnPrefs *prefs)
 {
 	HParamBlockRec pb;
+	Ptr raw;
 	long count;
 	short vRefNum;
 	long dirID;
 	OSErr err;
+	int migrated;
 
 	prefs_defaults(prefs);
 
@@ -84,33 +66,55 @@ prefs_load(FlynnPrefs *prefs)
 	if (err != noErr)
 		return;
 
+	/* Scratch buffer for the raw on-disk image.  Allocated on the heap
+	 * (not the stack): a full FlynnPrefs image is several KB and
+	 * prefs_migrate() also holds a frozen-layout copy on its stack, so a
+	 * stack buffer here would roughly double peak stack use on a 4 MiB
+	 * Mac Plus.  Sized to the current struct, which is >= every
+	 * historical layout. */
+	raw = NewPtr(sizeof(FlynnPrefs));
+	if (raw == 0L)
+		return;			/* low memory: keep defaults, no save */
+
 	memset(&pb, 0, sizeof(pb));
 	pb.ioParam.ioNamePtr = (StringPtr)PREFS_FILENAME;
 	pb.ioParam.ioVRefNum = vRefNum;
 	pb.ioParam.ioPermssn = fsRdPerm;
 	pb.fileParam.ioDirID = dirID;
 	err = PBHOpenSync(&pb);
-	if (err != noErr)
+	if (err != noErr) {
+		DisposePtr(raw);
 		return;
+	}
 
+	/* Read the raw on-disk image, then migrate it into the current
+	 * layout.  Reading into a separate buffer (rather than straight into
+	 * *prefs) is what lets prefs_migrate() interpret each historical
+	 * layout correctly instead of aliasing old bytes onto the current
+	 * field offsets. */
+	memset(raw, 0, sizeof(FlynnPrefs));
 	count = sizeof(FlynnPrefs);
-	err = FSRead(pb.ioParam.ioRefNum, &count, (Ptr)prefs);
+	err = FSRead(pb.ioParam.ioRefNum, &count, raw);
 	FSClose(pb.ioParam.ioRefNum);
 
 	if (err != noErr && err != eofErr) {
+		DisposePtr(raw);
 		prefs_defaults(prefs);
 		return;
 	}
 
-	/* Force null termination on all string fields (defense against corrupted file) */
+	/* count now holds the number of bytes actually read. */
+	migrated = prefs_migrate(raw, count, prefs);
+	DisposePtr(raw);
+
+	/* Force null termination on all string fields (defense against a
+	 * corrupted file). */
 	prefs->host[sizeof(prefs->host) - 1] = '\0';
 	prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
 	prefs->username[sizeof(prefs->username) - 1] = '\0';
 	{
 		short i;
 		short bc = prefs->bookmark_count;
-		/* Clamp to actual array size — critical for old-format
-		 * files where bookmarks[8+] overlaps other fields */
 		if (bc < 0) bc = 0;
 		if (bc > MAX_BOOKMARKS) bc = MAX_BOOKMARKS;
 		for (i = 0; i < bc; i++) {
@@ -123,391 +127,16 @@ prefs_load(FlynnPrefs *prefs)
 	prefs->finger_user[sizeof(prefs->finger_user) - 1] = '\0';
 
 	/* Validate DNS server IP */
-	{
-		if (prefs->dns_server[0] == '\0' || prefs->dns_server[0] == '.' ||
-		    ip2long(prefs->dns_server) == 0) {
-			strncpy(prefs->dns_server, "1.1.1.1",
-			    sizeof(prefs->dns_server) - 1);
-			prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
-		}
-	}
-
-	if (prefs->version == 1) {
-		/* v1→v2 migration: host/port already read, zero bookmark fields */
-		prefs->bookmark_count = 0;
-		memset(prefs->bookmarks, 0, sizeof(prefs->bookmarks));
-		prefs->font_id = 4;
-		prefs->font_size = 9;
-		prefs->version = PREFS_VERSION;
-		prefs_save(prefs);
-		return;
-	}
-
-	if (prefs->version == 2) {
-		/* v2→v3 migration: add font fields */
-		prefs->font_id = 4;
-		prefs->font_size = 9;
-		prefs->version = PREFS_VERSION;
-		prefs_save(prefs);
-		return;
-	}
-
-	if (prefs->version == 3) {
-		/* v3→v4 migration: add terminal_type and dark_mode */
-		prefs->terminal_type = 0;
-		prefs->dark_mode = 0;
+	if (prefs->dns_server[0] == '\0' || prefs->dns_server[0] == '.' ||
+	    ip2long(prefs->dns_server) == 0) {
 		strncpy(prefs->dns_server, "1.1.1.1",
 		    sizeof(prefs->dns_server) - 1);
 		prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
-		prefs->version = PREFS_VERSION;
+	}
+
+	/* Persist the upgraded layout so the next launch loads it directly. */
+	if (migrated)
 		prefs_save(prefs);
-		return;
-	}
-
-	if (prefs->version == 4) {
-		/* v4→v5 migration: add dns_server */
-		strncpy(prefs->dns_server, "1.1.1.1",
-		    sizeof(prefs->dns_server) - 1);
-		prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
-		prefs->username[0] = '\0';
-		prefs->version = PREFS_VERSION;
-		prefs_save(prefs);
-		return;
-	}
-
-	if (prefs->version == 5) {
-		/* v5→v6 migration: add username */
-		prefs->username[0] = '\0';
-		/* fall through to v6→v7 migration */
-		prefs->version = 6;
-	}
-
-	if (prefs->version == 6) {
-		/* v6→v7 migration: add per-bookmark settings.
-		 * Use literal 8 — old layout had 8-slot arrays. */
-		{
-			short i;
-			for (i = 0; i < 8; i++) {
-				prefs->bookmarks[i].username[0] = '\0';
-				prefs->bookmarks[i].terminal_type = -1;
-				prefs->bookmarks[i].font_id = 0;
-				prefs->bookmarks[i].font_size = 0;
-			}
-		}
-		/* fall through to v7→v8 migration */
-		prefs->version = 7;
-	}
-
-	if (prefs->version == 7) {
-		/* v7→v8 migration: add recent bookmarks */
-		prefs->recent_count = 0;
-		{
-			short i;
-			for (i = 0; i < MAX_RECENT; i++)
-				prefs->recent[i] = -1;
-		}
-		/* fall through to v8→v9 migration */
-		prefs->version = 8;
-	}
-
-	if (prefs->version == 8) {
-		/* v8→v9 migration: add backspace_bs.
-		 * backspace_bs was inserted before dns_server in the struct,
-		 * so reading v8 data into v9 layout shifts dns_server by 1 byte
-		 * (e.g., "1.1.1.1" becomes ".1.1.1"). Reset dns_server to default. */
-		prefs->backspace_bs =
-		    (prefs->terminal_type == 4) ? 1 : 0;
-		strncpy(prefs->dns_server, "1.1.1.1",
-		    sizeof(prefs->dns_server) - 1);
-		prefs->dns_server[sizeof(prefs->dns_server) - 1] = '\0';
-		prefs->version = PREFS_VERSION;
-		prefs_save(prefs);
-		return;
-	}
-
-	if (prefs->version == 9) {
-		/* v9→v10 migration: add local_echo.
-		 * Enable by default for ANSI-BBS. */
-		prefs->local_echo =
-		    (prefs->terminal_type == 4) ? 1 : 0;
-		/* fall through to v10→v11 migration */
-		prefs->version = 10;
-	}
-
-	if (prefs->version == 10) {
-		/* v10→v11 migration: add bookmark_protocol array.
-		 * Use literal 8 — old layout had 8-slot arrays. */
-		{
-			short i;
-			for (i = 0; i < 8; i++)
-				prefs->bookmark_protocol[i] = 0;
-		}
-		/* fall through to v11→v12 migration */
-		prefs->version = 11;
-	}
-
-	if (prefs->version == 11) {
-		/* v11→v12 migration: add finger_host/finger_user */
-		prefs->finger_host[0] = '\0';
-		prefs->finger_user[0] = '\0';
-		/* fall through to v12→v13 migration */
-		prefs->version = 12;
-	}
-
-	if (prefs->version == 12) {
-		/* v12→v13 migration: add bookmark_verbose.
-		 * bookmark_verbose was appended at end — no layout shift
-		 * for 8-bookmark struct. Fall through to v13→v14. */
-		{
-			short i;
-			for (i = 0; i < 8; i++)
-				prefs->bookmark_verbose[i] = 0;
-		}
-		prefs->version = 13;
-	}
-
-	if (prefs->version == 13) {
-		/* v13→v14 migration: MAX_BOOKMARKS 8→20.
-		 * bookmarks[], bookmark_protocol[], bookmark_verbose[]
-		 * all grew, shifting every field after bookmarks[8] in
-		 * the binary layout.  Read old data via a struct that
-		 * matches the v13 on-disk format, then copy into the
-		 * new (larger) layout field by field. */
-		struct V13Prefs {
-			short		version;
-			char		host[256];
-			short		port;
-			short		bookmark_count;
-			Bookmark	bookmarks[8];
-			short		font_id;
-			short		font_size;
-			short		terminal_type;
-			unsigned char	dark_mode;
-			unsigned char	backspace_bs;
-			char		dns_server[16];
-			char		username[64];
-			short		recent[MAX_RECENT];
-			short		recent_count;
-			unsigned char	local_echo;
-			unsigned char	show_status_bar;
-			short		bookmark_protocol[8];
-			char		finger_host[128];
-			char		finger_user[64];
-			unsigned char	bookmark_verbose[8];
-		};
-		{
-			struct V13Prefs old;
-			short i, bc;
-
-			/* Raw bytes in prefs match v13 layout */
-			memcpy(&old, prefs,
-			    sizeof(struct V13Prefs));
-
-			/* Reset to defaults with new layout */
-			prefs_defaults(prefs);
-
-			/* Copy scalar fields */
-			memcpy(prefs->host, old.host,
-			    sizeof(old.host));
-			prefs->port = old.port;
-			bc = old.bookmark_count;
-			if (bc < 0) bc = 0;
-			if (bc > 8) bc = 8;
-			prefs->bookmark_count = bc;
-
-			/* Copy old bookmarks into first 8 slots */
-			for (i = 0; i < bc; i++)
-				prefs->bookmarks[i] =
-				    old.bookmarks[i];
-
-			prefs->font_id = old.font_id;
-			prefs->font_size = old.font_size;
-			prefs->terminal_type = old.terminal_type;
-			prefs->dark_mode = old.dark_mode;
-			prefs->backspace_bs = old.backspace_bs;
-			memcpy(prefs->dns_server, old.dns_server,
-			    sizeof(old.dns_server));
-			memcpy(prefs->username, old.username,
-			    sizeof(old.username));
-			memcpy(prefs->recent, old.recent,
-			    sizeof(old.recent));
-			prefs->recent_count = old.recent_count;
-			prefs->local_echo = old.local_echo;
-			prefs->show_status_bar = old.show_status_bar;
-
-			/* Copy per-bookmark arrays (first 8) */
-			for (i = 0; i < 8; i++) {
-				prefs->bookmark_protocol[i] =
-				    old.bookmark_protocol[i];
-				prefs->bookmark_verbose[i] =
-				    old.bookmark_verbose[i];
-			}
-
-			memcpy(prefs->finger_host,
-			    old.finger_host,
-			    sizeof(old.finger_host));
-			memcpy(prefs->finger_user,
-			    old.finger_user,
-			    sizeof(old.finger_user));
-
-			prefs->version = PREFS_VERSION;
-			prefs_save(prefs);
-			return;
-		}
-	}
-
-	if (prefs->version == 14) {
-		/* v14→v15 migration: add win_x/win_y */
-		prefs->win_x = 2;
-		prefs->win_y = 40;
-		prefs->version = PREFS_VERSION;
-		prefs_save(prefs);
-		return;
-	}
-
-	if (prefs->version == 15) {
-		/* v15→v16 migration: add theme_id.
-		 * Derive from existing dark_mode setting. */
-		prefs->theme_id = prefs->dark_mode ? 1 : 0;
-		prefs->version = 16;
-	}
-
-	if (prefs->version == 16) {
-		/* v16→v17 migration: add per-bookmark
-		 * theme/backspace/echo fields.
-		 * Bookmark struct grew by 3 bytes per entry
-		 * (20 bookmarks = 60 bytes shift), so we must
-		 * re-read from v16 binary layout. */
-		struct V16Bookmark {
-			char		name[32];
-			char		host[128];
-			unsigned short	port;
-			char		username[64];
-			short		terminal_type;
-			short		font_id;
-			short		font_size;
-		};
-		struct V16Prefs {
-			short		version;
-			char		host[256];
-			short		port;
-			short		bookmark_count;
-			struct V16Bookmark bookmarks[MAX_BOOKMARKS];
-			short		font_id;
-			short		font_size;
-			short		terminal_type;
-			unsigned char	dark_mode;
-			unsigned char	backspace_bs;
-			char		dns_server[16];
-			char		username[64];
-			short		recent[MAX_RECENT];
-			short		recent_count;
-			unsigned char	local_echo;
-			unsigned char	show_status_bar;
-			short		bookmark_protocol[MAX_BOOKMARKS];
-			char		finger_host[128];
-			char		finger_user[64];
-			unsigned char	bookmark_verbose[MAX_BOOKMARKS];
-			short		win_x, win_y;
-			unsigned char	theme_id;
-		};
-		{
-			struct V16Prefs old;
-			short i, bc;
-
-			memcpy(&old, prefs,
-			    sizeof(struct V16Prefs));
-			prefs_defaults(prefs);
-
-			memcpy(prefs->host, old.host,
-			    sizeof(old.host));
-			prefs->port = old.port;
-			bc = old.bookmark_count;
-			if (bc < 0) bc = 0;
-			if (bc > MAX_BOOKMARKS)
-				bc = MAX_BOOKMARKS;
-			prefs->bookmark_count = bc;
-
-			for (i = 0; i < bc; i++) {
-				memcpy(prefs->bookmarks[i].name,
-				    old.bookmarks[i].name, 32);
-				memcpy(prefs->bookmarks[i].host,
-				    old.bookmarks[i].host, 128);
-				prefs->bookmarks[i].port =
-				    old.bookmarks[i].port;
-				memcpy(
-				    prefs->bookmarks[i].username,
-				    old.bookmarks[i].username, 64);
-				prefs->bookmarks[i].terminal_type =
-				    old.bookmarks[i].terminal_type;
-				prefs->bookmarks[i].font_id =
-				    old.bookmarks[i].font_id;
-				prefs->bookmarks[i].font_size =
-				    old.bookmarks[i].font_size;
-				prefs->bookmarks[i].bm_theme_id =
-				    -1;
-				prefs->bookmarks[i].bm_backspace_bs
-				    = -1;
-				prefs->bookmarks[i].bm_local_echo =
-				    -1;
-			}
-
-			prefs->font_id = old.font_id;
-			prefs->font_size = old.font_size;
-			prefs->terminal_type = old.terminal_type;
-			prefs->dark_mode = old.dark_mode;
-			prefs->backspace_bs = old.backspace_bs;
-			memcpy(prefs->dns_server,
-			    old.dns_server,
-			    sizeof(old.dns_server));
-			memcpy(prefs->username, old.username,
-			    sizeof(old.username));
-			memcpy(prefs->recent, old.recent,
-			    sizeof(old.recent));
-			prefs->recent_count = old.recent_count;
-			prefs->local_echo = old.local_echo;
-			prefs->show_status_bar =
-			    old.show_status_bar;
-
-			for (i = 0; i < MAX_BOOKMARKS; i++) {
-				prefs->bookmark_protocol[i] =
-				    old.bookmark_protocol[i];
-				prefs->bookmark_verbose[i] =
-				    old.bookmark_verbose[i];
-			}
-
-			memcpy(prefs->finger_host,
-			    old.finger_host,
-			    sizeof(old.finger_host));
-			memcpy(prefs->finger_user,
-			    old.finger_user,
-			    sizeof(old.finger_user));
-			prefs->win_x = old.win_x;
-			prefs->win_y = old.win_y;
-			prefs->theme_id = old.theme_id;
-
-			prefs->version = PREFS_VERSION;
-			prefs_save(prefs);
-			return;
-		}
-	}
-
-	if (prefs->version == 17) {
-		/* v17→v18 migration: add custom_themes[4] +
-		 * custom_theme_count. Zero-init the new fields
-		 * (no custom themes yet). */
-#ifdef FLYNN_THEMES
-		memset(prefs->custom_themes, 0,
-		    sizeof(prefs->custom_themes));
-		prefs->custom_theme_count = 0;
-#endif
-		prefs->version = PREFS_VERSION;
-		prefs_save(prefs);
-		return;
-	}
-
-	if (prefs->version != PREFS_VERSION)
-		prefs_defaults(prefs);
 }
 
 void
@@ -530,14 +159,17 @@ prefs_save(FlynnPrefs *prefs)
 	pb.fileParam.ioDirID = dirID;
 	PBHDeleteSync(&pb);
 
-	/* Create new file */
+	/* Create new file.  The old file was just deleted, so a failure
+	 * here means the settings are gone -- surface it. */
 	memset(&pb, 0, sizeof(pb));
 	pb.ioParam.ioNamePtr = (StringPtr)PREFS_FILENAME;
 	pb.ioParam.ioVRefNum = vRefNum;
 	pb.fileParam.ioDirID = dirID;
 	err = PBHCreateSync(&pb);
-	if (err != noErr)
+	if (err != noErr) {
+		show_error_alert("Could not save preferences.");
 		return;
+	}
 
 	/* Set type and creator */
 	memset(&pb, 0, sizeof(pb));
@@ -559,11 +191,25 @@ prefs_save(FlynnPrefs *prefs)
 	pb.ioParam.ioPermssn = fsWrPerm;
 	pb.fileParam.ioDirID = dirID;
 	err = PBHOpenSync(&pb);
-	if (err != noErr)
+	if (err != noErr) {
+		show_error_alert("Could not save preferences.");
 		return;
+	}
 
 	prefs->version = PREFS_VERSION;
 	count = sizeof(FlynnPrefs);
-	FSWrite(pb.ioParam.ioRefNum, &count, (Ptr)prefs);
-	FSClose(pb.ioParam.ioRefNum);
+	err = FSWrite(pb.ioParam.ioRefNum, &count, (Ptr)prefs);
+	{
+		OSErr cerr = FSClose(pb.ioParam.ioRefNum);
+		if (err == noErr)
+			err = cerr;
+	}
+
+	/* Flush the volume so the write reaches disk (important on floppy /
+	 * removable media), and report a full/locked/failed disk rather than
+	 * silently losing all settings. */
+	if (err == noErr)
+		FlushVol(0L, vRefNum);
+	else
+		show_error_alert("Could not save preferences.");
 }

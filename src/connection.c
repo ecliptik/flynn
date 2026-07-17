@@ -25,8 +25,8 @@
 #include "dialogs.h"
 #include "macutil.h"
 
-/* TCP connection state for TIME_WAIT */
-#define TCP_STATE_TIME_WAIT 14
+/* MacTCP connectionState value 14 = Close Wait (remote sent FIN) */
+#define TCP_STATE_CLOSE_WAIT 14
 
 static Boolean tcp_initialized = false;
 
@@ -259,7 +259,7 @@ conn_idle(Connection *conn)
 	/* Check if connection was closed by remote.
 	 * Drain any remaining data before closing so the final
 	 * screen (e.g. BBS goodbye message) gets displayed. */
-	if (status.connectionState == TCP_STATE_TIME_WAIT) {
+	if (status.connectionState == TCP_STATE_CLOSE_WAIT) {
 		if (status.amtUnreadData == 0) {
 			conn_close(conn);
 			return;

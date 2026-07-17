@@ -376,6 +376,38 @@ update_window_menu(void)
 	}
 }
 
+/*
+ * update_window_menu_title - lightweight update of just one session's
+ * Window-menu item text.  Used for OSC title changes, which arrive in
+ * bursts; a full update_window_menu() rebuild (DeleteMenuItem/AppendMenu
+ * per item) per burst is wasteful.  Item order matches the append order
+ * in update_window_menu(): count header, separator, then one item per
+ * existing session in index order starting at WIN_MENU_FIRST_WIN.
+ */
+void
+update_window_menu_title(Session *s)
+{
+	Str255 title;
+	short i, item;
+	Session *cur;
+
+	if (!window_menu || !s)
+		return;
+
+	item = WIN_MENU_FIRST_WIN;
+	for (i = 0; i < MAX_SESSIONS; i++) {
+		cur = session_get(i);
+		if (!cur)
+			continue;
+		if (cur == s) {
+			GetWTitle(s->window, title);
+			SetMenuItemText(window_menu, item, title);
+			return;
+		}
+		item++;
+	}
+}
+
 void
 update_prefs_menu(void)
 {

@@ -490,7 +490,11 @@ session_update_title(Session *sess)
 	else
 		SetWTitle(sess->window, "\pFlynn");
 	sess->terminal.title_changed = 0;
-	update_window_menu();
+	/* Title-only change on an existing session: update just this
+	 * item's text instead of a full Window-menu rebuild, which
+	 * would thrash the Menu Manager during OSC-title output floods.
+	 * The full rebuild still runs on session add/remove. */
+	update_window_menu_title(sess);
 }
 
 /*
@@ -913,40 +917,50 @@ main_event_loop(void)
 				EventRecord pending;
 
 				handle_key_down(active_session, &event);
-				while (GetNextEvent(keyDownMask |
-				    autoKeyMask, &pending))
+				/* handle_key_down may dispatch a menu
+				 * command (Quit, Close-last-window) that
+				 * destroys the active session and nulls
+				 * active_session; re-check before every
+				 * deref below. */
+				while (active_session && GetNextEvent(
+				    keyDownMask | autoKeyMask, &pending))
 					handle_key_down(active_session,
 					    &pending);
-				flush_key_send(active_session);
+				if (active_session) {
+					flush_key_send(active_session);
 
-				/* Echo poll: tight loop with 2-tick
-				 * (33ms) budget to catch server echo
-				 * on LAN-speed connections. */
-				if (active_session->conn.state ==
-				    CONN_STATE_CONNECTED) {
-					unsigned long deadline;
+					/* Echo poll: tight loop with 2-tick
+					 * (33ms) budget to catch server echo
+					 * on LAN-speed connections.  Skipped
+					 * with >1 session — the spin would
+					 * starve the other sessions. */
+					if (session_count() <= 1 &&
+					    active_session->conn.state ==
+					    CONN_STATE_CONNECTED) {
+						unsigned long deadline;
 
-					deadline = TickCount() + 2;
-					do {
-						conn_idle(
-						    &active_session->conn);
-						if (active_session->conn
-						    .read_len > 0) {
-							session_process_data(
-							    active_session);
-							break;
-						}
-					} while (TickCount() < deadline);
+						deadline = TickCount() + 2;
+						do {
+							conn_idle(
+							    &active_session->conn);
+							if (active_session->conn
+							    .read_len > 0) {
+								session_process_data(
+								    active_session);
+								break;
+							}
+						} while (TickCount() < deadline);
+					}
+
+					/* Draw locally-echoed or server-
+					 * echoed chars.  No-op if no
+					 * dirty rows. */
+					session_draw(active_session);
+
+					/* Next WNE returns immediately
+					 * for echo data arriving after */
+					had_data = 1;
 				}
-
-				/* Draw locally-echoed or server-
-				 * echoed chars.  No-op if no
-				 * dirty rows. */
-				session_draw(active_session);
-
-				/* Next WNE returns immediately
-				 * for echo data arriving after */
-				had_data = 1;
 			}
 			break;
 		case mouseDown:

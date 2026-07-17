@@ -50,13 +50,18 @@ extern Session *active_session;
  */
 static void
 finger_process_data(Terminal *term, unsigned char *src,
-    short slen)
+    short slen, Boolean *prev_cr)
 {
 	short i, start = 0;
+	Boolean was_cr = *prev_cr;
 
 	for (i = 0; i < slen; i++) {
-		if (src[i] == '\n' &&
-		    (i == 0 || src[i - 1] != '\r')) {
+		/* A lone LF (not already preceded by CR — even when the
+		 * CR was the last byte of the previous chunk) becomes
+		 * CRLF.  Tracking prev-byte-was-CR across calls avoids
+		 * injecting a spurious CR when \r\n straddles a chunk
+		 * boundary. */
+		if (src[i] == '\n' && !was_cr) {
 			if (i > start)
 				terminal_process(term,
 				    src + start,
@@ -65,10 +70,13 @@ finger_process_data(Terminal *term, unsigned char *src,
 			    (unsigned char *)"\r\n", 2);
 			start = i + 1;
 		}
+		was_cr = (src[i] == '\r');
 	}
 	if (start < slen)
 		terminal_process(term,
 		    src + start, slen - start);
+	if (slen > 0)
+		*prev_cr = (src[slen - 1] == '\r');
 }
 
 /* Finger dialog filter: Return=OK, Cmd+.=Cancel, Tab=cycle fields */
@@ -232,8 +240,13 @@ finger_connect(const char *host, const char *username,
 	GetPort(&save);
 	SetPort(s->window);
 	{
-		unsigned long deadline = TickCount() + 10 * 60;
+		/* ~3s ceiling (was 10s): a synchronous poll services no
+		 * events, so a long wait freezes the whole app.  Most
+		 * finger servers reply within a second; if not, the
+		 * "(No response)" path below still runs. */
+		unsigned long deadline = TickCount() + 3 * 60;
 		Boolean got_data = false;
+		Boolean prev_cr = false;
 
 		while (s->conn.state == CONN_STATE_CONNECTED &&
 		    TickCount() < deadline) {
@@ -245,7 +258,8 @@ finger_connect(const char *host, const char *username,
 				    &s->terminal,
 				    (unsigned char *)
 				    s->conn.read_buf,
-				    s->conn.read_len);
+				    s->conn.read_len,
+				    &prev_cr);
 				s->conn.read_len = 0;
 			}
 		}

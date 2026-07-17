@@ -333,6 +333,9 @@ session_destroy_and_fixup(Session *s)
 void
 session_init_from_prefs(Session *s)
 {
+	GrafPtr save;
+
+	GetPort(&save);
 	SetPort(s->window);
 	s->font_id = prefs.font_id;
 	s->font_size = prefs.font_size;
@@ -370,6 +373,8 @@ session_init_from_prefs(Session *s)
 		    s->terminal.active_rows * g_cell_height;
 		do_window_resize(s, win_w, win_h);
 	}
+
+	SetPort(save);
 }
 
 /* Font preset table for bookmark font cycling */

@@ -28,6 +28,12 @@ test_phase5.py
 test_launch.py
 tests/__pycache__/
 
+# Native test binaries
+tests/migration_test
+# The blanket "Makefile" rule above targets CMake-generated makefiles;
+# the hand-written native test makefile must stay tracked
+!tests/Makefile
+
 # Release and build artifacts
 Flynn_*
 *.bin

@@ -107,7 +107,7 @@ dns_build_query(const char *hostname, unsigned char *pkt, short pktlen,
  * Returns new offset past the name, or -1 on error.
  */
 static short
-dns_skip_name(const unsigned char *pkt, short pktlen, short offset)
+dns_skip_name(const unsigned char *pkt, unsigned short pktlen, short offset)
 {
 	short hops = 0;
 	while (offset < pktlen && hops < 128) {
@@ -127,7 +127,7 @@ dns_skip_name(const unsigned char *pkt, short pktlen, short offset)
  * Returns DNS_OK on success, DNS_ERR_* on failure.
  */
 static short
-dns_parse_response(const unsigned char *pkt, short pktlen,
+dns_parse_response(const unsigned char *pkt, unsigned short pktlen,
     unsigned short txn_id, ip_addr *ip)
 {
 	unsigned short flags, qdcount, ancount;
@@ -270,25 +270,55 @@ dns_resolve_tcp(const char *hostname, ip_addr *ip, ip_addr dns_server,
 		return DNS_ERR_NETWORK;
 	}
 
-	/* Receive response with timeout */
+	/* Receive the response.  TCP framing is a 2-byte big-endian
+	 * length prefix followed by the DNS message.  _TCPRcv returns
+	 * whatever is currently available (with a ~1s internal command
+	 * timeout), so a multi-segment response needs a loop: accumulate
+	 * the prefix, then the full body, bounded by an overall deadline.
+	 * A peer close/error before the message is complete is a
+	 * failure. */
 	result = DNS_ERR_TIMEOUT;
+	{
+		unsigned long deadline = TickCount() + DNS_TCP_TIMEOUT * 60L;
+		unsigned short have = 0;    /* bytes accumulated in recv_buf */
+		unsigned short want;
+		Boolean closed = false;
 
-	/* First read the 2-byte length prefix */
-	rcv_len = 2;
-	err = _TCPRcv(&pb, stream, (Ptr)recv_buf, &rcv_len,
-	    0L, 0L, false);
-	if (err == noErr && rcv_len == 2) {
-		msg_len = ((unsigned short)recv_buf[0] << 8) | recv_buf[1];
-		if (msg_len > DNS_BUF_SIZE)
-			msg_len = DNS_BUF_SIZE;
+		msg_len = 0;
 
-		/* Read the DNS message body */
-		rcv_len = msg_len;
-		err = _TCPRcv(&pb, stream, (Ptr)(recv_buf + 2), &rcv_len,
-		    0L, 0L, false);
-		if (err == noErr && rcv_len > 0) {
-			result = dns_parse_response(recv_buf + 2,
-			    rcv_len, txn_id, ip);
+		while (TickCount() < deadline) {
+			/* Decode the length prefix once it is complete. */
+			if (msg_len == 0 && have >= 2) {
+				msg_len = ((unsigned short)recv_buf[0] << 8) |
+				    recv_buf[1];
+				if (msg_len == 0 || msg_len > DNS_BUF_SIZE) {
+					result = DNS_ERR_FORMAT;
+					break;
+				}
+			}
+
+			/* Whole message present -> parse and stop. */
+			if (msg_len != 0 &&
+			    have >= (unsigned short)(2 + msg_len)) {
+				result = dns_parse_response(recv_buf + 2,
+				    msg_len, txn_id, ip);
+				break;
+			}
+
+			/* Peer gone before the message completed. */
+			if (closed)
+				break;
+
+			want = (msg_len == 0) ? 2
+			    : (unsigned short)(2 + msg_len);
+			rcv_len = want - have;
+			err = _TCPRcv(&pb, stream, (Ptr)(recv_buf + have),
+			    &rcv_len, 0L, 0L, false);
+			have += rcv_len;
+			if (err == commandTimeout)
+				continue;   /* no data yet; keep waiting */
+			if (err != noErr)
+				closed = true;  /* parse next pass if complete */
 		}
 	}
 
@@ -311,11 +341,17 @@ dns_resolve(const char *hostname, ip_addr *ip, ip_addr dns_server)
 	wdsEntry wds[2];
 	OSErr err;
 	short result, retry;
+	static unsigned short dns_seq = 0;
 
 	{
 		unsigned long secs;
 		ReadDateTime(&secs);
-		txn_id = (unsigned short)((TickCount() ^ secs ^ (unsigned long)&txn_id) & 0xFFFF);
+		/* Mix a rolling per-query counter into the clock/stack
+		 * entropy so consecutive lookups never share a txn_id
+		 * even within the same tick. */
+		dns_seq++;
+		txn_id = (unsigned short)((TickCount() ^ secs ^
+		    (unsigned long)&txn_id ^ dns_seq) & 0xFFFF);
 	}
 
 	query_len = dns_build_query(hostname, query, sizeof(query), txn_id);

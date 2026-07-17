@@ -124,15 +124,27 @@ do_paste(void)
 		if (s->terminal.bracketed_paste)
 			conn_send(&s->conn, "\033[200~", 6);
 
+		/* Mac scrap separates lines with bare CR; telnet NVT
+		 * wants CR LF, so expand each CR.  Output can be up to
+		 * 2x the input, so build into a bounded slice buffer and
+		 * flush it, rather than sending from the scrap directly. */
 		sent = 0;
 		while (sent < len) {
-			short chunk;
+			char out[512];
+			short oi;
 
-			chunk = len - sent;
-			if (chunk > 256)
-				chunk = 256;
-			conn_send(&s->conn, p + sent, chunk);
-			sent += chunk;
+			oi = 0;
+			while (sent < len && oi < (short)(sizeof(out) - 1)) {
+				char c = p[sent++];
+
+				if (c == '\r') {
+					out[oi++] = '\r';
+					out[oi++] = '\n';
+				} else {
+					out[oi++] = c;
+				}
+			}
+			conn_send(&s->conn, out, oi);
 		}
 
 		if (s->terminal.bracketed_paste)

@@ -8,6 +8,8 @@
 
 #include <Menus.h>
 
+struct Session;  /* forward declaration */
+
 /* Initialize menus from MBAR resource */
 void init_menus(void);
 
@@ -16,6 +18,9 @@ void update_menus(void);
 
 /* Update window menu with current session list */
 void update_window_menu(void);
+
+/* Update just one session's Window-menu item text (title-only change) */
+void update_window_menu_title(struct Session *s);
 
 /* Update Preferences menu checkmarks */
 void update_prefs_menu(void);

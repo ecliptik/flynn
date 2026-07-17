@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Crash on Cmd+Q or closing the last window from the keyboard: the event loop dereferenced the active session after menu dispatch had destroyed it, corrupting low memory before an address error (both)
+- Preferences migration corrupted all pre-v14 prefs files: the version overlays used current struct layouts instead of the historical on-disk ones, so upgrading from v1.5.x–v1.8.x garbled bookmarks, fonts, DNS server, and username. Migration rewritten with frozen per-era layouts and covered by a native test suite (tests/migration_test.c); v8-era DNS server settings are now recovered instead of reset (both)
+- Session log header/footer could write stack memory into the log file when the hostname was long (both, logging builds)
+- `ESC H` (tab set) left the escape parser in a stuck state, swallowing the next character — corrupted output after terminfo reset strings (both)
+- Insert mode (CSI 4h) was ignored for plain ASCII text, overwriting instead of shifting the line (both)
+- Truecolor SGR sequences with saturated colors (e.g. pure red) rendered gray: 16-bit overflow in the 256-color distance mapping (color builds on System 7)
+- DNS-over-TCP fallback failed on responses spanning multiple TCP segments — now reads until the full message arrives (both)
+- Multi-line paste sent bare CR line endings; now sends NVT-standard CR LF so pastes work on strict/line-mode servers (both, clipboard builds)
+- Cmd+1–Cmd+0 window-switch shortcuts were shadowed by an F-key mapping while connected; the F-key aliases are removed (function keys still work via real F1–F12) and Cmd+digit now switches sessions as the Window menu advertises (both)
+- Find in Scrollback never matched non-ASCII characters (signed-char comparison) (both)
+- 8-bit C1 OSC/CSI introducers (0x9D/0x9B) initialized parser state differently than their ESC-sequence equivalents (both)
+- Print jobs no longer call PrCloseDoc after a failed PrOpenDoc, which could fault in the printer driver (both, printing builds)
+- Finger fetches froze the UI for up to 10 seconds on slow servers; timeout reduced to 3 seconds (both, finger builds)
+- Finger LF→CRLF conversion produced a stray CR when a server's CR LF spanned two network reads (both, finger builds)
+- Preferences saves now report disk errors (full/locked disk) instead of silently losing all settings, and flush the volume after writing (both)
+- MacTCP connection-state constant misnamed TIME_WAIT renamed to CLOSE_WAIT (internal, no behavior change)
+
+### Changed
+- Window menu no longer fully rebuilds on every remote title change — only the affected item's text updates, avoiding Menu Manager thrash during OSC-title output floods (both)
+- Session logging batches file writes (flush on half-full buffer, ~1 s elapsed, stop, or disconnect) instead of one synchronous write per network chunk — reduces stalls when logging to slow media (both, logging builds)
+- Post-keystroke echo poll is skipped when more than one session is open, so typing in one window no longer starves the others (both)
+- Theme import writes preferences to disk once instead of twice (color builds)
+
 ## [1.10.1] - 2026-06-01
 
 ### Added
