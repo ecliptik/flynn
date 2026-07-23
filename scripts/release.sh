@@ -181,6 +181,27 @@ update_readme_downloads() {
     fi
 }
 
+# Update GitHub Pages site (docs/index.html) download links to point to this version
+update_pages_downloads() {
+    local tag="$1"
+    local ver="${tag#v}"
+    local page="$SCRIPT_DIR/docs/index.html"
+
+    if [ ! -f "$page" ]; then
+        echo "  Warning: docs/index.html not found, skipping Pages download link update"
+        return 0
+    fi
+
+    if grep -q "releases/download/v" "$page"; then
+        # Rewrite version in existing GitHub download URLs.
+        # Matches: /releases/download/vX.Y.Z/Flynn...-X.Y.Z.ext
+        sed -i -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/([A-Za-z-]*)-[0-9]+\.[0-9]+\.[0-9]+\.|releases/download/${tag}/\1-${ver}.|g" "$page"
+        echo "  Updated docs/index.html download links to $tag"
+    else
+        echo "  Warning: No download links found in docs/index.html"
+    fi
+}
+
 # Release a single version
 do_release() {
     local tag="$1"
@@ -242,6 +263,7 @@ See [BUILD.md](https://github.com/$GITHUB_REPO/blob/main/docs/BUILD.md) for cust
     release_forgejo "$tag" "$name" "$body"
     release_github "$tag" "$name" "$body"
     update_readme_downloads "$tag"
+    update_pages_downloads "$tag"
     echo ""
 }
 
