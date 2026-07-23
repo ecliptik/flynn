@@ -185,4 +185,4 @@ ISC License. See [LICENSE](LICENSE) for full details.
 
 ---
 
-> **Note:** The [GitHub repository](https://github.com/ecliptik/flynn) is a read-only mirror of the primary [Forgejo repository](https://forgejo.ecliptik.com/ecliptik/flynn). Please open issues on [GitHub](https://github.com/ecliptik/flynn/issues).
+> **Note:** Please open issues on [GitHub](https://github.com/ecliptik/flynn/issues).
