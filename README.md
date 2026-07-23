@@ -29,13 +29,13 @@ This project was 100% built agentically using [Claude Code](https://docs.anthrop
 
 ## Download
 
-Pre-built binaries are available on the [Releases](https://codeberg.org/ecliptik/flynn/releases) page, [Macintosh Garden](https://macintoshgarden.org/apps/flynn), and [Macintosh Repository](https://www.macintoshrepository.org/87841-flynn):
+Pre-built binaries are available on the [Releases](https://github.com/ecliptik/flynn/releases) page, [Macintosh Garden](https://macintoshgarden.org/apps/flynn), and [Macintosh Repository](https://www.macintoshrepository.org/87841-flynn):
 
 | Edition | Description | Memory | Download |
 |---------|-------------|--------|----------|
-| **Flynn** | All features — 4 sessions, 256-color themes, scrollback | ~1024KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-1.10.1.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-1.10.1.hqx) · [.sit](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-1.10.1.sit) |
-| **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-Lite-1.10.1.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-Lite-1.10.1.hqx) · [.sit](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-Lite-1.10.1.sit) |
-| **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-Minimal-1.10.1.dsk) · [.hqx](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-Minimal-1.10.1.hqx) · [.sit](https://codeberg.org/ecliptik/flynn/releases/download/v1.10.1/Flynn-Minimal-1.10.1.sit) |
+| **Flynn** | All features — 4 sessions, 256-color themes, scrollback | ~1024KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-1.10.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-1.10.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-1.10.1.sit) |
+| **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-Lite-1.10.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-Lite-1.10.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-Lite-1.10.1.sit) |
+| **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-Minimal-1.10.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-Minimal-1.10.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.10.1/Flynn-Minimal-1.10.1.sit) |
 
 Each edition is available as `.dsk` (800K floppy image), `.hqx` (BinHex archive), or `.sit` (StuffIt 1.5.1 archive). See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
@@ -185,4 +185,4 @@ ISC License. See [LICENSE](LICENSE) for full details.
 
 ---
 
-> **Note:** The [GitHub repository](https://github.com/ecliptik/flynn) is a read-only mirror. Please open issues and pull requests on [Codeberg](https://codeberg.org/ecliptik/flynn).
+> **Note:** The [GitHub repository](https://github.com/ecliptik/flynn) is a read-only mirror of the primary [Forgejo repository](https://forgejo.ecliptik.com/ecliptik/flynn). Please open issues on [GitHub](https://github.com/ecliptik/flynn/issues).

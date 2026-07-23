@@ -263,9 +263,9 @@ resource 'DITL' (130, "About Flynn") {
 		{84, 15, 100, 290},
 		StaticText { disabled, "\0xA9 2026 Micheal Waltz" };
 
-		/* 7: Codeberg */
+		/* 7: GitHub */
 		{102, 15, 118, 290},
-		StaticText { disabled, "https://codeberg.org/ecliptik/flynn" };
+		StaticText { disabled, "https://github.com/ecliptik/flynn" };
 
 		/* 8: Default button outline (UserItem) */
 		{134, 111, 162, 189},

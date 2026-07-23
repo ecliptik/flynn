@@ -38,7 +38,7 @@ Flynn is a Telnet client application for classic Macintosh (68000/Macintosh Plus
 
 ### Releases & Artifact Verification
 
-`scripts/release.sh vX.Y.Z` builds all 3 presets (`build.sh --clean --preset {full,lite,minimal}` → 9 artifacts: `.dsk`/`.hqx`/`.sit`) then tries to publish to Forgejo/Codeberg/GitHub; with no `FORGEJO_TOKEN`/`CODEBERG_TOKEN`/`gh auth` it skips publishing and leaves the artifacts in `build/` (ready for Macintosh Garden upload). The build stamps the version only if tag `vX.Y.Z` is at **HEAD** — bump `CMakeLists.txt`, `resources/telnet.r` (`"Flynn X.Y.Z"`), and `docs/About Flynn`, finalize CHANGELOG, then commit + tag before building.
+`scripts/release.sh vX.Y.Z` builds all 3 presets (`build.sh --clean --preset {full,lite,minimal}` → 9 artifacts: `.dsk`/`.hqx`/`.sit`) then tries to publish to Forgejo/GitHub; with no `FORGEJO_TOKEN`/`gh auth` it skips publishing and leaves the artifacts in `build/` (ready for Macintosh Garden upload). The build stamps the version only if tag `vX.Y.Z` is at **HEAD** — bump `CMakeLists.txt`, `resources/telnet.r` (`"Flynn X.Y.Z"`), and `docs/About Flynn`, finalize CHANGELOG, then commit + tag before building.
 
 Verify artifacts host-side (no Mac): `.dsk` via `hmount` (valid HFS + app); `.hqx` via `hexbin` (decoded `.bin` differs only in MacBinary header dates — resource fork is byte-identical); `.sit` via `macunpack -f` (resource fork byte-identical). To confirm a `.sit` opens in real StuffIt, test in **Basilisk/System 7** (System 6 has no Expander) — stage it in `~/emulators/unix/` and tag its `.finf` type/creator `SIT!`.
 
@@ -92,9 +92,8 @@ Emulator infrastructure lives in `/home/claude/emulators/`. See its docs for ful
 ## Repository Conventions
 
 - Git remote (primary): `ssh://git@forgejo.ecliptik.com/ecliptik/flynn.git`
-- Codeberg mirror: `https://codeberg.org/ecliptik/flynn` (read-only, auto-mirrored from Forgejo)
-- GitHub mirror: `https://github.com/ecliptik/flynn` (read-only, auto-mirrored from Forgejo)
-- Never push directly to Codeberg or GitHub — only push to Forgejo. Releases are created on all three via `release.sh`.
+- GitHub mirror: `https://github.com/ecliptik/flynn` (read-only, auto-mirrored from Forgejo; public-facing repo for links and issues)
+- Never push directly to GitHub — only push to Forgejo. Releases are created on both via `release.sh`.
 - Use feature branches, commits, and worktrees for development
 - Do NOT commit: disk images, FLYNN.md, or other non-source artifacts
 - Maintain: README.md, CHANGELOG.md, TODO.md

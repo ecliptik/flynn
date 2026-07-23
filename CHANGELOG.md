@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - Session logging batches file writes (flush on half-full buffer, ~1 s elapsed, stop, or disconnect) instead of one synchronous write per network chunk — reduces stalls when logging to slow media (both, logging builds)
 - Post-keystroke echo poll is skipped when more than one session is open, so typing in one window no longer starves the others (both)
 - Theme import writes preferences to disk once instead of twice (color builds)
+- Public project links (README, About dialog, About Flynn document) now point to the GitHub mirror at https://github.com/ecliptik/flynn instead of Codeberg; issues are tracked on GitHub. Codeberg release publishing removed from `release.sh` (both)
 
 ## [1.10.1] - 2026-06-01
 
