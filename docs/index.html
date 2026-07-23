@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flynn — Telnet &amp; Finger for Classic Macintosh</title>
+<meta name="description" content="Flynn is a telnet and finger client for classic 68k Macintosh. System 6 and System 7, MacTCP and Open Transport, VT100/VT220/xterm, 256 colors, four simultaneous sessions. Fits on an 800K floppy.">
+<link rel="canonical" href="https://ecliptik.github.io/flynn/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ecliptik.github.io/flynn/">
+<meta property="og:title" content="Flynn — Telnet &amp; Finger for Classic Macintosh">
+<meta property="og:description" content="A telnet and finger client for the Macintosh you refuse to throw away. Now in 256 glorious colors on System 7.">
+<meta property="og:image" content="https://ecliptik.github.io/flynn/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Flynn — Telnet &amp; Finger for Classic Macintosh">
+<meta name="twitter:description" content="A telnet and finger client for the Macintosh you refuse to throw away. Now in 256 glorious colors on System 7.">
+<meta name="twitter:image" content="https://ecliptik.github.io/flynn/assets/og-card.png">
+<meta name="theme-color" content="#fefefd">
+<link rel="icon" type="image/png" href="assets/flynn-icon-color-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+html, body { margin: 0; padding: 0; background: #fefefd; color: #1a1a1a; font-family: 'EB Garamond', Georgia, serif; -webkit-font-smoothing: antialiased; }
+a { color: #1a1a1a; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { color: #0095b6; }
+::selection { background: #ffd9b3; }
+@keyframes floatIn { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+
+/* top legal line */
+.legal-line { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 36px; font-size: 13px; font-style: italic; color: #999; letter-spacing: 0.02em; }
+.legal-line a { color: #999; }
+.legal-line a:hover { color: #0095b6; }
+.legal-links { display: flex; gap: 22px; }
+
+/* hero */
+.hero { text-align: center; padding: 72px 32px 40px; }
+.flower { position: relative; width: 460px; height: 400px; margin: 0 auto 20px; animation: floatIn 0.9s ease both; max-width: 100%; }
+.badge { position: absolute; width: 110px; height: 110px; border-radius: 26px; box-shadow: 0 16px 36px -12px var(--glow), inset 0 -8px 16px rgba(0,0,0,0.22), inset 0 2px 3px rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; transform: rotate(var(--rot)); transition: transform 0.35s ease; }
+.badge:hover { transform: rotate(var(--rot)) scale(1.1); }
+.badge img { width: 70px; height: 70px; image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.3)); }
+.badge .gloss { position: absolute; top: 4px; left: 8px; right: 8px; height: 42px; border-radius: 20px 20px 38px 38px; background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.05)); pointer-events: none; }
+.hero h1 { margin: 0; font-size: clamp(96px, 16vw, 200px); font-weight: 500; letter-spacing: -0.03em; line-height: 0.95; animation: floatIn 0.9s 0.05s ease both; }
+.hero-sub { margin: 28px auto 0; max-width: 620px; font-size: 24px; line-height: 1.45; color: #444; animation: floatIn 0.9s 0.15s ease both; }
+.hero-shot-wrap { margin: 64px auto 0; max-width: 980px; }
+.shot-link { display: block; text-decoration: none; }
+.hero-shot { width: 100%; display: block; border-radius: 6px; box-shadow: 0 30px 90px -20px rgba(0, 149, 182, 0.45), 0 60px 140px -30px rgba(232, 53, 94, 0.25), 0 2px 8px rgba(0,0,0,0.12); transition: transform 0.5s ease; }
+.hero-shot:hover { transform: scale(1.015); }
+.hero-caption { margin: 22px 0 0; font-size: 17px; font-style: italic; color: #888; }
+.cta-row { margin-top: 48px; display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; animation: floatIn 0.9s 0.3s ease both; }
+.pill-solid { text-decoration: none; background: #1a1a1a; color: #fefefd; padding: 14px 34px; border-radius: 999px; font-size: 19px; transition: background 0.25s; }
+.pill-solid:hover { background: #0095b6; color: #fff; }
+.pill-outline { text-decoration: none; border: 1px solid #ccc; color: #1a1a1a; padding: 14px 34px; border-radius: 999px; font-size: 19px; transition: border-color 0.25s, color 0.25s; }
+.pill-outline:hover { border-color: #e8355e; color: #e8355e; }
+
+/* shared section layout */
+.section { max-width: 1060px; margin: 150px auto 0; padding: 0 32px; text-align: center; }
+.section-features { margin-top: 140px; }
+.section h2 { margin: 0 0 16px; font-size: clamp(48px, 6vw, 72px); font-weight: 500; letter-spacing: -0.02em; }
+.section-lede { margin: 0 auto 60px; max-width: 560px; font-size: 20px; color: #555; line-height: 1.5; }
+
+/* features */
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 36px; text-align: left; }
+.feature { border-top: 3px solid var(--accent); padding-top: 20px; }
+.feature h3 { margin: 0 0 10px; font-size: 24px; font-weight: 600; }
+.feature p { margin: 0; font-size: 17px; line-height: 1.5; color: #444; }
+
+/* themes */
+.themes-title { font-size: clamp(44px, 5.5vw, 66px) !important; line-height: 1.1; }
+.themes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 22px; }
+.theme-chip { cursor: default; transition: transform 0.3s ease; }
+.theme-chip:hover { transform: translateY(-6px); }
+.theme-swatch { border: 1px solid rgba(0,0,0,0.12); border-radius: 8px; height: 104px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 26px -12px var(--glow); }
+.theme-swatch span { font-family: Monaco, 'Courier New', monospace; font-size: 14px; }
+.theme-name { margin: 12px 0 2px; font-size: 18px; font-weight: 600; }
+.theme-note { margin: 0; font-size: 14px; font-style: italic; color: #888; }
+.small-print { margin: 56px auto 0; max-width: 520px; font-size: 16px; font-style: italic; color: #888; }
+
+/* gallery */
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 40px 36px; }
+.gallery-grid figure { margin: 0; }
+.gallery-shot { width: 100%; display: block; border-radius: 5px; box-shadow: 0 18px 50px -16px var(--glow), 0 2px 6px rgba(0,0,0,0.1); transition: transform 0.4s ease; }
+.gallery-shot:hover { transform: scale(1.03); }
+.gallery-grid figcaption { margin-top: 14px; font-size: 17px; }
+.gallery-grid figcaption strong { font-weight: 600; }
+.gallery-grid figcaption span { color: #777; }
+
+/* download */
+.editions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 28px; text-align: left; }
+.edition { border: 1px solid #e2e2de; border-radius: 12px; padding: 30px 28px 26px; background: #fff; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.edition:hover { transform: translateY(-6px); box-shadow: 0 24px 60px -20px var(--glow); }
+.edition .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--dot); margin-bottom: 18px; }
+.edition h3 { margin: 0 0 6px; font-size: 28px; font-weight: 600; }
+.edition .desc { margin: 0 0 6px; font-size: 17px; line-height: 1.5; color: #444; min-height: 78px; }
+.edition .mem { margin: 0 0 20px; font-size: 15px; font-style: italic; color: #999; }
+.edition .buttons { display: flex; gap: 12px; }
+.btn-dsk { text-decoration: none; flex: 1; text-align: center; background: #1a1a1a; color: #fff; padding: 10px 0; border-radius: 999px; font-size: 17px; transition: background 0.25s; }
+.btn-dsk:hover { background: var(--dot); color: #fff; }
+.btn-sit { text-decoration: none; flex: 1; text-align: center; border: 1px solid #ccc; color: #1a1a1a; padding: 10px 0; border-radius: 999px; font-size: 17px; transition: border-color 0.25s, color 0.25s; }
+.btn-sit:hover { border-color: var(--dot); color: var(--dot); }
+.download-print { margin: 44px auto 0; max-width: 620px; font-size: 16px; color: #888; line-height: 1.55; font-style: normal; }
+
+/* footer */
+.credits { max-width: 620px; margin: 150px auto 0; padding: 0 32px 90px; text-align: center; }
+.credits .rule { height: 1px; background: #e4e4e0; margin-bottom: 56px; }
+.credits h2 { margin: 0 0 28px; font-size: 34px; font-weight: 500; }
+.credits .body { margin: 0 0 36px; font-size: 17px; line-height: 1.7; color: #555; }
+.credits .signoff { margin: 0; font-size: 26px; font-style: italic; }
+.credits .gag { margin: 26px 0 0; font-size: 12.5px; font-style: italic; color: #aaa; }
+</style>
+</head>
+<body>
+
+  <!-- top legal-line pastiche -->
+  <div class="legal-line">
+    <span>©2026 <a href="https://github.com/ecliptik/flynn">ecliptik/flynn</a>. All floppies reserved.</span>
+    <span class="legal-links"><a href="https://github.com/ecliptik/flynn">github.com/ecliptik/flynn</a><a href="https://macintoshgarden.org/apps/flynn">macintosh garden</a></span>
+  </div>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="flower">
+      <div class="badge" style="left: 104px; top: 24px; --rot: 144deg; --glow: rgba(255,140,26,0.6); background: linear-gradient(180deg, #ffc98a 0%, #ff9f3d 45%, #f57f00 55%, #ffa64d 100%);">
+        <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
+        <div class="gloss"></div>
+      </div>
+      <div class="badge" style="left: 246px; top: 24px; --rot: -144deg; --glow: rgba(108,196,23,0.6); background: linear-gradient(180deg, #c2ec8f 0%, #85cf3a 45%, #5cad10 55%, #8fd54a 100%);">
+        <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
+        <div class="gloss"></div>
+      </div>
+      <div class="badge" style="left: 61px; top: 158px; --rot: 72deg; --glow: rgba(125,79,201,0.6); background: linear-gradient(180deg, #c6abf2 0%, #9268d8 45%, #7d4fc9 55%, #9c74dd 100%);">
+        <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
+        <div class="gloss"></div>
+      </div>
+      <div class="badge" style="left: 289px; top: 158px; --rot: -72deg; --glow: rgba(232,53,94,0.6); background: linear-gradient(180deg, #f7a5bd 0%, #ee5a80 45%, #e8355e 55%, #ef6b8d 100%);">
+        <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
+        <div class="gloss"></div>
+      </div>
+      <div class="badge" style="left: 175px; top: 241px; --rot: 0deg; --glow: rgba(0,149,182,0.6); background: linear-gradient(180deg, #7fd4e8 0%, #29a8c9 45%, #0095b6 55%, #33b5d1 100%);">
+        <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
+        <div class="gloss"></div>
+      </div>
+    </div>
+    <h1>Ping.</h1>
+    <p class="hero-sub">Introducing Flynn. A telnet and finger client for the Macintosh you refuse to throw away. Now in 256 glorious colors on System&nbsp;7.</p>
+    <div class="hero-shot-wrap" data-reveal>
+      <a class="shot-link" href="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-256color.png" target="_blank" rel="noopener">
+        <img class="hero-shot" src="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-256color.png" alt="Flynn running four color sessions on System 7">
+      </a>
+      <p class="hero-caption">Four simultaneous sessions. One 68000 processor. Zero apologies.</p>
+    </div>
+    <div class="cta-row">
+      <a class="pill-solid" href="#download">Download Flynn</a>
+      <a class="pill-outline" href="#themes">See the colors</a>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section section-features">
+    <h2 data-reveal>Retro. Not obsolete.</h2>
+    <p class="section-lede" data-reveal style="margin-bottom: 64px;">Everything a terminal should be. Nothing a Mac Plus can't handle.</p>
+    <div class="features-grid">
+      <div class="feature" data-reveal style="--accent: #0095b6;">
+        <h3>Telnet &amp; Finger</h3>
+        <p>Full IAC negotiation, VT100/VT220/xterm emulation, ANSI-BBS with CP437, OSC sequences, and RFC 1288 finger with forwarding. Yes, finger. It's 1986 somewhere.</p>
+      </div>
+      <div class="feature" data-reveal style="--accent: #ff8c1a;">
+        <h3>Four sessions</h3>
+        <p>Up to 4 simultaneous connections in resizable windows, each with 192 lines of scrollback and per-bookmark fonts, terminal types and themes.</p>
+      </div>
+      <div class="feature" data-reveal style="--accent: #6cc417;">
+        <h3>256 colors</h3>
+        <p>Color QuickDraw on System 7, monochrome elegance on System 6. UTF-8 box-drawing, Unicode glyphs, emoji and Braille patterns — on a 68000.</p>
+      </div>
+      <div class="feature" data-reveal style="--accent: #e8355e;">
+        <h3>A good citizen</h3>
+        <p>MacTCP and Open Transport. Apple Events, telnet:// URLs, movable modal dialogs, persistent preferences. Aligned with the 1992 Human Interface Guidelines. Naturally.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- THEMES -->
+  <section id="themes" class="section">
+    <h2 class="themes-title" data-reveal>The thrill of telnet.<br>The agony of choosing a theme.</h2>
+    <p class="section-lede" data-reveal>Eleven built-in themes, plus Ghostty-format import for four of your own. Now for the hard part: which one will it be?</p>
+    <div class="themes-grid">
+      <div class="theme-chip" data-reveal style="--glow: rgba(0,0,0,0.25);">
+        <div class="theme-swatch" style="background: #ffffff;"><span style="color: #111111;">$ hello</span></div>
+        <p class="theme-name">Light</p>
+        <p class="theme-note">Mono. The default.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(0,0,0,0.5);">
+        <div class="theme-swatch" style="background: #111111;"><span style="color: #f2f2f2;">$ hello</span></div>
+        <p class="theme-name">Dark</p>
+        <p class="theme-note">Mono. After hours.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(181,137,0,0.5);">
+        <div class="theme-swatch" style="background: #fdf6e3;"><span style="color: #657b83;">$ hello</span></div>
+        <p class="theme-name">Solarized Light</p>
+        <p class="theme-note">Schoonover approved.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(0,43,54,0.6);">
+        <div class="theme-swatch" style="background: #002b36;"><span style="color: #839496;">$ hello</span></div>
+        <p class="theme-name">Solarized Dark</p>
+        <p class="theme-note">The other half.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(55,96,191,0.45);">
+        <div class="theme-swatch" style="background: #e1e2e7;"><span style="color: #3760bf;">$ hello</span></div>
+        <p class="theme-name">TokyoNight Day</p>
+        <p class="theme-note">Neon, at noon.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(122,162,247,0.5);">
+        <div class="theme-swatch" style="background: #1a1b26;"><span style="color: #7aa2f7;">$ hello</span></div>
+        <p class="theme-name">TokyoNight</p>
+        <p class="theme-note">Neon, at night.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(255,176,0,0.55);">
+        <div class="theme-swatch" style="background: #1a0f00;"><span style="color: #ffb000;">$ hello</span></div>
+        <p class="theme-name">Amber CRT</p>
+        <p class="theme-note">Phosphor nostalgia.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(125,79,201,0.45);">
+        <div class="theme-swatch" style="background: #dddddd;"><span style="color: #000000;">$ hello</span></div>
+        <p class="theme-name">System 7</p>
+        <p class="theme-note">The CLUT classic.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(189,147,249,0.5);">
+        <div class="theme-swatch" style="background: #282a36;"><span style="color: #bd93f9;">$ hello</span></div>
+        <p class="theme-name">Dracula</p>
+        <p class="theme-note">Bites in purple.</p>
+      </div>
+      <div class="theme-chip" data-reveal style="--glow: rgba(136,192,208,0.5);">
+        <div class="theme-swatch" style="background: #2e3440;"><span style="color: #88c0d0;">$ hello</span></div>
+        <p class="theme-name">Nord</p>
+        <p class="theme-note">Arctic and calm.</p>
+      </div>
+    </div>
+    <p class="small-print" data-reveal>Mono themes run on everything, including the Mac Plus. Color themes want a Mac II or later — Flynn checks so you don't have to.</p>
+  </section>
+
+  <!-- SCREENSHOTS / SYSTEM 6 -->
+  <section class="section">
+    <h2 data-reveal>Black tie optional.</h2>
+    <p class="section-lede" data-reveal style="max-width: 540px;">On System 6 Flynn wears monochrome, and wears it well. One bit per pixel. Every bit earned.</p>
+    <div class="gallery-grid">
+      <figure data-reveal>
+        <a class="shot-link" href="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-neofetch.png" target="_blank" rel="noopener">
+          <img class="gallery-shot" style="--glow: rgba(0,149,182,0.5);" src="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-neofetch.png" alt="Flynn telnet session running neofetch">
+        </a>
+        <figcaption><strong>Telnet session</strong><span> — neofetch over MacTCP, as nature intended.</span></figcaption>
+      </figure>
+      <figure data-reveal>
+        <a class="shot-link" href="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-tmux.png" target="_blank" rel="noopener">
+          <img class="gallery-shot" style="--glow: rgba(255,140,26,0.5);" src="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-tmux.png" alt="Flynn running tmux with split panes">
+        </a>
+        <figcaption><strong>tmux split panes</strong><span> — multiplexing on a machine older than tmux.</span></figcaption>
+      </figure>
+      <figure data-reveal>
+        <a class="shot-link" href="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-connect.png" target="_blank" rel="noopener">
+          <img class="gallery-shot" style="--glow: rgba(108,196,23,0.5);" src="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-connect.png" alt="Flynn connect dialog">
+        </a>
+        <figcaption><strong>Connect dialog</strong><span> — host, port, go. The 1992 HIG would be proud.</span></figcaption>
+      </figure>
+      <figure data-reveal>
+        <a class="shot-link" href="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-bbs-multiwindow.png" target="_blank" rel="noopener">
+          <img class="gallery-shot" style="--glow: rgba(232,53,94,0.5);" src="https://raw.githubusercontent.com/ecliptik/flynn/main/docs/screenshots/flynn-bbs-multiwindow.png" alt="Flynn BBS and terminal in multiple windows">
+        </a>
+        <figcaption><strong>Multi-session ANSI-BBS</strong><span> — Business in front. Party in the back.</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD -->
+  <section id="download" class="section">
+    <h2 data-reveal>Fits on a floppy.</h2>
+    <p class="section-lede" data-reveal>Three editions. One 800K disk each. Choose your commitment level.</p>
+    <div class="editions-grid">
+      <div class="edition" data-reveal style="--dot: #0095b6; --glow: rgba(0,149,182,0.5);">
+        <div class="dot"></div>
+        <h3>Flynn</h3>
+        <p class="desc">All of it. Four sessions, 256-color themes, scrollback, finger, bookmarks, the works.</p>
+        <p class="mem">~1024KB of memory</p>
+        <div class="buttons">
+          <a class="btn-dsk" href="https://github.com/ecliptik/flynn/releases/download/v1.10.2/Flynn-1.10.2.dsk">.dsk</a>
+          <a class="btn-sit" href="https://github.com/ecliptik/flynn/releases/download/v1.10.2/Flynn-1.10.2.sit">.sit</a>
+        </div>
+      </div>
+      <div class="edition" data-reveal style="--dot: #ff8c1a; --glow: rgba(255,140,26,0.5);">
+        <div class="dot"></div>
+        <h3>Flynn Lite</h3>
+        <p class="desc">The core. One session, favorites, monochrome. For Macs that count their kilobytes.</p>
+        <p class="mem">~340KB of memory</p>
+        <div class="buttons">
+          <a class="btn-dsk" href="https://github.com/ecliptik/flynn/releases/download/v1.10.2/Flynn-Lite-1.10.2.dsk">.dsk</a>
+          <a class="btn-sit" href="https://github.com/ecliptik/flynn/releases/download/v1.10.2/Flynn-Lite-1.10.2.sit">.sit</a>
+        </div>
+      </div>
+      <div class="edition" data-reveal style="--dot: #7d4fc9; --glow: rgba(125,79,201,0.5);">
+        <div class="dot"></div>
+        <h3>Flynn Minimal</h3>
+        <p class="desc">Only the essentials. One session, smallest footprint. Runs where nothing else will.</p>
+        <p class="mem">~256KB of memory</p>
+        <div class="buttons">
+          <a class="btn-dsk" href="https://github.com/ecliptik/flynn/releases/download/v1.10.2/Flynn-Minimal-1.10.2.dsk">.dsk</a>
+          <a class="btn-sit" href="https://github.com/ecliptik/flynn/releases/download/v1.10.2/Flynn-Minimal-1.10.2.sit">.sit</a>
+        </div>
+      </div>
+    </div>
+    <p class="small-print download-print" data-reveal>.dsk is an 800K floppy image; .sit is a StuffIt 1.5.1 archive. Also on <a href="https://macintoshgarden.org/apps/flynn">Macintosh Garden</a>. Requires a Mac Plus or later, 4MB RAM recommended, System 6.0.8+, and MacTCP or Open Transport.</p>
+  </section>
+
+  <!-- ACKNOWLEDGMENTS / FOOTER -->
+  <section class="credits" data-reveal>
+    <div class="rule"></div>
+    <h2>Standing on the shoulders of 68k giants.</h2>
+    <p class="body">Flynn was 100% vibe coded with <a href="https://claude.ai/code">Claude Code</a>. Source available on <a href="https://github.com/ecliptik/flynn">GitHub</a>.</p>
+    <p class="signoff">Flynn. Think retro.</p>
+    <p class="gag">© 2026 ecliptik/flynn. ISC licensed. Flynn is a telnet client and, coincidentally, a guy who got stuck inside a computer. Macintosh, System 6 and System 7 are trademarks of their respective owners, most of whom have moved on. Telnet is a protocol, not a suggestion.</p>
+  </section>
+
+<script>
+(function () {
+  var els = document.querySelectorAll("[data-reveal]");
+  if (!("IntersectionObserver" in window)) return;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) {
+        en.target.style.opacity = "1";
+        en.target.style.transform = en.target.style.transform.replace(/translateY\([^)]*\)\s*/, "");
+        io.unobserve(en.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  els.forEach(function (el) {
+    var r = el.getBoundingClientRect();
+    if (r.top < window.innerHeight * 0.9) return; // already visible on load
+    el.style.opacity = "0";
+    el.style.transform = (el.style.transform ? el.style.transform + " " : "") + "translateY(26px)";
+    el.style.transition = "opacity 0.8s ease, transform 0.8s ease";
+    io.observe(el);
+  });
+})();
+</script>
+</body>
+</html>
