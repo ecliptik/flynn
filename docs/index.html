@@ -36,11 +36,13 @@ a:hover { color: #0095b6; }
 
 /* hero */
 .hero { text-align: center; padding: 72px 32px 40px; }
-.flower { position: relative; width: 460px; height: 400px; margin: 0 auto 20px; animation: floatIn 0.9s ease both; max-width: 100%; }
-.badge { position: absolute; width: 110px; height: 110px; border-radius: 26px; box-shadow: 0 16px 36px -12px var(--glow), inset 0 -8px 16px rgba(0,0,0,0.22), inset 0 2px 3px rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; transform: rotate(var(--rot)); transition: transform 0.35s ease; }
+/* Flower is proportional (percentages of its 460x400 design box) so it
+   shrinks fluidly on narrow screens; at full width it is pixel-identical. */
+.flower { position: relative; width: 460px; max-width: 100%; aspect-ratio: 460 / 400; margin: 0 auto 20px; animation: floatIn 0.9s ease both; }
+.badge { position: absolute; width: 23.913%; aspect-ratio: 1; border-radius: 23.636%; box-shadow: 0 16px 36px -12px var(--glow), inset 0 -8px 16px rgba(0,0,0,0.22), inset 0 2px 3px rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; transform: rotate(var(--rot)); transition: transform 0.35s ease; }
 .badge:hover { transform: rotate(var(--rot)) scale(1.1); }
-.badge img { width: 70px; height: 70px; image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.3)); }
-.badge .gloss { position: absolute; top: 4px; left: 8px; right: 8px; height: 42px; border-radius: 20px 20px 38px 38px; background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.05)); pointer-events: none; }
+.badge img { width: 63.636%; height: auto; image-rendering: pixelated; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.3)); }
+.badge .gloss { position: absolute; top: 3.636%; left: 7.273%; right: 7.273%; height: 38.182%; border-radius: 21.277% 21.277% 40.426% 40.426% / 47.619% 47.619% 90.476% 90.476%; background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.05)); pointer-events: none; }
 .hero h1 { margin: 0; font-size: clamp(96px, 16vw, 200px); font-weight: 500; letter-spacing: -0.03em; line-height: 0.95; animation: floatIn 0.9s 0.05s ease both; }
 .hero-sub { margin: 44px auto 0; max-width: 620px; font-size: 24px; line-height: 1.45; color: #444; animation: floatIn 0.9s 0.15s ease both; }
 .hero-shot-wrap { margin: 64px auto 0; max-width: 980px; }
@@ -60,7 +62,7 @@ a:hover { color: #0095b6; }
 .section-lede { margin: 0 auto 60px; max-width: 560px; font-size: 20px; color: #555; line-height: 1.5; }
 
 /* features */
-.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 36px; text-align: left; }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr)); gap: 36px; text-align: left; }
 .feature { border-top: 3px solid var(--accent); padding-top: 20px; }
 .feature h3 { margin: 0 0 10px; font-size: 24px; font-weight: 600; }
 .feature p { margin: 0; font-size: 17px; line-height: 1.5; color: #444; }
@@ -77,7 +79,7 @@ a:hover { color: #0095b6; }
 .small-print { margin: 56px auto 0; max-width: 520px; font-size: 16px; font-style: italic; color: #888; }
 
 /* gallery */
-.gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 40px 36px; }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 40px 36px; }
 .gallery-grid figure { margin: 0; }
 .gallery-shot { width: 100%; display: block; border-radius: 5px; box-shadow: 0 18px 50px -16px var(--glow), 0 2px 6px rgba(0,0,0,0.1); transition: transform 0.4s ease; }
 .gallery-shot:hover { transform: scale(1.03); }
@@ -86,7 +88,7 @@ a:hover { color: #0095b6; }
 .gallery-grid figcaption span { color: #777; }
 
 /* download */
-.editions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 28px; text-align: left; }
+.editions-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 28px; text-align: left; }
 .edition { border: 1px solid #e2e2de; border-radius: 12px; padding: 30px 28px 26px; background: #fff; transition: transform 0.3s ease, box-shadow 0.3s ease; }
 .edition:hover { transform: translateY(-6px); box-shadow: 0 24px 60px -20px var(--glow); }
 .edition .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--dot); margin-bottom: 18px; }
@@ -118,23 +120,23 @@ a:hover { color: #0095b6; }
   <!-- HERO -->
   <section class="hero">
     <div class="flower">
-      <div class="badge" style="left: 104px; top: 24px; --rot: 144deg; --glow: rgba(255,140,26,0.6); background: linear-gradient(180deg, #ffc98a 0%, #ff9f3d 45%, #f57f00 55%, #ffa64d 100%);">
+      <div class="badge" style="left: 22.609%; top: 6%; --rot: 144deg; --glow: rgba(255,140,26,0.6); background: linear-gradient(180deg, #ffc98a 0%, #ff9f3d 45%, #f57f00 55%, #ffa64d 100%);">
         <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
         <div class="gloss"></div>
       </div>
-      <div class="badge" style="left: 246px; top: 24px; --rot: -144deg; --glow: rgba(108,196,23,0.6); background: linear-gradient(180deg, #c2ec8f 0%, #85cf3a 45%, #5cad10 55%, #8fd54a 100%);">
+      <div class="badge" style="left: 53.478%; top: 6%; --rot: -144deg; --glow: rgba(108,196,23,0.6); background: linear-gradient(180deg, #c2ec8f 0%, #85cf3a 45%, #5cad10 55%, #8fd54a 100%);">
         <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
         <div class="gloss"></div>
       </div>
-      <div class="badge" style="left: 61px; top: 158px; --rot: 72deg; --glow: rgba(125,79,201,0.6); background: linear-gradient(180deg, #c6abf2 0%, #9268d8 45%, #7d4fc9 55%, #9c74dd 100%);">
+      <div class="badge" style="left: 13.261%; top: 39.5%; --rot: 72deg; --glow: rgba(125,79,201,0.6); background: linear-gradient(180deg, #c6abf2 0%, #9268d8 45%, #7d4fc9 55%, #9c74dd 100%);">
         <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
         <div class="gloss"></div>
       </div>
-      <div class="badge" style="left: 289px; top: 158px; --rot: -72deg; --glow: rgba(232,53,94,0.6); background: linear-gradient(180deg, #f7a5bd 0%, #ee5a80 45%, #e8355e 55%, #ef6b8d 100%);">
+      <div class="badge" style="left: 62.826%; top: 39.5%; --rot: -72deg; --glow: rgba(232,53,94,0.6); background: linear-gradient(180deg, #f7a5bd 0%, #ee5a80 45%, #e8355e 55%, #ef6b8d 100%);">
         <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
         <div class="gloss"></div>
       </div>
-      <div class="badge" style="left: 175px; top: 241px; --rot: 0deg; --glow: rgba(0,149,182,0.6); background: linear-gradient(180deg, #7fd4e8 0%, #29a8c9 45%, #0095b6 55%, #33b5d1 100%);">
+      <div class="badge" style="left: 38.043%; top: 60.25%; --rot: 0deg; --glow: rgba(0,149,182,0.6); background: linear-gradient(180deg, #7fd4e8 0%, #29a8c9 45%, #0095b6 55%, #33b5d1 100%);">
         <img src="assets/flynn-icon-color-512.png" alt="Flynn desktop icon">
         <div class="gloss"></div>
       </div>
