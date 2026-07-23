@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.10.2] - 2026-07-23
 
 ### Fixed
 - Crash on Cmd+Q or closing the last window from the keyboard: the event loop dereferenced the active session after menu dispatch had destroyed it, corrupting low memory before an address error (both)
