@@ -15,7 +15,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-FORGEJO_URL="${FORGEJO_URL:-https://forgejo.ecliptik.com}"
+# Forgejo host comes from origin: it's a private tailnet name and this
+# repo is mirrored publicly, so it isn't written here.
+FORGEJO_URL="${FORGEJO_URL:-https://$(git -C "$SCRIPT_DIR" remote get-url origin | sed -E \
+    -e 's#^[a-z+]+://([^@/]+@)?([^/:]+).*#\2#' -e 's#^[^@/]+@([^:/]+):.*#\1#')}"
 FORGEJO_REPO="${FORGEJO_REPO:-ecliptik/flynn}"
 GITHUB_REPO="${GITHUB_REPO:-ecliptik/flynn}"
 

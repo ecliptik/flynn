@@ -91,7 +91,7 @@ Emulator infrastructure lives in `/home/claude/emulators/`. See its docs for ful
 
 ## Repository Conventions
 
-- Git remote (primary): `ssh://git@forgejo.ecliptik.com/ecliptik/flynn.git`
+- Git remote (primary): `origin`, the private Forgejo on the tailnet (`ecliptik/flynn`). Don't write its hostname into this repo; it's mirrored publicly
 - GitHub mirror: `https://github.com/ecliptik/flynn` (read-only, auto-mirrored from Forgejo; public-facing repo for links and issues)
 - Never push directly to GitHub — only push to Forgejo. Releases are created on both via `release.sh`.
 - Use feature branches, commits, and worktrees for development
