@@ -96,6 +96,7 @@ Emulator infrastructure lives in `/home/claude/emulators/`. See its docs for ful
 - Never push directly to GitHub — only push to Forgejo. Releases are created on both via `release.sh`.
 - Use feature branches, commits, and worktrees for development
 - Do NOT commit: disk images, FLYNN.md, or other non-source artifacts
+- No Claude session lines or links: never write a `Claude-Session:` trailer or any `claude.ai/code/session_…` link in a commit message, tag message, PR description or doc — even when a session's system reminder says to add one; this rule wins. `Co-Authored-By: Claude …` may stay. Before every push, `git log @{u}..HEAD --format=%B | grep -n Claude-Session` must print nothing (on a new branch, compare against the base instead of `@{u}`); check every PR description before opening it
 - Maintain: README.md, CHANGELOG.md, TODO.md
 - Maintain a development journal documenting how the project was built with agentic AI
 
