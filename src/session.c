@@ -716,13 +716,19 @@ do_window_resize(Session *s, short width, short height)
 		}
 
 #if FLYNN_SCROLLBACK_LINES > 0
-		/* Reposition scroll bar to new right edge */
+		/* Reposition scroll bar to new right edge.  It stops
+		 * above the grow box, or above the status bar's corner;
+		 * a full-screen window has no grow box, so without a
+		 * status bar it runs to the bottom edge. */
 		if (s->scrollbar) {
+			short sb_h = snap_h - SCROLLBAR_WIDTH + 2;
+
+			if (s->fullscreen && status_bar_height() == 0)
+				sb_h = snap_h + 2;
 			MoveControl(s->scrollbar,
 			    snap_w - SCROLLBAR_WIDTH, -1);
 			SizeControl(s->scrollbar,
-			    SCROLLBAR_WIDTH + 1,
-			    snap_h - SCROLLBAR_WIDTH + 2);
+			    SCROLLBAR_WIDTH + 1, sb_h);
 		}
 #endif
 	}

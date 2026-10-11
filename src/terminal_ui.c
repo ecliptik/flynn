@@ -1100,25 +1100,39 @@ do_draw:
 		 */
 	}
 
-	/* Fill area below terminal grid with black in dark mode.
+	/* Fill the areas outside the terminal grid with black in dark
+	 * mode: below the last row, and right of the last column.
 	 * The offscreen buffer is zeroed (white) on allocation, so
-	 * the gap between the last terminal row and the status bar
-	 * remains white unless explicitly filled. */
+	 * these gaps remain white unless explicitly filled.  The
+	 * right gap only exists in full screen, where the window
+	 * keeps the screen size instead of snapping to the grid. */
 	{
 		short grid_bottom = row_bottom(term->active_rows - 1);
+		short grid_right = LEFT_MARGIN +
+		    term->active_cols * g_cell_width;
 		short content_bottom = win->portRect.bottom -
 		    status_bar_height();
+		short content_right = win->portRect.right -
+		    SCROLLBAR_WIDTH;
+		Rect gaps[2];
+		short ngaps = 0, gi;
 
-		if (grid_bottom < content_bottom) {
-			Rect gap_r;
-			SetRect(&gap_r, 0, grid_bottom,
-			    win->portRect.right - SCROLLBAR_WIDTH,
-			    content_bottom);
+		if (grid_bottom < content_bottom)
+			SetRect(&gaps[ngaps++], 0, grid_bottom,
+			    content_right, content_bottom);
+		if (grid_right < content_right)
+			SetRect(&gaps[ngaps++], grid_right, 0,
+			    content_right,
+			    grid_bottom < content_bottom ?
+			    grid_bottom : content_bottom);
+
+		for (gi = 0; gi < ngaps; gi++) {
+			Rect *gap_r = &gaps[gi];
 
 #ifdef FLYNN_OFFSCREEN
 			if (use_offscreen && (g_dark_mode ||
 			    g_mono_dark)) {
-				offscreen_fill_rect(&gap_r, 0xFF);
+				offscreen_fill_rect(gap_r, 0xFF);
 			} else if (use_color_offscreen &&
 			    g_dark_mode) {
 #ifdef FLYNN_THEMES
@@ -1130,13 +1144,13 @@ do_draw:
 #else
 				set_bg_color(0);
 #endif
-				EraseRect(&gap_r);
+				EraseRect(gap_r);
 			} else
 #endif
 			if (g_dark_mode || g_mono_dark) {
-				PaintRect(&gap_r);
+				PaintRect(gap_r);
 			} else {
-				EraseRect(&gap_r);
+				EraseRect(gap_r);
 			}
 		}
 	}
