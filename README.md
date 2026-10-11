@@ -89,6 +89,7 @@ Flynn is designed for the Apple M0110/M0110A keyboard, which lacks Escape and Co
 | Paste | Cmd+V | Sends clipboard to connection |
 | Select All | Cmd+A | Selects entire terminal screen |
 | Switch session | Cmd+1..0 | Jump to window 1-10 (see Window menu) |
+| Full Screen | Cmd+M | Toggle the terminal filling the screen below the menu bar (Window menu) |
 | Find | Cmd+F | Search scrollback and screen |
 | Find Again | Cmd+G | Repeat last search |
 | Show Clipboard | Cmd+K | Show clipboard viewer window |

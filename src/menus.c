@@ -340,6 +340,18 @@ update_window_menu(void)
 		count--;
 	}
 
+	/* Full Screen toggle, checked when the active session is
+	 * full screen */
+	AppendMenu(window_menu, "\pFull Screen/M");
+	if (active_session) {
+		EnableItem(window_menu, WIN_MENU_FULLSCREEN);
+		CheckItem(window_menu, WIN_MENU_FULLSCREEN,
+		    active_session->fullscreen);
+	} else {
+		DisableItem(window_menu, WIN_MENU_FULLSCREEN);
+	}
+	AppendMenu(window_menu, "\p(-");
+
 	/* Add count header (disabled) */
 	sess_count = session_count();
 	snprintf(count_str, sizeof(count_str), "%d of %d Sessions",
@@ -351,9 +363,9 @@ update_window_menu(void)
 		ps[0] = len;
 		memcpy(ps + 1, count_str, len);
 		AppendMenu(window_menu, "\p ");
-		SetMenuItemText(window_menu, 1, ps);
+		SetMenuItemText(window_menu, WIN_MENU_COUNT, ps);
 	}
-	DisableItem(window_menu, 1);
+	DisableItem(window_menu, WIN_MENU_COUNT);
 
 	/* Separator */
 	AppendMenu(window_menu, "\p(-");
@@ -381,7 +393,8 @@ update_window_menu(void)
  * Window-menu item text.  Used for OSC title changes, which arrive in
  * bursts; a full update_window_menu() rebuild (DeleteMenuItem/AppendMenu
  * per item) per burst is wasteful.  Item order matches the append order
- * in update_window_menu(): count header, separator, then one item per
+ * in update_window_menu(): Full Screen, separator, count header,
+ * separator, then one item per
  * existing session in index order starting at WIN_MENU_FIRST_WIN.
  */
 void
@@ -885,7 +898,8 @@ handle_theme_menu(short item)
 		    active_session->window->portRect.right,
 		    active_session->window->portRect.bottom);
 		ClipRect(&sb_r);
-		DrawGrowIcon(active_session->window);
+		if (!active_session->fullscreen)
+			DrawGrowIcon(active_session->window);
 		SetClip(sc);
 		DisposeRgn(sc);
 #if FLYNN_SCROLLBACK_LINES > 0
@@ -1049,6 +1063,13 @@ handle_window_menu(short item)
 {
 	short win_idx = item - WIN_MENU_FIRST_WIN;
 	short count = 0, si;
+
+	if (item == WIN_MENU_FULLSCREEN) {
+		if (active_session)
+			session_toggle_fullscreen(active_session);
+		update_menus();
+		return;
+	}
 
 	for (si = 0; si < MAX_SESSIONS; si++) {
 		Session *ws = session_get(si);

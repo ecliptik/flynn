@@ -120,7 +120,11 @@
 
 /* Window menu */
 #define WINDOW_MENU_ID      133
-#define WIN_MENU_FIRST_WIN  3	/* after count header + separator */
+#define WIN_MENU_FULLSCREEN 1	/* Full Screen toggle (Cmd-M) */
+/* separator = 2 */
+#define WIN_MENU_COUNT      3	/* "N of M Sessions" header */
+/* separator = 4 */
+#define WIN_MENU_FIRST_WIN  5	/* first session window */
 
 /* Control menu items */
 #define CTRL_MENU_CTRLC     1

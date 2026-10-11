@@ -23,6 +23,9 @@ typedef struct Session {
 #if FLYNN_SCROLLBACK_LINES > 0
 	ControlHandle	scrollbar;
 #endif
+	/* Full screen: window fills the screen below the menu bar */
+	Boolean		fullscreen;
+	Rect		normal_bounds;	/* global content rect to restore */
 
 	/* Core protocol state */
 	Connection	conn;
@@ -103,6 +106,9 @@ void do_font_change(short font_id, short font_size);
 
 /* Resize session window and update terminal grid */
 void do_window_resize(Session *s, short width, short height);
+
+/* Switch a session's window between normal and full screen */
+void session_toggle_fullscreen(Session *s);
 
 /* Destroy all sessions (reverse order) */
 void session_destroy_all(void);

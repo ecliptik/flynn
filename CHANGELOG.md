@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Window > Full Screen (Cmd+M): the active session's window fills the whole screen below the menu bar, with no title bar, and the terminal grid grows to fit (about 82x27 on a 512x342 Mac Plus with Monaco 9). Choosing it again restores the normal window where it was. The server is told the new size, so full-screen programs reflow (both)
+
 ## [1.10.2] - 2026-07-23
 
 ### Fixed

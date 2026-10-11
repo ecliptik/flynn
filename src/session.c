@@ -24,8 +24,78 @@
 
 extern FlynnPrefs prefs;
 
+/* Document window with zoom box + grow box (Multiversal headers
+ * don't define it) */
+#ifndef zoomDocProc
+#define zoomDocProc	8
+#endif
+
 static Session *sessions[MAX_SESSIONS];
 static short num_sessions = 0;
+
+/*
+ * session_make_window - create a session's window and scroll bar.
+ *
+ * proc is the WDEF variant: zoomDocProc for a normal window, or
+ * plainDBox for full screen (no title bar, frame falls outside the
+ * screen).  On failure s->window is NULL and nothing is allocated.
+ */
+static Boolean
+session_make_window(Session *s, const Rect *bounds, short proc)
+{
+	/* Use NewCWindow on System 7 for color, NewWindow on System 6 */
+	if (g_has_color_qd) {
+		s->window = NewCWindow(0L, bounds, "\pFlynn", true,
+		    proc, (WindowPtr)-1L, proc != plainDBox, (long)s);
+	} else {
+		s->window = NewWindow(0L, bounds, "\pFlynn", true,
+		    proc, (WindowPtr)-1L, proc != plainDBox, (long)s);
+	}
+	if (s->window == 0L)
+		return false;
+
+	/*
+	 * Note: Palette attachment removed — NSetPalette with
+	 * pmTolerant was interfering with RGBForeColor for text.
+	 * RGBForeColor/RGBBackColor work directly on color
+	 * displays without a custom palette.
+	 */
+
+	/* Pre-fill window with dark background for dark themes.
+	 * Without this, the window starts white and shows
+	 * briefly before the first draw covers it. */
+#ifdef FLYNN_COLOR
+	if (g_has_color_qd && prefs.dark_mode) {
+		GrafPtr save;
+		RGBColor black_c = {0, 0, 0};
+		RGBColor white_c = {0xFFFF, 0xFFFF, 0xFFFF};
+		GetPort(&save);
+		SetPort(s->window);
+		RGBBackColor(&black_c);
+		EraseRect(&s->window->portRect);
+		RGBBackColor(&white_c);
+		SetPort(save);
+	}
+#endif
+
+	/* Create vertical scroll bar in right border area.
+	 * Standard Mac positioning: overlap window frame by 1px
+	 * on top/right, stop above grow box at bottom. */
+#if FLYNN_SCROLLBACK_LINES > 0
+	{
+		Rect sb_bounds;
+
+		SetRect(&sb_bounds,
+		    s->window->portRect.right - SCROLLBAR_WIDTH,
+		    -1,
+		    s->window->portRect.right + 1,
+		    s->window->portRect.bottom - SCROLLBAR_WIDTH + 1);
+		s->scrollbar = NewControl(s->window, &sb_bounds,
+		    "\p", true, 0, 0, 0, scrollBarProc, 0L);
+	}
+#endif
+	return true;
+}
 
 Session *
 session_new(void)
@@ -78,16 +148,7 @@ session_new(void)
 		    2 + offset + win_w, 40 + offset + win_h);
 	}
 
-	/* Use NewCWindow on System 7 for color, NewWindow on System 6 */
-	/* zoomDocProc (8) = document window with zoom box + grow box */
-	if (g_has_color_qd) {
-		s->window = NewCWindow(0L, &bounds, "\pFlynn", true,
-		    8, (WindowPtr)-1L, true, (long)s);
-	} else {
-		s->window = NewWindow(0L, &bounds, "\pFlynn", true,
-		    8, (WindowPtr)-1L, true, (long)s);
-	}
-	if (s->window == 0L) {
+	if (!session_make_window(s, &bounds, zoomDocProc)) {
 		if (s->terminal.screen_color)
 			DisposePtr((Ptr)s->terminal.screen_color);
 		if (s->terminal.alt_color)
@@ -97,47 +158,6 @@ session_new(void)
 		DisposePtr((Ptr)s);
 		return 0L;
 	}
-
-	/*
-	 * Note: Palette attachment removed — NSetPalette with
-	 * pmTolerant was interfering with RGBForeColor for text.
-	 * RGBForeColor/RGBBackColor work directly on color
-	 * displays without a custom palette.
-	 */
-
-	/* Pre-fill window with dark background for dark themes.
-	 * Without this, the window starts white and shows
-	 * briefly before the first draw covers it. */
-#ifdef FLYNN_COLOR
-	if (g_has_color_qd && prefs.dark_mode) {
-		GrafPtr save;
-		RGBColor black_c = {0, 0, 0};
-		RGBColor white_c = {0xFFFF, 0xFFFF, 0xFFFF};
-		GetPort(&save);
-		SetPort(s->window);
-		RGBBackColor(&black_c);
-		EraseRect(&s->window->portRect);
-		RGBBackColor(&white_c);
-		SetPort(save);
-	}
-#endif
-
-	/* Create vertical scroll bar in right border area.
-	 * Standard Mac positioning: overlap window frame by 1px
-	 * on top/right, stop above grow box at bottom. */
-#if FLYNN_SCROLLBACK_LINES > 0
-	{
-		Rect sb_bounds;
-
-		SetRect(&sb_bounds,
-		    s->window->portRect.right - SCROLLBAR_WIDTH,
-		    -1,
-		    s->window->portRect.right + 1,
-		    s->window->portRect.bottom - SCROLLBAR_WIDTH + 1);
-		s->scrollbar = NewControl(s->window, &sb_bounds,
-		    "\p", true, 0, 0, 0, scrollBarProc, 0L);
-	}
-#endif
 
 	sessions[slot] = s;
 	num_sessions++;
@@ -162,12 +182,18 @@ session_destroy(Session *s)
 		GrafPtr save;
 		Point pt;
 
-		GetPort(&save);
-		SetPort(s->window);
-		pt.h = 0;
-		pt.v = 0;
-		LocalToGlobal(&pt);
-		SetPort(save);
+		if (s->fullscreen) {
+			/* Remember where the normal window was */
+			pt.h = s->normal_bounds.left;
+			pt.v = s->normal_bounds.top;
+		} else {
+			GetPort(&save);
+			SetPort(s->window);
+			pt.h = 0;
+			pt.v = 0;
+			LocalToGlobal(&pt);
+			SetPort(save);
+		}
 
 		prefs.win_x = pt.h;
 		prefs.win_y = pt.v;
@@ -254,6 +280,97 @@ session_any_connected(void)
 
 /* External references to main.c globals */
 extern Session *active_session;
+
+/*
+ * session_toggle_fullscreen - switch a session between its normal
+ * window and a borderless window covering the screen below the
+ * menu bar.
+ *
+ * A window's WDEF variant is fixed at creation, so the window is
+ * replaced: the new one is made first, then the old window and
+ * scroll bar are disposed.  Terminal and connection state live in
+ * the Session and are untouched; do_window_resize() recomputes the
+ * grid and sends NAWS when it changes.
+ */
+void
+session_toggle_fullscreen(Session *s)
+{
+	WindowPtr old_win;
+#if FLYNN_SCROLLBACK_LINES > 0
+	ControlHandle old_sb;
+#endif
+	Str255 title;
+	Rect bounds;
+	short proc;
+	GrafPtr save;
+
+	if (!s || !s->window)
+		return;
+
+	GetPort(&save);
+	old_win = s->window;
+#if FLYNN_SCROLLBACK_LINES > 0
+	old_sb = s->scrollbar;
+#endif
+	GetWTitle(old_win, title);
+
+	if (!s->fullscreen) {
+		/* Remember the normal window's content rect */
+		Point pt;
+
+		SetPort(old_win);
+		pt.h = 0;
+		pt.v = 0;
+		LocalToGlobal(&pt);
+		s->normal_bounds.left = pt.h;
+		s->normal_bounds.top = pt.v;
+		s->normal_bounds.right = pt.h +
+		    (old_win->portRect.right - old_win->portRect.left);
+		s->normal_bounds.bottom = pt.v +
+		    (old_win->portRect.bottom - old_win->portRect.top);
+
+		bounds = qd.screenBits.bounds;
+		bounds.top += GetMBarHeight();
+		proc = plainDBox;
+	} else {
+		bounds = s->normal_bounds;
+		proc = zoomDocProc;
+	}
+
+	/* The offscreen buffer belongs to the old window */
+	term_ui_invalidate_offscreen();
+
+	if (!session_make_window(s, &bounds, proc)) {
+		s->window = old_win;
+#if FLYNN_SCROLLBACK_LINES > 0
+		s->scrollbar = old_sb;
+#endif
+		SetPort(save);
+		SysBeep(10);
+		return;
+	}
+	SetWTitle(s->window, title);
+	s->fullscreen = !s->fullscreen;
+
+#if FLYNN_SCROLLBACK_LINES > 0
+	if (old_sb)
+		DisposeControl(old_sb);
+#endif
+	DisposeWindow(old_win);
+	if (save == (GrafPtr)old_win)
+		save = (GrafPtr)s->window;
+
+	/* New port needs the session's font */
+	SetPort(s->window);
+	TextFont(s->font_id);
+	TextSize(s->font_size);
+
+	do_window_resize(s,
+	    bounds.right - bounds.left,
+	    bounds.bottom - bounds.top);
+	session_update_scrollbar(s);
+	SetPort(save);
+}
 
 void
 session_destroy_all(void)
@@ -545,6 +662,16 @@ do_window_resize(Session *s, short width, short height)
 	/* Ensure we use this session's font metrics */
 	session_load_font(s);
 
+	/* A full-screen window never changes size: callers asking
+	 * for a new size (font or status bar change) just get the
+	 * grid recomputed for the screen. */
+	if (s->fullscreen) {
+		width = s->window->portRect.right -
+		    s->window->portRect.left;
+		height = s->window->portRect.bottom -
+		    s->window->portRect.top;
+	}
+
 	old_cols = s->terminal.active_cols;
 	old_rows = s->terminal.active_rows;
 
@@ -575,11 +702,18 @@ do_window_resize(Session *s, short width, short height)
 	{
 		short snap_w, snap_h;
 
-		snap_w = LEFT_MARGIN * 2 + new_cols * g_cell_width +
-		    SCROLLBAR_WIDTH;
-		snap_h = status_bar_height() +
-		    new_rows * g_cell_height;
-		SizeWindow(s->window, snap_w, snap_h, true);
+		if (s->fullscreen) {
+			/* Full screen keeps the whole screen; the
+			 * renderer fills the leftover margins. */
+			snap_w = width;
+			snap_h = height;
+		} else {
+			snap_w = LEFT_MARGIN * 2 +
+			    new_cols * g_cell_width + SCROLLBAR_WIDTH;
+			snap_h = status_bar_height() +
+			    new_rows * g_cell_height;
+			SizeWindow(s->window, snap_w, snap_h, true);
+		}
 
 #if FLYNN_SCROLLBACK_LINES > 0
 		/* Reposition scroll bar to new right edge */
@@ -648,7 +782,8 @@ do_window_resize(Session *s, short width, short height)
 		    s->window->portRect.right + 1,
 		    s->window->portRect.bottom + 1);
 		ClipRect(&col_r);
-		DrawGrowIcon(s->window);
+		if (!s->fullscreen)
+			DrawGrowIcon(s->window);
 		SetClip(save_clip);
 		DisposeRgn(save_clip);
 

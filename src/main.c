@@ -1403,7 +1403,8 @@ handle_update(EventRecord *event)
 		    win->portRect.right + 1,
 		    win->portRect.bottom + 1);
 		ClipRect(&clip_r);
-		DrawGrowIcon(win);
+		if (!sess || !sess->fullscreen)
+			DrawGrowIcon(win);
 		SetClip(save_clip);
 		DisposeRgn(save_clip);
 
@@ -1475,7 +1476,8 @@ handle_activate(EventRecord *event)
 				    win->portRect.right + 1,
 				    win->portRect.bottom + 1);
 				ClipRect(&gb_r);
-				DrawGrowIcon(win);
+				if (!sess->fullscreen)
+					DrawGrowIcon(win);
 				SetClip(sc);
 				DisposeRgn(sc);
 				SetPort(save_p);
@@ -1514,7 +1516,8 @@ handle_activate(EventRecord *event)
 				    win->portRect.right + 1,
 				    win->portRect.bottom + 1);
 				ClipRect(&gb_r);
-				DrawGrowIcon(win);
+				if (!sess->fullscreen)
+					DrawGrowIcon(win);
 				SetClip(sc);
 				DisposeRgn(sc);
 				SetPort(save_p);

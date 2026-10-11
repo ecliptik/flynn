@@ -329,6 +329,12 @@ buffer, connection state, cursor, and text selection.
   - The Window menu lists all open sessions with a
     checkmark on the active window.
 
+  Full Screen:
+  - Choose Full Screen from the Window menu (Command-M)
+    to make the current session fill the screen below
+    the menu bar. Choose it again to get the normal
+    window back.
+
   Closing a Session:
   - Close the window via the close box or Command-W.
   - Choose "Close Session" from the File menu.
