@@ -1244,6 +1244,11 @@ do_reconnect(void)
 		term_ui_invalidate_offscreen();
 		term_dirty_all(&s->terminal);
 		term_ui_draw(s->window, &s->terminal);
+		/* Save the cursor state the draw left on screen.  The
+		 * update event for the dismissed alert loads s->ui before
+		 * the next idle save; stale state there leaves an XOR
+		 * cursor mark that nothing erases. */
+		term_ui_save_state(&s->ui);
 		SetPort(save);
 	}
 

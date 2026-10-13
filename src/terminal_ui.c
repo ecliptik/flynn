@@ -1047,6 +1047,18 @@ term_ui_draw(WindowPtr win, Terminal *term)
 			EraseRect(&r);
 		}
 
+#ifdef FLYNN_OFFSCREEN
+		/* Copy the row to the shadow buffer before the blank-row
+		 * skip below.  A row erased to blank must not keep its
+		 * old text in the shadow: if the same text came back
+		 * later, the shadow check would call it unchanged and
+		 * the row would never be drawn. */
+		if (term->scroll_offset == 0)
+			memcpy(&g_shadow[row][0],
+			    term->screen_rows[row],
+			    term->active_cols * sizeof(TermCell));
+#endif
+
 		/* Set default fg color before drawing row */
 		if (g_has_color_qd) {
 #ifdef FLYNN_THEMES
@@ -1082,14 +1094,6 @@ term_ui_draw(WindowPtr win, Terminal *term)
 		}
 do_draw:
 		draw_row(term, row);
-
-#ifdef FLYNN_OFFSCREEN
-		/* Copy rendered row to shadow buffer */
-		if (term->scroll_offset == 0)
-			memcpy(&g_shadow[row][0],
-			    term->screen_rows[row],
-			    term->active_cols * sizeof(TermCell));
-#endif
 
 		/*
 		 * On color systems, draw_row() handles dark mode

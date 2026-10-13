@@ -9,6 +9,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Status bar kept saying "Disconnected" after Reconnect, or after connecting again from a disconnected window, until something forced a full redraw; it now shows the host and port as soon as the connection opens (both, status bar builds)
+- Lines sometimes never appeared: when a row was cleared and the same text was later written back to it (a server greeting after Reconnect, `clear` followed by the same output), the renderer thought the row was unchanged and skipped it until the next full redraw (mono)
+- Reconnect could leave a stray cursor block in the top-left corner (both)
 
 ## [1.10.2] - 2026-07-23
 
