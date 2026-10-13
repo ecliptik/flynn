@@ -380,6 +380,25 @@ do_about(void)
 /* ---- Post-connect shared logic ---- */
 
 /*
+ * redraw_status_bar - repaint the status bar after a connect.
+ * A reused (disconnected) window only gets update events for the
+ * areas the connect dialogs covered, which never include the status
+ * bar, so it would keep showing "Disconnected".
+ */
+static void
+redraw_status_bar(Session *s)
+{
+	GrafPtr save;
+
+	if (!prefs.show_status_bar)
+		return;
+	GetPort(&save);
+	SetPort(s->window);
+	draw_status_bar(s->window, s);
+	SetPort(save);
+}
+
+/*
  * session_post_connect - shared setup after successful TCP connect.
  * Initializes telnet, sets terminal type, resets terminal, saves
  * host/port to prefs, tracks bookmark, auto-sends username, sets title.
@@ -458,6 +477,7 @@ session_post_connect(Session *s, short ttype, short bm_index,
 
 	/* Update window title */
 	set_wtitlef(s->window, "Flynn - %s", s->conn.host);
+	redraw_status_bar(s);
 }
 
 #ifdef FLYNN_FAVORITES
@@ -1234,6 +1254,7 @@ do_reconnect(void)
 	if (conn_connect(&s->conn, s->conn.host, s->conn.port, sw)) {
 		conn_status_close(sw);
 		set_wtitlef(s->window, "Flynn - %s", s->conn.host);
+		redraw_status_bar(s);
 	} else {
 		conn_status_close(sw);
 	}
