@@ -94,6 +94,7 @@ Emulator infrastructure lives in `/home/claude/emulators/`. See its docs for ful
 - Git remote (primary): `origin`, the private Forgejo on the tailnet (`ecliptik/flynn`). Don't write its hostname into this repo; it's mirrored publicly
 - GitHub mirror: `https://github.com/ecliptik/flynn` (read-only, auto-mirrored from Forgejo; public-facing repo for links and issues)
 - Never push directly to GitHub — only push to Forgejo. Releases are created on both via `release.sh`.
+- Merge GitHub PRs on Forgejo, never with GitHub's merge button. The push mirror runs `git push --mirror`, so any commit or branch that exists only on GitHub is wiped at the next sync (this happened to PRs #1 and #2). Fetch the PR head (`git fetch github refs/pull/N/head`), merge or fast-forward it into Forgejo `main`, and push to Forgejo; the mirror then carries it to GitHub, which marks the PR merged
 - Use feature branches, commits, and worktrees for development
 - Do NOT commit: disk images, FLYNN.md, or other non-source artifacts
 - No Claude session lines or links: never write a `Claude-Session:` trailer or any `claude.ai/code/session_…` link in a commit message, tag message, PR description or doc — even when a session's system reminder says to add one; this rule wins. `Co-Authored-By: Claude …` may stay. Before every push, `git log @{u}..HEAD --format=%B | grep -n Claude-Session` must print nothing (on a new branch, compare against the base instead of `@{u}`); check every PR description before opening it
