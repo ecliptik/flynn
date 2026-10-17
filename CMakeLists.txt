@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 project(Flynn VERSION 1.11.0)
 
 # --- Feature flags with defaults ---
+option(FLYNN_TALKIP        "TCP/IP over LocalTalk with talkip instead of MacTCP (512Ke)" OFF)
 option(FLYNN_FINGER        "Enable Finger protocol"            ON)
 option(FLYNN_COLOR         "Enable 256-color support"          OFF)
 option(FLYNN_GLYPHS        "Enable Unicode glyph rendering"    ON)
@@ -76,7 +77,19 @@ if(FLYNN_THEMES)
     list(APPEND FLYNN_SOURCES src/theme.c src/theme_import.c)
 endif()
 
+# talkip: its library replaces src/tcp.c (same _TCP*/_UDP* API, no MacTCP needed)
+if(FLYNN_TALKIP)
+    list(REMOVE_ITEM FLYNN_SOURCES src/tcp.c)
+    if(NOT DEFINED TALKIP_DIR)
+        set(TALKIP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../talkip)
+    endif()
+    add_subdirectory(${TALKIP_DIR} talkip)
+endif()
+
 add_application(Flynn ${FLYNN_SOURCES} resources/telnet.r)
+if(FLYNN_TALKIP)
+    target_link_libraries(Flynn talkip)
+endif()
 
 # Include path for MacTCP.h and local headers
 target_include_directories(Flynn PRIVATE
@@ -88,6 +101,7 @@ target_include_directories(Flynn PRIVATE
 target_compile_definitions(Flynn PRIVATE
     MAX_SESSIONS=${FLYNN_MAX_SESSIONS}
     FLYNN_SCROLLBACK_LINES=${FLYNN_SCROLLBACK}
+    $<$<BOOL:${FLYNN_TALKIP}>:FLYNN_TALKIP>
     $<$<BOOL:${FLYNN_FINGER}>:FLYNN_FINGER>
     $<$<BOOL:${FLYNN_COLOR}>:FLYNN_COLOR>
     $<$<BOOL:${FLYNN_GLYPHS}>:FLYNN_GLYPHS>

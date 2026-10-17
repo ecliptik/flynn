@@ -35,6 +35,7 @@ FLYNN_OFFSCREEN=ON
 FLYNN_STATUS_BAR=ON
 FLYNN_CURSOR_STYLES=ON
 FLYNN_TAB_STOPS=ON
+FLYNN_TALKIP=OFF
 
 PRESET=""
 
@@ -183,6 +184,7 @@ while [[ $# -gt 0 ]]; do
         --no-statusbar)  FLYNN_STATUS_BAR=OFF;       shift ;;
         --cursorstyles)  FLYNN_CURSOR_STYLES=ON;     shift ;;
         --no-cursorstyles) FLYNN_CURSOR_STYLES=OFF;  shift ;;
+        --talkip)        FLYNN_TALKIP=ON;            shift ;;  # TCP/IP over LocalTalk (talkip), no MacTCP
         --tabstops)      FLYNN_TAB_STOPS=ON;         shift ;;
         --no-tabstops)   FLYNN_TAB_STOPS=OFF;        shift ;;
         *)
@@ -324,7 +326,8 @@ cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=MinSi
     -DFLYNN_OFFSCREEN="$FLYNN_OFFSCREEN" \
     -DFLYNN_STATUS_BAR="$FLYNN_STATUS_BAR" \
     -DFLYNN_CURSOR_STYLES="$FLYNN_CURSOR_STYLES" \
-    -DFLYNN_TAB_STOPS="$FLYNN_TAB_STOPS"
+    -DFLYNN_TAB_STOPS="$FLYNN_TAB_STOPS" \
+    -DFLYNN_TALKIP="$FLYNN_TALKIP"
 make "${MAKE_ARGS[@]}"
 
 # Fix MacBinary header: Retro68 writes '????' as creator and leaves ctime/mtime
