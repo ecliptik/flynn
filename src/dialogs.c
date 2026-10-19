@@ -50,6 +50,30 @@ static MenuHandle g_bm_popup;
 static short g_bm_selected = -1;  /* bookmark index selected from popup */
 #endif /* FLYNN_FAVORITES */
 
+/*
+ * session_new() fails both when every session slot is in use and when
+ * the allocation fails.  The 1-session presets (minimal, lite) hit the
+ * slot limit on the second New Session, which is not a memory problem.
+ */
+static void
+alert_session_new_failed(void)
+{
+	char msg[96];
+
+	if (session_count() >= MAX_SESSIONS) {
+		if (MAX_SESSIONS == 1)
+			show_error_alert("This build supports only one "
+			    "session. Close the current session first.");
+		else {
+			snprintf(msg, sizeof(msg), "All %d sessions are "
+			    "in use. Close one first.", MAX_SESSIONS);
+			show_error_alert(msg);
+		}
+	} else {
+		show_error_alert("Out of memory");
+	}
+}
+
 /* ---- HIG-appropriate modal dialog proc ---- */
 
 /*
@@ -952,7 +976,7 @@ do_connect(void)
 
 				s = session_new();
 				if (!s) {
-					show_error_alert("Out of memory");
+					alert_session_new_failed();
 					update_menus();
 					return;
 				}
@@ -1055,7 +1079,7 @@ do_connect_bookmark(short index)
 	if (!s) {
 		s = session_new();
 		if (!s) {
-			show_error_alert("Out of memory");
+			alert_session_new_failed();
 			return;
 		}
 		session_init_from_prefs(s);
