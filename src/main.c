@@ -967,6 +967,13 @@ main_event_loop(void)
 					 * for echo data arriving after */
 					had_data = 1;
 				}
+			} else if (event.modifiers & cmdKey) {
+				/* No session window (Connect dialog
+				 * cancelled): Cmd-keys must still reach
+				 * the menu bar, e.g. Cmd+Q. */
+				update_menus();
+				handle_menu(MenuKey(
+				    event.message & charCodeMask));
 			}
 			break;
 		case mouseDown:
