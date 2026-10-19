@@ -306,6 +306,31 @@ resource 'DITL' (128, "Alert") {
 	}
 };
 
+/* Message alert (errors and notes): OK only, nothing to cancel */
+resource 'ALRT' (140) {
+	{60, 80, 180, 420},
+	140,
+	{
+		OK, visible, sound1,
+		OK, visible, sound1,
+		OK, visible, sound1,
+		OK, visible, sound1
+	},
+	noAutoCenter
+};
+
+resource 'DITL' (140, "Message Alert") {
+	{
+		/* 1: OK button */
+		{85, 250, 105, 320},
+		Button { enabled, "OK" };
+
+		/* 2: Text */
+		{15, 75, 70, 325},
+		StaticText { disabled, "^0" };
+	}
+};
+
 /* Favorites manager dialog */
 resource 'DLOG' (131, "Favorites") {
 	{40, 60, 300, 430},

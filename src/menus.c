@@ -786,7 +786,7 @@ handle_ttype_submenu(short item)
 		    "\pTerminal type change takes "
 		    "effect on next connection.",
 		    "\p", "\p", "\p");
-		NoteAlert(128, 0L);
+		NoteAlert(MSG_ALERT_ID, 0L);
 	}
 }
 
