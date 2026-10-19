@@ -1378,7 +1378,7 @@ find_and_show(Session *s, const char *text,
 		last_find_col = found_col;
 	} else {
 		ParamText("\pText not found.", "\p", "\p", "\p");
-		NoteAlert(128, 0L);
+		NoteAlert(MSG_ALERT_ID, 0L);
 	}
 }
 

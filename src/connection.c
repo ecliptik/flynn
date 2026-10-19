@@ -107,7 +107,7 @@ conn_fail(Connection *conn, const char *msg)
 
 	c2pstr(pmsg, msg);
 	ParamText(pmsg, "\p", "\p", "\p");
-	StopAlert(128, 0L);
+	StopAlert(MSG_ALERT_ID, 0L);
 	return false;
 }
 
