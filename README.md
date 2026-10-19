@@ -142,6 +142,20 @@ Then build Flynn:
 ./scripts/build.sh
 ```
 
+### Macintosh 512Ke without MacTCP: Flynn Lite on talkip
+
+MacTCP doesn't fit in a 512K Mac alongside System 6 and AppleShare. [talkip](https://github.com/ecliptik/talkip) is
+a small TCP/IP stack for LocalTalk Macs (MacIP to a gateway such as netatalk's `macipgw`) with the same `_TCP*`/`_UDP*`
+API as Flynn's `tcp.c`, so Flynn can be built against it. Clone talkip next to this repository (or pass
+`-DTALKIP_DIR=...`), then:
+
+```bash
+./scripts/build.sh --preset minimal --finger --talkip
+```
+
+The result runs on a real Macintosh 512Ke over LocalTalk, with no MacTCP or INIT. Alternatively, install talkip's
+TalkIP Driver INIT and run the regular MacTCP build.
+
 ### Build Presets
 
 Flynn supports fully customizable builds. Three presets cover common configurations:

@@ -21,6 +21,9 @@
 #include <stdlib.h>
 
 #include "main.h"
+#ifdef FLYNN_TALKIP
+#include "talkip.h"
+#endif
 #include "session.h"
 #include "connection.h"
 #include "telnet.h"
@@ -721,6 +724,9 @@ main_event_loop(void)
 			wait_ticks = session_any_connected() ? 1L : 10L;
 		had_data = 0;
 		WaitNextEvent(everyEvent, &event, wait_ticks, 0L);
+#ifdef FLYNN_TALKIP
+		talkip_idle();	/* talkip runs in the app: process datagrams, run timers */
+#endif
 
 		switch (event.what) {
 		case nullEvent:
