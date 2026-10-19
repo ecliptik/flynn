@@ -24,6 +24,9 @@
 #include "connection.h"
 #include "dialogs.h"
 #include "macutil.h"
+#ifdef FLYNN_TALKIP
+#include "talkip.h"
+#endif
 
 /* MacTCP connectionState value 14 = Close Wait (remote sent FIN) */
 #define TCP_STATE_CLOSE_WAIT 14
@@ -147,8 +150,16 @@ conn_resolve_host(Connection *conn, WindowPtr status_win)
 
 		/* DNS lookup via UDP */
 		{
-			short dns_err = dns_resolve(conn->host, &ip,
-			    conn->dns_server);
+			ip_addr dns_server = conn->dns_server;
+			short dns_err;
+
+#ifdef FLYNN_TALKIP
+			/* the MacIP gateway's DNS server, once talkip
+			 * has its lease */
+			if (talkip_nameserver())
+				dns_server = talkip_nameserver();
+#endif
+			dns_err = dns_resolve(conn->host, &ip, dns_server);
 			switch (dns_err) {
 			case DNS_OK:
 				conn->remote_ip = ip;

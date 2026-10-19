@@ -8,9 +8,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#ifdef FLYNN_TALKIP
-#include "talkip.h"
-#endif
 #include "session.h"
 #include "main.h"
 #include "connection.h"
@@ -464,10 +461,6 @@ session_init_from_prefs(Session *s)
 	term_ui_init(s->window, &s->terminal);
 	term_ui_save_state(&s->ui);
 	s->conn.dns_server = ip2long(prefs.dns_server);
-#ifdef FLYNN_TALKIP
-	if (talkip_nameserver())	/* the MacIP gateway's DNS server */
-		s->conn.dns_server = talkip_nameserver();
-#endif
 	/* Inherit settings from active session, fall back to prefs */
 	if (active_session) {
 		s->theme_id = active_session->theme_id;
