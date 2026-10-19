@@ -83,6 +83,12 @@ if(FLYNN_TALKIP)
     if(NOT DEFINED TALKIP_DIR)
         set(TALKIP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../talkip)
     endif()
+    if(NOT EXISTS ${TALKIP_DIR}/CMakeLists.txt)
+        message(FATAL_ERROR "FLYNN_TALKIP needs the talkip library, but "
+            "${TALKIP_DIR}/CMakeLists.txt does not exist. Clone it next "
+            "to this repo (git clone https://github.com/ecliptik/talkip "
+            "../talkip) or pass -DTALKIP_DIR=<path>.")
+    endif()
     add_subdirectory(${TALKIP_DIR} talkip)
 endif()
 

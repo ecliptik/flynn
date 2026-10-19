@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- Flynn Lite on talkip: with AppleTalk off, connecting says "AppleTalk is not available. Turn it on in the Chooser (LocalTalk)." instead of "MacTCP is not available"; the MacIP stack keeps running while a dialog is open; building with `--talkip` without the talkip library next to the repo now stops with a clear message (talkip builds)
+
 ## [1.12.0] - 2026-10-19
 
 ### Added

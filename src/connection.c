@@ -126,7 +126,12 @@ conn_resolve_host(Connection *conn, WindowPtr status_win)
 	{
 		OSErr tcp_err = conn_ensure_tcp();
 		if (tcp_err != noErr)
+#ifdef FLYNN_TALKIP
+			return conn_fail(conn, "AppleTalk is not available. "
+			    "Turn it on in the Chooser (LocalTalk).");
+#else
 			return conn_fail(conn, "MacTCP is not available");
+#endif
 	}
 
 	/* Validate hostname before attempting resolution */

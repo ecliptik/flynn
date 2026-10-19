@@ -28,6 +28,9 @@
 #include "favorites.h"
 #include "color.h"
 #include "macutil.h"
+#ifdef FLYNN_TALKIP
+#include "talkip.h"
+#endif
 #include "sysutil.h"
 #include "finger.h"
 #include "menus.h"
@@ -270,6 +273,13 @@ setup_default_button_outline(DialogPtr dlg, short outline_item)
 Boolean
 modal_filter_event(DialogPtr dlg, EventRecord *evt)
 {
+#ifdef FLYNN_TALKIP
+	/* talkip runs in the app, not in a driver: keep its lease and
+	 * timers going while a modal dialog is open (macipgw frees the
+	 * lease after about 5 minutes of silence) */
+	talkip_idle();
+#endif
+
 	/* Handle dragging of movableDBoxProc dialogs.
 	 * Some System 7 ROMs don't have ModalDialog handle
 	 * inDrag for movable modals — do it explicitly. */
