@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-10-19
+
+### Added
+- Flynn Lite on talkip for the Macintosh 512Ke: `./scripts/build.sh --preset minimal --finger --talkip` links the talkip library (`../talkip`, or `-DTALKIP_DIR`) instead of the MacTCP code, so Flynn telnets over LocalTalk through a MacIP gateway with no MacTCP. The gateway's DNS server is used when it provides one. Tested on a real 512Ke. This build is not among the release artifacts; build it from source (see the README) (talkip builds)
+
+### Fixed
+- Cmd+Q and every other Cmd-key menu shortcut did nothing when no session window was open (for example after cancelling the Connect dialog); the keys now reach the menu bar (both)
+- Opening a second session on a one-session build (minimal, lite) said "Out of memory"; it now says "This build supports only one session. Close the current session first." Real allocation failures still say "Out of memory" (both)
+- Error and note alerts no longer show a Cancel button when there is nothing to cancel; confirmations such as "Disconnect and close session?" keep it (both)
+
 ## [1.11.0] - 2026-10-13
 
 ### Added
