@@ -479,14 +479,24 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 						 * Latin Extended-A (C4/C5 xx) is also
 						 * CP437 box drawing, so it only
 						 * bypasses this once the peer has
-						 * sent a clean 3/4-byte sequence. */
+						 * sent a clean 3/4-byte sequence or a
+						 * Latin-1 letter (C3 80-BF).  Once
+						 * confirmed, letters with an exact Mac
+						 * Roman byte (OE oe Y-diaeresis florin
+						 * pi) are drawn too. */
 						if (term->utf8_expect >= 3 && cp > 0)
+							term->utf8_confirmed = 1;
+						else if (term->utf8_expect == 2 &&
+						    cp >= 0xC0 && cp <= 0xFF &&
+						    cp != 0xD7 && cp != 0xF7)
 							term->utf8_confirmed = 1;
 						if (term->utf8_expect == 2 &&
 						    cp > 0xFF && cp < 0x800 &&
 						    glyph_lookup(cp) < 0 &&
 						    !(term->utf8_confirmed &&
-						    unicode_transliterate(cp))) {
+						    (unicode_transliterate(cp) ||
+						    unicode_symbol_to_macroman(
+						    (unsigned short)cp)))) {
 							term_put_cp437(term,
 							    term->utf8_buf[0]);
 							term_put_cp437(term,
@@ -2929,7 +2939,7 @@ boxdraw_to_dec(unsigned short cp)
 static const unsigned char latin1_to_macroman[128] = {
 	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,		/* 0x80-0x8F: C1 */
 	0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0,		/* 0x90-0x9F: C1 */
-	0xCA,0xC1,0xA2,0xA3, 0xB4,0xB4,0x7C,0xA4,	/* 0xA0-0xA7 */
+	0xCA,0xC1,0xA2,0xA3, 0xDB,0xB4,0x7C,0xA4,	/* 0xA0-0xA7 */
 	0xAC,0xA9,0xBB,0xC7, 0xC2,0,0xA8,0xF8,	/* 0xA8-0xAF */
 	0xA1,0xB1,0,0, 0xAB,0xB5,0xA6,0xE1,		/* 0xB0-0xB7 */
 	0xFC,0,0xBC,0xC8, 0,0,0,0xC0,			/* 0xB8-0xBF */
@@ -2961,6 +2971,10 @@ static unsigned char
 unicode_symbol_to_macroman(unsigned short cp)
 {
 	switch (cp) {
+	case 0x0152: return 0xCE;	/* OE */
+	case 0x0153: return 0xCF;	/* oe */
+	case 0x0178: return 0xD9;	/* Y diaeresis */
+	case 0x0192: return 0xC4;	/* florin */
 	case 0x2013: return 0xD0;	/* en dash */
 	case 0x2014: return 0xD1;	/* em dash */
 	case 0x2018: return 0xD4;	/* left single quote */
@@ -3100,7 +3114,8 @@ term_put_unicode(Terminal *term, long cp)
 
 	/* Common Unicode symbols -> Mac Roman */
 	if ((cp >= 0x2000 && cp <= 0x22FF) || cp == 0x03C0 ||
-	    cp == 0x20AC || cp == 0x0387) {
+	    cp == 0x20AC || cp == 0x0387 || cp == 0x0152 || cp == 0x0153 ||
+	    cp == 0x0178 || cp == 0x0192) {
 		ch = unicode_symbol_to_macroman((unsigned short)cp);
 		if (ch) {
 			term_put_char(term, ch);
