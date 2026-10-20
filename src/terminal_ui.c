@@ -2025,6 +2025,22 @@ font_cache_rebuild(void)
 
 #ifdef FLYNN_OFFSCREEN
 /*
+ * font_cache_covers - 1 if no character in the run is above the cached
+ * range (Mac Roman 0x80-0xFF: accents, dashes, quotes), which the cache
+ * does not hold and font_cache_blit_run would leave blank.
+ */
+static short
+font_cache_covers(const char *buf, short len)
+{
+	short i;
+
+	for (i = 0; i < len; i++)
+		if ((unsigned char)buf[i] > FONT_CACHE_LAST)
+			return 0;
+	return 1;
+}
+
+/*
  * font_cache_blit_run - render ASCII text run directly to offscreen buffer
  *
  * Copies pre-rendered glyph bitmaps from the font cache to the offscreen
@@ -2628,7 +2644,8 @@ draw_row(Terminal *term, short row)
 			    g_use_offscreen_now &&
 			    !g_has_color_qd &&
 			    cell_w == g_cell_width &&
-			    !(run_attr & ATTR_ITALIC)) {
+			    !(run_attr & ATTR_ITALIC) &&
+			    font_cache_covers(buf, run_len)) {
 				if (run_attr & ATTR_INVERSE) {
 					Rect inv_r;
 					SetRect(&inv_r,
