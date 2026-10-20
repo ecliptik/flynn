@@ -60,6 +60,7 @@ static void term_put_unicode(Terminal *term, long cp);
 static unsigned char boxdraw_to_dec(unsigned short cp);
 static unsigned char unicode_to_macroman(unsigned short cp);
 static unsigned char unicode_symbol_to_macroman(unsigned short cp);
+static unsigned char unicode_transliterate(long cp);
 
 #include <OSUtils.h>
 
@@ -143,6 +144,7 @@ terminal_init(Terminal *term)
 	term->utf8_len = 0;
 	term->utf8_expect = 0;
 	term->last_was_emoji = 0;
+	term->utf8_confirmed = 0;
 	term->wrap_pending = 0;
 
 	/* Restore active dimensions (default if not set) */
@@ -473,10 +475,18 @@ terminal_process(Terminal *term, unsigned char *data, short len)
 						 * to U+0100-U+07FF with no glyph is
 						 * likely CP437 bytes misinterpreted.
 						 * Handles servers sending raw CP437
-						 * despite xterm-256color TTYPE. */
+						 * despite xterm-256color TTYPE.
+						 * Latin Extended-A (C4/C5 xx) is also
+						 * CP437 box drawing, so it only
+						 * bypasses this once the peer has
+						 * sent a clean 3/4-byte sequence. */
+						if (term->utf8_expect >= 3 && cp > 0)
+							term->utf8_confirmed = 1;
 						if (term->utf8_expect == 2 &&
 						    cp > 0xFF && cp < 0x800 &&
-						    glyph_lookup(cp) < 0) {
+						    glyph_lookup(cp) < 0 &&
+						    !(term->utf8_confirmed &&
+						    unicode_transliterate(cp))) {
 							term_put_cp437(term,
 							    term->utf8_buf[0]);
 							term_put_cp437(term,
@@ -2974,6 +2984,34 @@ unicode_symbol_to_macroman(unsigned short cp)
 	}
 }
 
+/* Latin Extended-A (U+0100-U+017F) -> base ASCII letter, or 0 if none.
+ * Used as a readability fallback for accented Latin that Mac Roman lacks
+ * (Central/Eastern European).  Index: codepoint - 0x100.  Entries that Mac
+ * Roman covers (OE/oe at 0x152/0x153, Y-diaeresis at 0x178) are left 0 so
+ * unicode_symbol_to_macroman handles them first. */
+static const unsigned char latinext_a_base[128] = {
+	'A','a','A','a', 'A','a','C','c', 'C','c','C','c', 'C','c','D','d', /* 0x100 */
+	'D','d','E','e', 'E','e','E','e', 'E','e','E','e', 'G','g','G','g', /* 0x110 */
+	'G','g','G','g', 'H','h','H','h', 'I','i','I','i', 'I','i','I','i', /* 0x120 */
+	'I','i','I','i', 'J','j','K','k', 'k','L','l','L', 'l','L','l','L', /* 0x130 */
+	'l','L','l','N', 'n','N','n','N', 'n','n','N','n', 'O','o','O','o', /* 0x140 */
+	'O','o',0,0,     'R','r','R','r', 'R','r','S','s', 'S','s','S','s', /* 0x150 */
+	'S','s','T','t', 'T','t','T','t', 'U','u','U','u', 'U','u','U','u', /* 0x160 */
+	'U','u','U','u', 'W','w','Y','y', 0,'Z','z','Z',   'z','Z','z','s', /* 0x170 */
+};
+
+/*
+ * unicode_transliterate - accented Latin Extended-A -> base ASCII letter.
+ * Returns the base letter, or 0 if there is no transliteration.
+ */
+static unsigned char
+unicode_transliterate(long cp)
+{
+	if (cp >= 0x100 && cp <= 0x17F)
+		return latinext_a_base[cp - 0x100];
+	return 0;
+}
+
 /*
  * term_put_unicode - translate a Unicode codepoint and output to terminal
  */
@@ -3068,6 +3106,13 @@ term_put_unicode(Terminal *term, long cp)
 			term_put_char(term, ch);
 			return;
 		}
+	}
+
+	/* Accented Latin Extended-A -> base ASCII letter */
+	ch = unicode_transliterate(cp);
+	if (ch) {
+		term_put_char(term, ch);
+		return;
 	}
 
 	/* Legacy Computing (U+1FB00-U+1FBFF): single-width fallback */

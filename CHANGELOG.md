@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Accented Latin Extended-A letters (Central/Eastern European, e.g. ā ş ő) now show as their base letter instead of `?`, once the server has sent a clean 3/4-byte UTF-8 sequence; before that, 2-byte C4/C5 sequences are still treated as CP437 box drawing so ANSI art is unaffected
+
 ## [1.12.1] - 2026-10-19
 
 ### Changed
