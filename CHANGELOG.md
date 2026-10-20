@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-10-20
+
 ### Fixed
 - Œ œ Ÿ ƒ and π (UTF-8 `C5 92`, `C5 93`, `C5 B8`, `C6 92`, `CF 80`) were drawn as two CP437 characters even in a UTF-8 session; they now map to their Mac Roman characters once UTF-8 is confirmed (both)
 - The currency sign ¤ (U+00A4) drew as a yen sign; it now maps to the Mac Roman currency character (both)
