@@ -33,9 +33,9 @@ Pre-built binaries are available on the [Releases](https://github.com/ecliptik/f
 
 | Edition | Description | Memory | Download |
 |---------|-------------|--------|----------|
-| **Flynn** | All features — 4 sessions, 256-color themes, scrollback | ~1024KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-1.12.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-1.12.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-1.12.1.sit) |
-| **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-Lite-1.12.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-Lite-1.12.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-Lite-1.12.1.sit) |
-| **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-Minimal-1.12.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-Minimal-1.12.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.12.1/Flynn-Minimal-1.12.1.sit) |
+| **Flynn** | All features — 4 sessions, 256-color themes, scrollback | ~1024KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-1.13.0.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-1.13.0.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-1.13.0.sit) |
+| **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-Lite-1.13.0.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-Lite-1.13.0.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-Lite-1.13.0.sit) |
+| **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-Minimal-1.13.0.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-Minimal-1.13.0.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.13.0/Flynn-Minimal-1.13.0.sit) |
 
 Each edition is available as `.dsk` (800K floppy image), `.hqx` (BinHex archive), or `.sit` (StuffIt 1.5.1 archive). See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
