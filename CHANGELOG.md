@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Monochrome builds drew nothing for characters above 0x7E (é ü, em dash, curly quotes and other Mac Roman characters); such runs now use the normal text path instead of the ASCII-only font cache
+
 ## [1.12.1] - 2026-10-19
 
 ### Changed
