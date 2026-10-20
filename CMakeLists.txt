@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.9)
-project(Flynn VERSION 1.12.1)
+project(Flynn VERSION 1.13.0)
 
 # --- Feature flags with defaults ---
 option(FLYNN_TALKIP        "TCP/IP over LocalTalk with talkip instead of MacTCP (512Ke)" OFF)
