@@ -217,7 +217,7 @@ typedef struct {
 	unsigned char	utf8_len;	/* bytes accumulated so far */
 	unsigned char	utf8_expect;	/* total bytes expected (2, 3, or 4) */
 	unsigned char	last_was_emoji;	/* absorb following modifiers */
-	unsigned char	utf8_confirmed;	/* peer sent a clean 3/4-byte sequence */
+	unsigned char	utf8_confirmed;	/* peer sent a clean 3/4-byte sequence or Latin-1 letter */
 
 	/* Screen snapshot for disconnect recovery (saved on full clear).
 	 * Handle-based: allocated on demand, freed after restore.

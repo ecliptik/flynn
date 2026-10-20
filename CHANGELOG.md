@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Œ œ Ÿ ƒ and π (UTF-8 `C5 92`, `C5 93`, `C5 B8`, `C6 92`, `CF 80`) were drawn as two CP437 characters even in a UTF-8 session; they now map to their Mac Roman characters once UTF-8 is confirmed (both)
+- The currency sign ¤ (U+00A4) drew as a yen sign; it now maps to the Mac Roman currency character (both)
+- A Latin-1 letter (é, ñ, ü and the like) now also confirms UTF-8, so Latin Extended-A text from servers that only send Western European accents is no longer taken for CP437 box drawing (both)
+
 ## [1.13.0] - 2026-10-19
 
 ### Added
