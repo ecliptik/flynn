@@ -99,6 +99,9 @@ short show_ttype_popup(DialogPtr dlg, short item_num,
 /* Show the Connect dialog */
 void do_connect(void);
 
+/* Explain a session_new() failure: all sessions in use, or out of memory */
+void alert_session_new_failed(void);
+
 #ifdef FLYNN_FAVORITES
 /* Connect directly via bookmark index */
 void do_connect_bookmark(short index);

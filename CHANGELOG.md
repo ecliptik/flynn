@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Flynn 512Ke: a fourth release download for the Macintosh 512Ke over LocalTalk. It is the Minimal edition plus Finger, built with talkip v0.1.0 instead of MacTCP, so it needs no MacTCP and no INIT, only AppleTalk and a MacIP gateway. Build it yourself with `./scripts/build.sh --preset 512ke` (talkip builds)
 
+### Fixed
+- File > Finger with every session slot in use (a telnet session open in Lite, Minimal-based or 512Ke builds, or 4 sessions in Flynn) said "Out of memory"; it now gives the same one-session or all-sessions-in-use message as New Session (both)
+
 ### Changed
 - A `--talkip` build of another preset is now named `<Edition>-TalkIP-<version>`, so it no longer overwrites that preset's MacTCP files; `TALKIP_DIR` in the environment points `build.sh` at a talkip checkout (talkip builds)
 

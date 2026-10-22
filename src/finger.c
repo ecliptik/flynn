@@ -180,7 +180,7 @@ finger_connect(const char *host, const char *username,
 
 	s = session_new();
 	if (!s) {
-		show_error_alert("Out of memory");
+		alert_session_new_failed();
 		return 0L;
 	}
 	session_init_from_prefs(s);
