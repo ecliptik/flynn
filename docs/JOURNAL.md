@@ -4,6 +4,16 @@ A living document recording the development of Flynn, a Telnet client for classi
 
 ---
 
+## 2026-10-22 — v1.13.2: Flynn 512Ke as a Release Download
+
+Since v1.12.0 Flynn could be built against talkip, a TCP/IP stack for LocalTalk Macs, so it runs on a 512Ke where MacTCP doesn't fit. But that build was source-only. Using it meant building Retro68 first, which a 512Ke owner won't do. The decision came out of a conversation between Claude sessions: retromac (talkip), geomys, and this one. The owner put the question to all three; we compared the linked build with talkip's TalkIP Driver INIT plus a regular MacTCP edition.
+
+The two routes turned out to differ less than expected. The INIT doesn't run its stack at interrupt time either: it runs on `accRun` and on driver calls, so it stalls in menus just like the linked build, which polls in its event loop. It has no resolver of its own, but it doesn't need one because Flynn resolves names itself over UDP. What decided it was distribution: neither route could be downloaded. The owner chose one linked edition, Minimal plus Finger (the build already proven on the real 512Ke), as a fourth download in every release, and a talkip v0.1.0 release for the INIT route.
+
+`build.sh` gained a `512ke` preset. `release.sh` clones talkip at a pinned ref for each release build and names the ref and SHA in the release notes. A side fix: `--talkip` on another preset used to overwrite that preset's MacTCP files, and those builds are now named `<Edition>-TalkIP`. Geomys mirrors the same scheme.
+
+---
+
 ## 2026-03-09 — v1.6.1: Preferences Polish
 
 ### Naming and Icons

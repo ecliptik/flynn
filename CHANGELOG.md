@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-10-22
+
+### Added
+- Flynn 512Ke: a fourth release download for the Macintosh 512Ke over LocalTalk. It is the Minimal edition plus Finger, built with talkip v0.1.0 instead of MacTCP, so it needs no MacTCP and no INIT, only AppleTalk and a MacIP gateway. Build it yourself with `./scripts/build.sh --preset 512ke` (talkip builds)
+
+### Changed
+- A `--talkip` build of another preset is now named `<Edition>-TalkIP-<version>`, so it no longer overwrites that preset's MacTCP files; `TALKIP_DIR` in the environment points `build.sh` at a talkip checkout (talkip builds)
+
 ## [1.13.1] - 2026-10-20
 
 ### Fixed

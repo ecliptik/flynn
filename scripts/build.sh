@@ -62,6 +62,13 @@ apply_preset() {
             FLYNN_CURSOR_STYLES=OFF
             FLYNN_TAB_STOPS=OFF
             ;;
+        512ke)
+            # Macintosh 512Ke over LocalTalk: minimal + finger, linked
+            # against talkip instead of MacTCP (needs TALKIP_DIR or ../talkip)
+            apply_preset minimal
+            FLYNN_FINGER=ON
+            FLYNN_TALKIP=ON
+            ;;
         lite|macplus)
             # "macplus" is a legacy alias for "lite"
             FLYNN_MAX_SESSIONS=1
@@ -105,7 +112,7 @@ apply_preset() {
             FLYNN_TAB_STOPS=ON
             ;;
         *)
-            echo "Error: unknown preset '$1' (valid: minimal, lite, full; macplus is alias for lite)"
+            echo "Error: unknown preset '$1' (valid: minimal, lite, full, 512ke; macplus is alias for lite)"
             exit 1
             ;;
     esac
@@ -327,7 +334,8 @@ cmake "$SCRIPT_DIR" -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=MinSi
     -DFLYNN_STATUS_BAR="$FLYNN_STATUS_BAR" \
     -DFLYNN_CURSOR_STYLES="$FLYNN_CURSOR_STYLES" \
     -DFLYNN_TAB_STOPS="$FLYNN_TAB_STOPS" \
-    -DFLYNN_TALKIP="$FLYNN_TALKIP"
+    -DFLYNN_TALKIP="$FLYNN_TALKIP" \
+    ${TALKIP_DIR:+-DTALKIP_DIR="$TALKIP_DIR"}
 make "${MAKE_ARGS[@]}"
 
 # Fix MacBinary header: Retro68 writes '????' as creator and leaves ctime/mtime
@@ -415,8 +423,11 @@ PRESET_LABEL="${PRESET:-full}"
 case "$PRESET_LABEL" in
     full)    FILE_PREFIX="Flynn" ;;
     minimal) FILE_PREFIX="Flynn-Minimal" ;;
+    512ke)   FILE_PREFIX="Flynn-512Ke" ;;
     *)       FILE_PREFIX="Flynn-Lite" ;;
 esac
+# A talkip build of another preset must not overwrite its MacTCP artifacts
+[ "$FLYNN_TALKIP" = "ON" ] && [ "$PRESET_LABEL" != "512ke" ] && FILE_PREFIX="${FILE_PREFIX}-TalkIP"
 
 # Create versioned copies with preset in filename
 cp "$BUILD_DIR/Flynn.bin" "$BUILD_DIR/${FILE_PREFIX}-${VERSION_DISPLAY}.bin"

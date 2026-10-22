@@ -1,7 +1,7 @@
 =====================================================
 Flynn
 Telnet and Finger Client for Macintosh
-Version 1.13.1
+Version 1.13.2
 =====================================================
 
 
@@ -52,6 +52,12 @@ System Requirements
     MacTCP compatibility layer)
   - 4 MB RAM recommended
   - Network connection (Ethernet or compatible)
+
+Flynn 512Ke is built for the Macintosh 512Ke on
+LocalTalk instead: it has its own TCP/IP stack
+(talkip) and needs no MacTCP or INIT, only AppleTalk
+turned on in the Chooser and a MacIP gateway on the
+network.
 
 
 Getting Started

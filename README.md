@@ -36,6 +36,7 @@ Pre-built binaries are available on the [Releases](https://github.com/ecliptik/f
 | **Flynn** | All features — 4 sessions, 256-color themes, scrollback | ~1024KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-1.13.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-1.13.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-1.13.1.sit) |
 | **Flynn Lite** | Core features — 1 session, favorites, monochrome | ~340KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-Lite-1.13.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-Lite-1.13.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-Lite-1.13.1.sit) |
 | **Flynn Minimal** | Only essentials — 1 session, smallest footprint | ~256KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-Minimal-1.13.1.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-Minimal-1.13.1.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.13.1/Flynn-Minimal-1.13.1.sit) |
+| **Flynn 512Ke** | Minimal plus Finger for the Macintosh 512Ke over LocalTalk — no MacTCP or INIT needed | ~266KB | [.dsk](https://github.com/ecliptik/flynn/releases/download/v1.13.2/Flynn-512Ke-1.13.2.dsk) · [.hqx](https://github.com/ecliptik/flynn/releases/download/v1.13.2/Flynn-512Ke-1.13.2.hqx) · [.sit](https://github.com/ecliptik/flynn/releases/download/v1.13.2/Flynn-512Ke-1.13.2.sit) |
 
 Each edition is available as `.dsk` (800K floppy image), `.hqx` (BinHex archive), or `.sit` (StuffIt 1.5.1 archive). See [docs/BUILD.md](docs/BUILD.md) for custom builds.
 
@@ -142,29 +143,31 @@ Then build Flynn:
 ./scripts/build.sh
 ```
 
-### Macintosh 512Ke without MacTCP: Flynn Lite on talkip
+### Macintosh 512Ke without MacTCP: Flynn 512Ke on talkip
 
 MacTCP doesn't fit in a 512K Mac alongside System 6 and AppleShare. [talkip](https://github.com/ecliptik/talkip) is
 a small TCP/IP stack for LocalTalk Macs (MacIP to a gateway such as netatalk's `macipgw`) with the same `_TCP*`/`_UDP*`
-API as Flynn's `tcp.c`, so Flynn can be built against it. Clone talkip next to this repository (or pass
-`-DTALKIP_DIR=...`), then:
+API as Flynn's `tcp.c`, so Flynn can be built against it. The **Flynn 512Ke** download is that build: Minimal plus
+Finger, with no MacTCP or INIT needed. To build it yourself, clone talkip next to this repository (or set
+`TALKIP_DIR=<path>`), then:
 
 ```bash
-./scripts/build.sh --preset minimal --finger --talkip
+./scripts/build.sh --preset 512ke
 ```
 
-The result runs on a real Macintosh 512Ke over LocalTalk, with no MacTCP or INIT. Alternatively, install talkip's
-TalkIP Driver INIT and run the regular MacTCP build.
+Alternatively, talkip's TalkIP Driver INIT lets MacTCP apps run on a 512Ke; Flynn Minimal is the edition sized for
+that, but it hasn't been tested over the driver yet.
 
 ### Build Presets
 
-Flynn supports fully customizable builds. Three presets cover common configurations:
+Flynn supports fully customizable builds. Four presets cover common configurations:
 
 | Preset | Sessions | Features | Memory |
 |--------|----------|----------|--------|
 | `full` | 4 | all features | ~1024KB |
 | `lite` | 1 | core features | ~340KB |
 | `minimal` | 1 | only essentials | ~256KB |
+| `512ke` | 1 | minimal plus finger, talkip instead of MacTCP | ~266KB |
 
 The default build uses the **full** preset. Select a preset with `--preset`:
 
