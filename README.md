@@ -155,7 +155,7 @@ Finger, with no MacTCP or INIT needed. To build it yourself, clone talkip next t
 ./scripts/build.sh --preset 512ke
 ```
 
-Alternatively, talkip's TalkIP Driver INIT lets MacTCP apps run on a 512Ke; Flynn Minimal is the edition sized for
+Alternatively, talkip's TalkIP Driver INIT ([talkip releases](https://github.com/ecliptik/talkip/releases)) lets MacTCP apps run on a 512Ke; Flynn Minimal is the edition sized for
 that, but it hasn't been tested over the driver yet.
 
 ### Build Presets

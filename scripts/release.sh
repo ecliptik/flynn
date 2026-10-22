@@ -279,7 +279,7 @@ do_release() {
 | **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped features | ~256KB |
 | **Flynn 512Ke** | For the Macintosh 512Ke over LocalTalk — Minimal plus Finger, with [talkip](https://github.com/ecliptik/talkip) ${TALKIP_REF}${TALKIP_SHA:+ (${TALKIP_SHA})} built in instead of MacTCP; needs a MacIP gateway, no INIT | ~266KB |
 
-talkip's TalkIP Driver INIT is the other way onto a 512Ke: it lets MacTCP apps run there; Flynn Minimal is the edition sized for that.
+talkip's TalkIP Driver INIT ([talkip releases](https://github.com/ecliptik/talkip/releases)) is the other way onto a 512Ke: it lets MacTCP apps run there; Flynn Minimal is the edition sized for that.
 
 Each edition ships in three formats — pick whichever suits your transfer path:
 - **.dsk** — 800K floppy disk image; mount in an emulator or write to a real floppy
