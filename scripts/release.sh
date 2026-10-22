@@ -22,6 +22,12 @@ FORGEJO_URL="${FORGEJO_URL:-https://$(git -C "$SCRIPT_DIR" remote get-url origin
 FORGEJO_REPO="${FORGEJO_REPO:-ecliptik/flynn}"
 GITHUB_REPO="${GITHUB_REPO:-ecliptik/flynn}"
 
+# talkip (TCP/IP over LocalTalk) for the Flynn 512Ke edition, pinned to a
+# released ref and cloned fresh for each release build
+TALKIP_REPO="${TALKIP_REPO:-https://github.com/ecliptik/talkip}"
+TALKIP_REF="${TALKIP_REF:-v0.1.0}"
+TALKIP_SHA=""
+
 # Extract changelog section for a given version (without the v prefix)
 extract_changelog() {
     local ver="$1"
@@ -37,7 +43,8 @@ collect_artifacts() {
     for artifact in \
         "Flynn-${ver}.dsk" "Flynn-${ver}.hqx" "Flynn-${ver}.sit" \
         "Flynn-Lite-${ver}.dsk" "Flynn-Lite-${ver}.hqx" "Flynn-Lite-${ver}.sit" \
-        "Flynn-Minimal-${ver}.dsk" "Flynn-Minimal-${ver}.hqx" "Flynn-Minimal-${ver}.sit"; do
+        "Flynn-Minimal-${ver}.dsk" "Flynn-Minimal-${ver}.hqx" "Flynn-Minimal-${ver}.sit" \
+        "Flynn-512Ke-${ver}.dsk" "Flynn-512Ke-${ver}.hqx" "Flynn-512Ke-${ver}.sit"; do
         [ -f "$build_dir/$artifact" ] && RELEASE_FILES+=("$build_dir/$artifact")
     done
 }
@@ -136,7 +143,18 @@ release_github() {
     echo "  GitHub release complete: https://github.com/$GITHUB_REPO/releases/tag/$tag"
 }
 
-# Build all three presets (build.sh produces correctly-named artifacts)
+# Clone talkip at $TALKIP_REF into a temporary directory; sets TALKIP_DIR
+# and TALKIP_SHA for the 512Ke build
+fetch_talkip() {
+    TALKIP_DIR="$(mktemp -d)/talkip"
+    echo "  Cloning talkip $TALKIP_REF from $TALKIP_REPO..."
+    git clone -q "$TALKIP_REPO" "$TALKIP_DIR"
+    git -C "$TALKIP_DIR" -c advice.detachedHead=false checkout -q "$TALKIP_REF"
+    TALKIP_SHA=$(git -C "$TALKIP_DIR" rev-parse --short HEAD)
+    echo "  talkip $TALKIP_REF is $TALKIP_SHA"
+}
+
+# Build all four editions (build.sh produces correctly-named artifacts)
 build_all_presets() {
     local ver="$1"
     local build_dir="$SCRIPT_DIR/build"
@@ -154,6 +172,11 @@ build_all_presets() {
     # Minimal preset → Flynn-Minimal-{ver}.*
     echo "  Building minimal preset..."
     "$SCRIPT_DIR/scripts/build.sh" --preset minimal
+
+    # 512Ke preset (minimal + finger, linked against talkip) → Flynn-512Ke-{ver}.*
+    echo "  Building 512ke preset..."
+    fetch_talkip
+    TALKIP_DIR="$TALKIP_DIR" "$SCRIPT_DIR/scripts/build.sh" --preset 512ke
 
     echo "  All presets built:"
     ls -la "$build_dir"/Flynn*-${ver}.* 2>/dev/null
@@ -173,7 +196,7 @@ update_readme_downloads() {
     if grep -q "releases/download/v" "$readme"; then
         # Rewrite version in existing GitHub download URLs.
         # Matches: /releases/download/vX.Y.Z/Flynn...-X.Y.Z.ext
-        sed -i -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/([A-Za-z-]*)-[0-9]+\.[0-9]+\.[0-9]+\.|releases/download/${tag}/\1-${ver}.|g" "$readme"
+        sed -i -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/([A-Za-z][A-Za-z0-9-]*)-[0-9]+\.[0-9]+\.[0-9]+\.|releases/download/${tag}/\1-${ver}.|g" "$readme"
         # For each row carrying an .hqx link but no .sit link, append a .sit
         # link pointing at the same versioned URL with a swapped extension.
         # The /[.sit]/! address makes this idempotent on re-run.
@@ -198,7 +221,7 @@ update_pages_downloads() {
     if grep -q "releases/download/v" "$page"; then
         # Rewrite version in existing GitHub download URLs.
         # Matches: /releases/download/vX.Y.Z/Flynn...-X.Y.Z.ext
-        sed -i -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/([A-Za-z-]*)-[0-9]+\.[0-9]+\.[0-9]+\.|releases/download/${tag}/\1-${ver}.|g" "$page"
+        sed -i -E "s|releases/download/v[0-9]+\.[0-9]+\.[0-9]+/([A-Za-z][A-Za-z0-9-]*)-[0-9]+\.[0-9]+\.[0-9]+\.|releases/download/${tag}/\1-${ver}.|g" "$page"
         echo "  Updated docs/index.html download links to $tag"
     else
         echo "  Warning: No download links found in docs/index.html"
@@ -236,7 +259,7 @@ do_release() {
 
     if [ ${#RELEASE_FILES[@]} -eq 0 ]; then
         echo "Warning: No artifacts found for $ver"
-        echo "  Expected: Flynn-${ver}.dsk/.hqx/.sit, Flynn-Lite-${ver}.dsk/.hqx/.sit, Flynn-Minimal-${ver}.dsk/.hqx/.sit"
+        echo "  Expected: Flynn-${ver}.dsk/.hqx/.sit, Flynn-Lite-${ver}.dsk/.hqx/.sit, Flynn-Minimal-${ver}.dsk/.hqx/.sit, Flynn-512Ke-${ver}.dsk/.hqx/.sit"
     else
         echo "  Artifacts: ${#RELEASE_FILES[@]} files"
         for f in "${RELEASE_FILES[@]}"; do echo "    $(basename "$f")"; done
@@ -254,6 +277,9 @@ do_release() {
 | **Flynn** | Full build — 4 sessions, 192-line scrollback, all features including 256-color | ~768KB |
 | **Flynn Lite** | Recommended — 1 session, 96-line scrollback, most features | ~384KB |
 | **Flynn Minimal** | Bare-bones — 1 session, no scrollback, stripped features | ~256KB |
+| **Flynn 512Ke** | For the Macintosh 512Ke over LocalTalk — Minimal plus Finger, with [talkip](https://github.com/ecliptik/talkip) ${TALKIP_REF}${TALKIP_SHA:+ (${TALKIP_SHA})} built in instead of MacTCP; needs a MacIP gateway, no INIT | ~266KB |
+
+talkip's TalkIP Driver INIT is the other way onto a 512Ke: it lets MacTCP apps run there; Flynn Minimal is the edition sized for that.
 
 Each edition ships in three formats — pick whichever suits your transfer path:
 - **.dsk** — 800K floppy disk image; mount in an emulator or write to a real floppy

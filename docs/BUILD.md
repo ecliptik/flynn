@@ -32,7 +32,7 @@ full-featured 119KB multi-session powerhouse for System 7.
 
 ## Build Presets
 
-Three presets cover the most common configurations. Use `--preset NAME` to select one.
+Four presets cover the most common configurations. Use `--preset NAME` to select one.
 
 ### minimal (~256KB partition, ~82KB binary)
 
@@ -50,6 +50,14 @@ What you lose: no scroll-back history, no bookmarks, no Finger protocol, no Unic
 glyphs or box-drawing characters, no file save, no session logging, no printing, no
 dark mode, no offscreen buffering (may see flicker), no status bar, no custom cursor
 styles or tab stops, no double-width/height line rendering.
+
+### 512ke (~266KB partition, ~123KB binary)
+
+The minimal preset plus Finger, linked against [talkip](https://github.com/ecliptik/talkip)
+instead of MacTCP, for the Macintosh 512Ke over LocalTalk (MacIP through a gateway such as
+netatalk's `macipgw`). Released as **Flynn 512Ke**. Needs a talkip checkout at `../talkip`,
+or set `TALKIP_DIR=<path>`. `--talkip` on any other preset builds the same way and names the
+files `<Edition>-TalkIP-<version>` so they don't overwrite that preset's MacTCP build.
 
 ### lite (~384KB partition, ~115KB binary)
 
@@ -285,7 +293,8 @@ The build produces four artifacts in the `build/` directory:
   bootstrap. Skipped with a note if the tooling isn't installed.
 
 Versioned copies include the preset name (e.g., `Flynn-1.10.1.bin` for full,
-`Flynn-Lite-1.10.1.bin` for lite, `Flynn-Minimal-1.10.1.bin` for minimal).
+`Flynn-Lite-1.10.1.bin` for lite, `Flynn-Minimal-1.10.1.bin` for minimal,
+`Flynn-512Ke-1.13.2.bin` for 512ke).
 
 ## Build Summary
 

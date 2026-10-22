@@ -58,7 +58,7 @@ static short g_bm_selected = -1;  /* bookmark index selected from popup */
  * the allocation fails.  The 1-session presets (minimal, lite) hit the
  * slot limit on the second New Session, which is not a memory problem.
  */
-static void
+void
 alert_session_new_failed(void)
 {
 	char msg[96];
