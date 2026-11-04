@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- An open Clipboard window now shows the new contents after Copy, after Show Clipboard, and when Flynn comes back to the front after another application copied something. It used to keep showing whatever was on the clipboard when the window was first opened, until you closed and reopened it.
+
 ## [1.13.2] - 2026-10-22
 
 ### Added

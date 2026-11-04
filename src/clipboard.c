@@ -97,6 +97,9 @@ do_copy(void)
 	ZeroScrap();
 	PutScrap(len, 'TEXT', buf);
 	DisposePtr((Ptr)buf);
+
+	/* An open Clipboard window shows the new contents */
+	clipboard_window_refresh();
 }
 
 void
@@ -195,6 +198,9 @@ static WindowPtr g_clip_window = 0L;
 static TEHandle g_clip_te = 0L;
 static ControlHandle g_clip_vscroll = 0L;
 static ControlHandle g_clip_hscroll = 0L;
+static short g_clip_scrap_count;      /* scrapCount last shown */
+
+static void clip_update_scroll(void);
 
 static void
 clip_calc_rects(Rect *view_r, Rect *dest_r)
@@ -369,16 +375,80 @@ clip_resize(void)
 	}
 }
 
-void
-do_show_clipboard(void)
+/*
+ * clip_load_scrap - put the desk scrap's TEXT in the Clipboard
+ * window, scrolled back to the top. Port must be the window.
+ */
+static void
+clip_load_scrap(void)
 {
 	Handle scrap_h;
 	long scrap_len, scrap_offset;
+	Rect view_r, dest_r;
+
+	scrap_len = GetScrap(0L, 'TEXT', &scrap_offset);
+	if (scrap_len > 0) {
+		if (scrap_len > 4096)
+			scrap_len = 4096;
+		scrap_h = NewHandle(0);
+		if (scrap_h) {
+			/* GetScrap resizes the handle to the whole
+			 * scrap; show at most the first 4 KB */
+			GetScrap(scrap_h, 'TEXT', &scrap_offset);
+			HLock(scrap_h);
+			TESetText(*scrap_h, scrap_len, g_clip_te);
+			HUnlock(scrap_h);
+			DisposeHandle(scrap_h);
+		}
+	} else {
+		TESetText("(Clipboard is empty.)", 21,
+		    g_clip_te);
+	}
+	g_clip_scrap_count = InfoScrap()->scrapCount;
+
+	/* Back to the top-left: reset the TE rects and scroll bars */
+	clip_calc_rects(&view_r, &dest_r);
+	(*g_clip_te)->viewRect = view_r;
+	(*g_clip_te)->destRect = dest_r;
+	TECalText(g_clip_te);
+	if (g_clip_vscroll)
+		SetControlValue(g_clip_vscroll, 0);
+	if (g_clip_hscroll)
+		SetControlValue(g_clip_hscroll, 0);
+	clip_update_scroll();
+	InvalRect(&g_clip_window->portRect);
+}
+
+/*
+ * clipboard_window_refresh - if the Clipboard window is open and the
+ * scrap changed since it was filled (a Copy here, or another app's
+ * while we were suspended), show the new contents.
+ */
+void
+clipboard_window_refresh(void)
+{
+	GrafPtr save;
+
+	if (!g_clip_window || !g_clip_te)
+		return;
+	if (InfoScrap()->scrapCount == g_clip_scrap_count)
+		return;
+
+	GetPort(&save);
+	SetPort(g_clip_window);
+	clip_load_scrap();
+	SetPort(save);
+}
+
+void
+do_show_clipboard(void)
+{
 	Rect bounds, view_r, dest_r, scroll_r;
 	short mbar_h;
 	GrafPtr save;
 
 	if (g_clip_window) {
+		clipboard_window_refresh();
 		SelectWindow(g_clip_window);
 		return;
 	}
@@ -439,25 +509,7 @@ do_show_clipboard(void)
 		return;
 	}
 
-	/* Get clipboard text */
-	scrap_len = GetScrap(0L, 'TEXT', &scrap_offset);
-	if (scrap_len > 0) {
-		if (scrap_len > 4096)
-			scrap_len = 4096;
-		scrap_h = NewHandle(scrap_len);
-		if (scrap_h) {
-			GetScrap(scrap_h, 'TEXT', &scrap_offset);
-			HLock(scrap_h);
-			TESetText(*scrap_h, scrap_len, g_clip_te);
-			HUnlock(scrap_h);
-			DisposeHandle(scrap_h);
-		}
-	} else {
-		TESetText("(Clipboard is empty.)", 21,
-		    g_clip_te);
-	}
-
-	clip_update_scroll();
+	clip_load_scrap();
 	SetPort(save);
 }
 

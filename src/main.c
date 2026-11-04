@@ -1000,6 +1000,8 @@ main_event_loop(void)
 					if (convert_clip) {
 						LoadScrap();
 					}
+					/* Another app may have copied */
+					clipboard_window_refresh();
 					if (notification_posted) {
 						NMRemove(&nm_rec);
 						notification_posted = false;

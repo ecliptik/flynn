@@ -19,6 +19,10 @@ void do_select_all(void);
 /* Show Clipboard viewer window */
 void do_show_clipboard(void);
 
+/* Show the current scrap in the Clipboard window if it is open and
+ * the scrap changed (after Copy, and on resume from another app) */
+void clipboard_window_refresh(void);
+
 /* Clipboard window event handlers (called from main event loop) */
 WindowPtr clipboard_window_ptr(void);
 void clipboard_window_update(WindowPtr win);
@@ -30,6 +34,7 @@ void clipboard_window_grow(WindowPtr win, Point where);
 #define do_paste()      ((void)0)
 #define do_select_all() ((void)0)
 #define do_show_clipboard()              ((void)0)
+#define clipboard_window_refresh()       ((void)0)
 #define clipboard_window_ptr()           ((WindowPtr)0L)
 #define clipboard_window_update(w)       ((void)0)
 #define clipboard_window_close()         ((void)0)
